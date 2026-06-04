@@ -52,4 +52,14 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后，GSCore 主人触发今日老婆或娶群友时不再按每日固定结果，可重复随机抽取',
         True,
     ),
+    'DailyWifeOneBotApiUrl': GsStrConfig(
+        'OneBot HTTP API 地址',
+        '用于直抓群成员列表，留空则只使用 GSCore 成员缓存；例如 http://127.0.0.1:3000',
+        '',
+    ),
+    'DailyWifeOneBotAccessToken': GsStrConfig(
+        'OneBot HTTP API Token',
+        'OneBot HTTP API 的 access_token，没有则留空',
+        '',
+    ),
 }

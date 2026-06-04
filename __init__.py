@@ -182,7 +182,86 @@ def _valid_member_text(value: Any) -> str:
     return '' if text in {'', '1', 'None', 'none', 'null'} else text
 
 
-async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...]:
+def _onebot_api_url() -> str:
+    return str(_cfg('DailyWifeOneBotApiUrl') or '').strip().rstrip('/')
+
+
+def _onebot_access_token() -> str:
+    return str(_cfg('DailyWifeOneBotAccessToken') or '').strip()
+
+
+def _member_from_onebot_data(data: dict[str, Any]) -> MemberCandidate | None:
+    user_id = _valid_member_text(data.get('user_id'))
+    if not user_id:
+        return None
+
+    name = (
+        _valid_member_text(data.get('card'))
+        or _valid_member_text(data.get('nickname'))
+        or _valid_member_text(data.get('title'))
+        or user_id
+    )
+    avatar = _valid_member_text(data.get('avatar')) or _qq_avatar_url(user_id)
+    return MemberCandidate(name=name, user_id=user_id, avatar=avatar)
+
+
+async def _load_onebot_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...]:
+    base_url = _onebot_api_url()
+    if not base_url or not ev.group_id:
+        return ()
+
+    try:
+        import httpx
+    except Exception as exc:
+        logger.warning(f'[gs_wuwa_daily_wife] httpx 不可用，无法直抓群成员: {exc}')
+        return ()
+
+    headers: dict[str, str] = {}
+    token = _onebot_access_token()
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.post(
+                f'{base_url}/get_group_member_list',
+                json={'group_id': int(ev.group_id)},
+                headers=headers,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+    except Exception as exc:
+        logger.warning(f'[gs_wuwa_daily_wife] OneBot 直抓群成员失败，将使用缓存: {exc}')
+        return ()
+
+    if isinstance(payload, dict):
+        status = str(payload.get('status') or '').lower()
+        retcode = payload.get('retcode')
+        if status and status not in {'ok', 'async'}:
+            logger.warning(f'[gs_wuwa_daily_wife] OneBot 返回异常: {payload}')
+            return ()
+        if retcode not in {None, 0}:
+            logger.warning(f'[gs_wuwa_daily_wife] OneBot 返回异常: {payload}')
+            return ()
+        members_data = payload.get('data') or []
+    elif isinstance(payload, list):
+        members_data = payload
+    else:
+        return ()
+
+    candidates: dict[str, MemberCandidate] = {}
+    for item in members_data:
+        if not isinstance(item, dict):
+            continue
+        member = _member_from_onebot_data(item)
+        if not member or member.user_id == str(ev.bot_self_id or ''):
+            continue
+        candidates[member.user_id] = member
+
+    return tuple(sorted(candidates.values(), key=lambda item: item.user_id))
+
+
+async def _load_cached_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...]:
     if not ev.group_id:
         return ()
 
@@ -204,6 +283,13 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
     return tuple(sorted(candidates.values(), key=lambda item: item.user_id))
 
 
+async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...]:
+    direct_members = await _load_onebot_group_member_candidates(ev)
+    if direct_members:
+        return direct_members
+    return await _load_cached_group_member_candidates(ev)
+
+
 def _select_daily_member(
     rng: random.Random,
     candidates: tuple[MemberCandidate, ...],
@@ -215,20 +301,29 @@ def _build_member_text(member: MemberCandidate) -> str:
     return f'你今天的老婆是{member.name}\nQQ：{member.user_id}'
 
 
-async def _send_group_member_wife(bot: Bot, ev: Event, rng: random.Random | None = None):
+async def _send_group_member_wife(
+    bot: Bot,
+    ev: Event,
+    rng: random.Random | None = None,
+    *,
+    force_text: bool = True,
+):
     if not ev.group_id:
         return await bot.send('这个命令只能在群聊里使用。')
 
     members = await _load_group_member_candidates(ev)
     if not members:
-        return await bot.send('没有找到本群已记录成员，暂时娶不到群友。')
+        hint = '没有获取到本群成员，暂时娶不到群友。'
+        if not _onebot_api_url():
+            hint += '\n可在控制台配置 OneBot HTTP API 地址来直抓群成员；未配置时只能使用 GSCore 已记录成员缓存。'
+        return await bot.send(hint)
 
     member = _select_daily_member(rng or _event_rng(ev), members)
     logger.info(
         f'[gs_wuwa_daily_wife] user={ev.user_id} group={ev.group_id} '
         f'member={member.name} qq={member.user_id}'
     )
-    if bool(_cfg('DailyWifeSendText')):
+    if force_text or bool(_cfg('DailyWifeSendText')):
         return await bot.send([
             _build_member_text(member),
             MessageSegment.image(member.avatar),
@@ -282,7 +377,7 @@ async def _send_daily_wife(bot: Bot, ev: Event):
     if bool(_cfg('DailyWifeEnableGroupMember')) and ev.group_id:
         members = await _load_group_member_candidates(ev)
         if members and rng.random() < _group_member_probability():
-            return await _send_group_member_wife(bot, ev, rng)
+            return await _send_group_member_wife(bot, ev, rng, force_text=False)
 
     role = rng.choice(candidates)
     image = rng.choice(role.images)
