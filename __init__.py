@@ -365,7 +365,7 @@ def _get_event_target_user_id(ev: Event) -> str | None:
 
             if isinstance(value, bool):
                 continue
-            
+
             v_str = str(value).strip()
             if v_str and v_str.lower() not in ('none', 'true', 'false', 'all'):
                 match = re.search(r'(\d{5,20})', v_str)
