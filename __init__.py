@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
+from urllib.request import Request, urlopen
 
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
@@ -30,6 +31,7 @@ Plugins(
 sv = SV('鸣潮今日老婆')
 BASE_DIR = Path(__file__).parent
 CACHE_TTL_SECONDS = 300
+MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
 # 本地图片读取相关常量
 ROLE_MAP_RE = re.compile(r'^\s*(\d+)\s*[:：]\s*(.+?)\s*$')
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'}
@@ -389,15 +391,40 @@ def _valid_member_text(value: Any) -> str:
     return text
 
 
+def _qq_avatar_url(user_id: str) -> str:
+    return f'https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640'
+
+
 def _member_avatar_cache_path(user_id: str) -> Path:
     safe_user_id = re.sub(r'[^0-9A-Za-z_-]+', '_', str(user_id)) or 'unknown'
     return BASE_DIR / 'group_member_avatar_cache' / f'{safe_user_id}.jpg'
 
 
-def _usable_cached_avatar(path: Path) -> bool:
+def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
     try:
-        return path.is_file() and path.stat().st_size > 0
+        if not path.is_file() or path.stat().st_size <= 0:
+            return False
+        if check_ttl and time.time() - path.stat().st_mtime > MEMBER_AVATAR_CACHE_SECONDS:
+            return False
+        return True
     except Exception:
+        return False
+
+
+def _download_avatar(url: str, path: Path) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        request = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urlopen(request, timeout=8) as response:
+            data = response.read(2 * 1024 * 1024 + 1)
+        if not data or len(data) > 2 * 1024 * 1024:
+            return False
+        tmp_path = path.with_suffix('.tmp')
+        tmp_path.write_bytes(data)
+        tmp_path.replace(path)
+        return True
+    except Exception as exc:
+        logger.warning(f'[gs_wuwa_daily_wife] 下载群友头像失败: {url} -> {exc}')
         return False
 
 
@@ -407,15 +434,19 @@ def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
         return str(cache_path)
 
     source = _valid_member_text(avatar_source)
-    if not source or source.startswith(('http://', 'https://')):
-        return ''
+    if source and not source.startswith(('http://', 'https://')):
+        try:
+            local_path = Path(source)
+            if local_path.is_file():
+                return str(local_path)
+        except Exception:
+            pass
 
-    try:
-        local_path = Path(source)
-        if local_path.is_file():
-            return str(local_path)
-    except Exception:
-        pass
+    if str(user_id).isdigit() and _download_avatar(_qq_avatar_url(str(user_id)), cache_path):
+        return str(cache_path)
+
+    if _usable_cached_avatar(cache_path, check_ttl=False):
+        return str(cache_path)
     return ''
 
 
@@ -459,8 +490,10 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
     return tuple(sorted(result.values(), key=lambda item: (item.name, item.user_id)))
 
 
-async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCandidate:
+async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCandidate | None:
     avatar = await asyncio.to_thread(_resolve_member_avatar, member.user_id, member.avatar)
+    if not avatar:
+        return None
     return MemberCandidate(member.name, member.user_id, avatar)
 
 
@@ -471,7 +504,9 @@ async def _pick_group_member(ev: Event, rng: random.Random) -> MemberCandidate |
 
     rng.shuffle(candidates)
     for member in candidates:
-        return await _resolve_member_candidate_avatar(member)
+        resolved = await _resolve_member_candidate_avatar(member)
+        if resolved is not None:
+            return resolved
     return None
 
 

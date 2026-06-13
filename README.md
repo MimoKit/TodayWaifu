@@ -6,7 +6,7 @@
 
 GSCore / GsUID 版鸣潮“今日老婆”插件。
 
-插件的鸣潮角色图片只从本地角色图片目录读取，配合角色 ID 对照表抽取，不再依赖画廊接口。若开启抽群友功能，群友头像只使用 GSCore 缓存的本地头像路径或插件本地头像缓存，不会把群友 QQ 号发给外部头像接口。
+插件的鸣潮角色图片只从本地角色图片目录读取，配合角色 ID 对照表抽取，不再依赖画廊接口。若开启抽群友功能，群友头像会优先使用 GSCore 缓存或本地头像缓存；没有可用头像时，会用群友 QQ 号请求 QQ 头像接口并缓存到本地后发送。
 
 ## 插件目录
 
@@ -88,7 +88,7 @@ custom_role_pile/
 CoreUser.get_group_all_user(str(ev.group_id))
 ```
 
-插件不会恢复旧版 OneBot HTTP 获取群成员逻辑。头像只使用 `CoreUser.user_icon` 里已经存在的本地图片路径，或者插件本地缓存目录中已存在的头像文件：
+插件不会恢复旧版 OneBot HTTP 获取群成员逻辑。头像优先使用 `CoreUser.user_icon` 中可用的本地图片路径；没有可用本地头像时，使用群友 QQ 号请求 QQ 头像接口，并下载到插件本地缓存目录后再发送：
 
 ```text
 group_member_avatar_cache/{user_id}.jpg
@@ -97,7 +97,7 @@ group_member_avatar_cache/{user_id}.jpg
 相关规则：
 
 - `DailyWifeEnableGroupMember` 开启后，`今日老婆` 才会按 `DailyWifeGroupMemberProbability` 概率抽群友；
-- 概率没有命中或群成员缓存为空时，`今日老婆` 会自动回退为正常抽鸣潮女角色；如果群友没有可用本地头像，则只发送文字；
+- 概率没有命中、群成员缓存为空或头像获取失败时，`今日老婆` 会自动回退为正常抽鸣潮女角色；
 - `DailyWifeMarryGroupMemberEnabled` 开启后，可直接使用 `娶群友` 命令随机抽本群群友；
 - 群友候选会排除触发者自己和机器人账号；
 - 群友头像缓存目录已加入 `.gitignore`，不会提交到仓库。
