@@ -31,6 +31,7 @@ sv = SV('鸣潮今日老婆')
 BASE_DIR = Path(__file__).parent
 CACHE_TTL_SECONDS = 300
 MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
+LIST_FORWARD_THRESHOLD = 10
 
 # --- 日志前缀 ---
 LOG_PREFIX = '[鸣潮今日老婆]'
@@ -807,14 +808,14 @@ def _save_daily_wife_record(
     _save_wife_data(data)
 
 
-async def _wife_list_text(ev: Event, mode: str = 'wife') -> str:
+async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
     bucket = 'husbands' if mode == 'husband' else 'wives'
     title = '老公' if mode == 'husband' else '老婆'
     data = _load_wife_data()
     context = _get_today_context(data, ev)
     wives = context.get(bucket, {})
     if not isinstance(wives, dict) or not wives:
-        return f'今天本群还没有人抽{title}。'
+        return f'今天本群还没有人抽{title}。', []
 
     group_display_names = await _load_group_display_names(ev)
     data_changed = False
@@ -848,15 +849,26 @@ async def _wife_list_text(ev: Event, mode: str = 'wife') -> str:
         items.append((order, display_name, wife_name))
 
     if not items:
-        return f'今天本群还没有可用的{title}记录。'
+        return f'今天本群还没有可用的{title}记录。', []
 
     if data_changed:
         _save_wife_data(data)
 
     items.sort(key=lambda item: (item[0], item[1]))
-    lines = [f'今日{title}列表：']
+    return f'今日{title}列表：', items
+
+
+def _wife_list_text_from_items(title_text: str, items: list[tuple[int, str, str]]) -> str:
+    if not items:
+        return title_text
+    lines = [title_text]
     lines.extend(f'{index}. {display_name} → {wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1))
     return '\n'.join(lines)
+
+
+async def _wife_list_text(ev: Event, mode: str = 'wife') -> str:
+    title_text, items = await _wife_list_items(ev, mode)
+    return _wife_list_text_from_items(title_text, items)
 
 
 async def _send_role_image(
@@ -1061,7 +1073,13 @@ async def _send_rob_wife(bot: Bot, ev: Event):
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
-    await bot.send(await _wife_list_text(ev, mode))
+    title_text, items = await _wife_list_items(ev, mode)
+    if len(items) > LIST_FORWARD_THRESHOLD:
+        nodes = [title_text]
+        nodes.extend(f'{index}. {display_name} → {wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1))
+        await bot.send(MessageSegment.node(nodes))
+        return
+    await bot.send(_wife_list_text_from_items(title_text, items))
 
 
 @sv.on_prefix(('今日老婆', '娶婆娘'), block=True)
