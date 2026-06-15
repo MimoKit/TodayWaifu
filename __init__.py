@@ -1430,6 +1430,14 @@ def _build_rob_success_text(role: RoleCandidate, target_user_id: str) -> str:
     )
 
 
+def _build_gift_success_text(role: RoleCandidate, target_user_id: str) -> str:
+    return str(_cfg('DailyWifeGiftSuccessTemplate') or '你把今天的老婆{name}送给了对方！').format(
+        name=role.name,
+        role_id='/'.join(role.role_ids),
+        target=target_user_id,
+    )
+
+
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
     if mode == 'husband':
         template = str(_cfg('DailyHusbandTextTemplate') or '你今天的老公是{name}')
@@ -1558,6 +1566,8 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             order = 0
         if raw_record.get('stolen_by'):
             wife_name = '被抢走了~'
+        elif raw_record.get('gifted_to'):
+            wife_name = '送出去了~'
         else:
             wife_name = record.name
 
@@ -1715,6 +1725,12 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已被抢，拒绝分配新角色')
             return await _send_prefixed(bot,f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
 
+        if isinstance(current_record, dict) and current_record.get('gifted_to'):
+            wife_name = current_record.get('name', '老婆')
+            gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')
+            logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已送出，拒绝分配新角色')
+            return await _send_prefixed(bot,f'你的{wife_name}已经送给{gifted_to_name}了，今天就先忍忍吧~')
+
     record: WifeRecord | None = None
 
     if is_debug_active:
@@ -1799,6 +1815,11 @@ async def _send_rob_wife(bot: Bot, ev: Event):
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
+
+    target_data = context['wives'].get(_user_key(ev, target_user_id))
+    if isinstance(target_data, dict) and target_data.get('gifted_to'):
+        return await _send_prefixed(bot, '对方的老婆已经送出去了，抢不到了哦~')
+
     attempts = context.setdefault('rob_attempts', {})
     is_master = _is_master(ev)
     
@@ -1828,6 +1849,55 @@ async def _send_rob_wife(bot: Bot, ev: Event):
     role = target_record.to_role()
     text = _build_rob_success_text(role, target_user_id)
     await _send_role_image(bot, role, target_record.image, text, robber_id)
+
+
+async def _send_gift_wife(bot: Bot, ev: Event):
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 发起了送老婆操作')
+    if not _cfg_bool('DailyWifeGiftEnabled', True):
+        return await _send_prefixed(bot, '送老婆功能当前已关闭。')
+
+    target_user_id = _get_event_target_user_id(ev)
+    if not target_user_id:
+        return await _send_prefixed(bot, '要送给谁？请艾特对方或在命令后面写对方 QQ。')
+
+    giver_id = _user_key(ev)
+    if target_user_id == giver_id:
+        return await _send_prefixed(bot, '不能把老婆送给自己哦！')
+
+    giver_record = _get_existing_daily_wife_record(ev, giver_id)
+    if giver_record is None:
+        return await _send_prefixed(bot, '你今天还没有老婆，先去抽一个吧~')
+    if giver_record.record_type == 'member':
+        return await _send_prefixed(bot, '群友老婆不能送出去哦~')
+
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+
+    giver_data = context['wives'].get(giver_id)
+    if isinstance(giver_data, dict) and giver_data.get('stolen_by'):
+        return await _send_prefixed(bot, '你的老婆已经被抢走了，没有老婆可以送了~')
+    if isinstance(giver_data, dict) and giver_data.get('gifted_to'):
+        return await _send_prefixed(bot, '你今天已经把老婆送出去了~')
+
+    target_existing = context['wives'].get(target_user_id)
+    if isinstance(target_existing, dict) and target_existing.get('name'):
+        if not target_existing.get('stolen_by') and not target_existing.get('gifted_to'):
+            return await _send_prefixed(bot, '对方今天已经有老婆了，不需要你送哦~')
+
+    logger.info(f'{LOG_PREFIX} 用户 {giver_id} 把老婆送给了 {target_user_id}')
+    context['wives'][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
+    context['wives'][target_user_id]['gifted_from'] = giver_id
+
+    giver_name = _user_display_name(ev, giver_id)
+    if isinstance(context['wives'].get(giver_id), dict):
+        context['wives'][giver_id]['gifted_to'] = target_user_id
+        context['wives'][giver_id]['gifted_to_name'] = _user_display_name(ev, target_user_id)
+
+    _save_wife_data(data)
+
+    role = giver_record.to_role()
+    text = _build_gift_success_text(role, target_user_id)
+    await _send_role_image(bot, role, giver_record.image, text, giver_id)
 
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
@@ -2077,6 +2147,16 @@ async def rob_wife(bot: Bot, ev: Event):
 @sv.on_fullmatch(('抢老婆', '抢今日老婆', '抢婆娘'), block=True)
 async def rob_wife_at(bot: Bot, ev: Event):
     await _send_rob_wife(bot, ev)
+
+
+@sv.on_prefix(('送老婆', '送今日老婆'), block=True)
+async def gift_wife(bot: Bot, ev: Event):
+    await _send_gift_wife(bot, ev)
+
+
+@sv.on_fullmatch(('送老婆', '送今日老婆'), block=True)
+async def gift_wife_at(bot: Bot, ev: Event):
+    await _send_gift_wife(bot, ev)
 
 
 # 注册到 GsCore 帮助一览页（core帮助）

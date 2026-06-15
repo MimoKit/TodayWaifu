@@ -119,4 +119,14 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID',
         '抢老婆成功！你把对方今天的老婆{name}抢过来了！',
     ),
+    'DailyWifeGiftEnabled': GsBoolConfig(
+        '启用送老婆',
+        '开启后可使用「送老婆 @对方」命令，把自己今天的老婆送给对方',
+        True,
+    ),
+    'DailyWifeGiftSuccessTemplate': GsStrConfig(
+        '送老婆成功提示',
+        '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收方用户 ID',
+        '你把今天的老婆{name}送给了对方！',
+    ),
 }

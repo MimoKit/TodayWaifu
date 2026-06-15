@@ -17,6 +17,7 @@
 - `今日萝莉`：从本地萝莉图库随机发一张，与老婆/老公/群友完全独立。
 - `娶群友`：只抽群友，不依赖 XWUID。
 - `抢老婆 @对方`：抢走对方当天抽到的鸣潮角色老婆。
+- `送老婆 @对方`：把自己今天的老婆送给对方。
 - `老婆列表` / `老公列表`：查看本群当天记录。
 - `今日老婆帮助`：发送图文帮助卡片，并注册到 GSCore「core帮助」一览页。
 - 主人命令：创建 / 上传 / 查看 / 删除自定义老婆图片；下载 / 删除萝莉图库。
@@ -32,6 +33,7 @@
 | `今日萝莉` | 从萝莉图库随机发一张 | 需先由主人「下载萝莉图片」 |
 | `娶群友` | 只抽群友 | `DailyWifeMarryGroupMemberEnabled` |
 | `抢老婆 @对方` / `抢今日老婆` / `抢婆娘` | 抢对方当天老婆，每天一次 | `DailyWifeRobEnabled` |
+| `送老婆 @对方` / `送今日老婆` | 把自己今天的老婆送给对方 | `DailyWifeGiftEnabled` |
 | `老婆列表` / `今日老婆列表` | 查看本群今日老婆记录 | 无 |
 | `老公列表` / `今日老公列表` | 查看本群今日老公记录 | 无 |
 | `今日老婆帮助` | 发送图文帮助卡片 | 无 |
@@ -143,6 +145,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 今日老婆 | 本地模式依赖；图库模式不依赖 | 本地读取角色图片，图库从接口获取 |
 | 今日老公 | 仅本地模式可用 | 图库模式下禁用并提示 |
 | 抢老婆 | 是 | 抢的是别人当天抽到的鸣潮角色老婆 |
+| 送老婆 | 是 | 送的是自己当天抽到的鸣潮角色老婆 |
 | 老婆列表 / 老公列表 | 间接依赖 | 记录来自抽取结果 |
 | 今日老婆概率抽群友 / 娶群友 | 否 | 使用 GSCore 群成员缓存和 QQ 头像 |
 | 今日萝莉 | 否 | 使用独立萝莉图库目录 |
@@ -168,8 +171,9 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | `DailyWifeHusbandEnabled` | 关闭 | 是否启用 `今日老公` |
 | `DailyWifeRobEnabled` | 开启 | 是否启用抢老婆 |
 | `DailyWifeRobSuccessRate` | `0.5` | 抢老婆成功概率 |
+| `DailyWifeGiftEnabled` | 开启 | 是否启用送老婆 |
 
-文字模板类配置（`DailyWifeTextTemplate` / `DailyHusbandTextTemplate` / `DailyWifeGroupMemberTextTemplate` / `DailyWifeMarryGroupMemberTextTemplate` / `DailyWifeRobSuccessTemplate`）可在控制台自定义提示文案，支持 `{name}`、`{role_id}`、`{user_id}`、`{target}` 等变量。
+文字模板类配置（`DailyWifeTextTemplate` / `DailyHusbandTextTemplate` / `DailyWifeGroupMemberTextTemplate` / `DailyWifeMarryGroupMemberTextTemplate` / `DailyWifeRobSuccessTemplate` / `DailyWifeGiftSuccessTemplate`）可在控制台自定义提示文案，支持 `{name}`、`{role_id}`、`{user_id}`、`{target}` 等变量。
 
 ## 帮助图自定义
 
