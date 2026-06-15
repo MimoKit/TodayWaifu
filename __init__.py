@@ -18,9 +18,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from PIL import Image
+
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
 from gsuid_core.data_store import get_res_path
+from gsuid_core.help.utils import register_help
 from gsuid_core.logger import logger
 from gsuid_core.models import Event, Message
 from gsuid_core.segment import MessageSegment
@@ -38,6 +41,7 @@ Plugins(
 sv = SV('鸣潮今日老婆')
 upload_sv = SV('鸣潮今日老婆上传', pm=1)
 BASE_DIR = Path(__file__).parent
+HELP_IMAGE_PATH = BASE_DIR / 'help.png'
 DEFAULT_GALLERY_API_URL = 'https://img.xlinxc.cn/api/xwuid/roles'
 CACHE_TTL_SECONDS = 300
 MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
@@ -2006,6 +2010,14 @@ async def delete_loli_images(bot: Bot, ev: Event):
     await _send_delete_loli_images(bot, ev)
 
 
+@sv.on_fullmatch('今日老婆帮助', block=True)
+async def daily_wife_help(bot: Bot, ev: Event):
+    if not HELP_IMAGE_PATH.is_file():
+        logger.warning(f'{LOG_PREFIX} 帮助图片不存在: {HELP_IMAGE_PATH}')
+        return await bot.send('帮助图片缺失，请联系管理员。')
+    await bot.send(MessageSegment.image(HELP_IMAGE_PATH))
+
+
 @sv.on_fullmatch('今日萝莉', block=True)
 async def daily_loli(bot: Bot, ev: Event):
     await _send_loli_image(bot, ev)
@@ -2064,3 +2076,12 @@ async def rob_wife(bot: Bot, ev: Event):
 @sv.on_fullmatch(('抢老婆', '抢今日老婆', '抢婆娘'), block=True)
 async def rob_wife_at(bot: Bot, ev: Event):
     await _send_rob_wife(bot, ev)
+
+
+# 注册到 GsCore 帮助一览页（core帮助）
+if HELP_IMAGE_PATH.is_file():
+    try:
+        with Image.open(HELP_IMAGE_PATH) as _help_icon:
+            register_help('TodayWaifu', '今日老婆帮助', _help_icon.copy())
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 注册插件帮助失败: {exc}')
