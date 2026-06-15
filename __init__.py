@@ -47,7 +47,6 @@ UPLOAD_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 CUSTOM_ROLE_DELETE_CONFIRM_SECONDS = 120
 LOLI_IMAGE_REPO_ZIP_URL = 'https://github.com/nnlmc/waifu-gallery/raw/main/img.zip'
 LOLI_IMAGE_ZIP_MAX_BYTES = 200 * 1024 * 1024
-LOLI_IMAGE_TMP_NAME = 'loli_images.tmp'
 LOLI_IMAGE_DIR_NAME = 'loli_images'
 
 # --- 日志前缀 ---
@@ -193,7 +192,7 @@ def _cfg_bool(key: str, default: bool = False) -> bool:
     value = _cfg(key)
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
+    if isinstance(value, int):
         return bool(value)
     if isinstance(value, str):
         text = value.strip().lower()
@@ -256,10 +255,6 @@ def _custom_upload_role_pile_root() -> Path:
 
 def _loli_image_root() -> Path:
     return _custom_upload_data_root() / LOLI_IMAGE_DIR_NAME
-
-
-def _loli_image_tmp_root() -> Path:
-    return _custom_upload_data_root() / LOLI_IMAGE_TMP_NAME
 
 
 def _writable_role_map_path() -> Path:
@@ -977,7 +972,7 @@ def _extract_loli_images(zip_path: Path) -> LoliImageDownloadResult:
 
 
 def _download_and_extract_loli_images() -> LoliImageDownloadResult:
-    zip_path = _custom_upload_data_root() / 'loli_images.zip.tmp'
+    zip_path = _custom_upload_data_root() / f'loli_images.{int(time.time() * 1000)}.zip.tmp'
     try:
         _download_loli_zip(zip_path)
         return _extract_loli_images(zip_path)
@@ -1052,7 +1047,7 @@ def _event_rng(ev: Event) -> random.Random:
 
 
 def _wife_data_path() -> Path:
-    return BASE_DIR / 'daily_wife_data.json'
+    return _custom_upload_data_root() / 'daily_wife_data.json'
 
 
 def _today_key() -> str:
@@ -1139,7 +1134,7 @@ def _qq_avatar_url(user_id: str) -> str:
 
 def _member_avatar_cache_path(user_id: str) -> Path:
     safe_user_id = re.sub(r'[^0-9A-Za-z_-]+', '_', str(user_id)) or 'unknown'
-    return BASE_DIR / 'group_member_avatar_cache' / f'{safe_user_id}.jpg'
+    return _custom_upload_data_root() / 'group_member_avatar_cache' / f'{safe_user_id}.jpg'
 
 
 def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
@@ -1284,6 +1279,16 @@ async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, r
 
 def _load_wife_data() -> dict[str, Any]:
     path = _wife_data_path()
+    if not path.is_file():
+        # 兼容旧版本：把插件目录下的数据文件一次性迁移到 data 目录
+        legacy = BASE_DIR / 'daily_wife_data.json'
+        if legacy.is_file():
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(legacy.read_bytes())
+                logger.info(f'{LOG_PREFIX} 已迁移旧数据文件到 data 目录: {path}')
+            except OSError as exc:
+                logger.warning(f'{LOG_PREFIX} 迁移旧数据文件失败: {exc}')
     if not path.is_file():
         logger.debug(f'{LOG_PREFIX} 数据文件不存在，将创建新数据')
         return {'days': {}}
@@ -1457,42 +1462,51 @@ async def _ensure_daily_wife_record(
 ) -> WifeRecord | None:
     bucket = 'husbands' if mode == 'husband' else 'wives'
     salt = 'husband' if mode == 'husband' else ''
+    key = _user_key(ev, user_id)
+
+    # 快速路径：当天已有记录直接返回
     data = _load_wife_data()
     context = _get_today_context(data, ev)
-    key = _user_key(ev, user_id)
     current = context[bucket].get(key)
-    
     if isinstance(current, dict):
         record = _record_from_dict(current)
         if record is not None:
             logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
             return record
 
+    # 准备阶段：含 await，先不持有待写入的 data，避免覆盖期间其它协程的写入
+    chosen: WifeRecord | None = None
     if mode == 'wife':
-        member_record = await _roll_group_member_wife(ev, key)
-        if member_record is not None:
-            context[bucket][key] = _record_to_dict(member_record, ev, key)
-            _save_wife_data(data)
-            return member_record
+        chosen = await _roll_group_member_wife(ev, key)
 
-    candidates, error = await _load_candidates()
-    if error or not candidates:
-        logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
-        return None
-    candidates = _filter_by_mode(candidates, mode)
-    if not candidates:
-        logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
-        return None
+    if chosen is None:
+        candidates, error = await _load_candidates()
+        if error or not candidates:
+            logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
+            return None
+        candidates = _filter_by_mode(candidates, mode)
+        if not candidates:
+            logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
+            return None
+        rng = _daily_rng(ev, key, salt)
+        role = rng.choice(candidates)
+        image = rng.choice(role.images)
+        chosen = WifeRecord.from_role(role, image)
 
-    rng = _daily_rng(ev, key, salt)
-    role = rng.choice(candidates)
-    image = rng.choice(role.images)
-    record = WifeRecord.from_role(role, image)
-    
-    logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的 {mode}: {record.name}')
-    context[bucket][key] = _record_to_dict(record, ev, key)
+    # 写入阶段：重新加载并二次校验，整段不含 await，事件循环下保证原子
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    existing = context[bucket].get(key)
+    if isinstance(existing, dict):
+        existing_record = _record_from_dict(existing)
+        if existing_record is not None:
+            logger.debug(f'{LOG_PREFIX} 写入前发现已有 {mode} 记录，直接复用: {existing_record.name}')
+            return existing_record
+
+    logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的 {mode}: {chosen.name}')
+    context[bucket][key] = _record_to_dict(chosen, ev, key)
     _save_wife_data(data)
-    return record
+    return chosen
 
 
 def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord | None:
@@ -1502,17 +1516,6 @@ def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord
     if isinstance(current, dict):
         return _record_from_dict(current)
     return None
-
-
-def _save_daily_wife_record(
-    ev: Event, record: WifeRecord, user_id: str | int | None = None, mode: str = 'wife'
-) -> None:
-    bucket = 'husbands' if mode == 'husband' else 'wives'
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    key = _user_key(ev, user_id)
-    context[bucket][key] = _record_to_dict(record, ev, key)
-    _save_wife_data(data)
 
 
 async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
@@ -1707,37 +1710,34 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已被抢，拒绝分配新角色')
             return await _send_prefixed(bot,f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
 
-    candidates, error = await _load_candidates()
-    if error or not candidates:
-        return await _send_prefixed(bot,error or '没有找到可用角色。')
-
-    candidates = _filter_by_mode(candidates, mode)
-    if not candidates:
-        return await _send_prefixed(bot,f'没有找到可用的{title}角色。')
-
     record: WifeRecord | None = None
 
     if is_debug_active:
         logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
+        candidates, error = await _load_candidates()
+        if error or not candidates:
+            return await _send_prefixed(bot, error or '没有找到可用角色。')
+        candidates = _filter_by_mode(candidates, mode)
+        if not candidates:
+            return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
         if specified_name:
             target_candidates = [c for c in candidates if c.name == specified_name]
             if not target_candidates:
-                return await _send_prefixed(bot,f'未找到名为“{specified_name}”的{title}角色。')
+                return await _send_prefixed(bot, f'未找到名为“{specified_name}”的{title}角色。')
             role = target_candidates[0]
         else:
             role = random.choice(candidates)
-            
+
         image = random.choice(role.images)
         record = WifeRecord.from_role(role, image)
     else:
         if specified_name:
             logger.warning(f'{LOG_PREFIX} 普通用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝')
-            return await _send_prefixed(bot,f'只有在 Debug 模式下主人才能指定{title}哦。')
+            return await _send_prefixed(bot, f'只有在 Debug 模式下主人才能指定{title}哦。')
 
         record = await _ensure_daily_wife_record(ev, mode=mode)
         if record is None:
-            return await _send_prefixed(bot,f'没有找到可用的{title}角色。')
-        _save_daily_wife_record(ev, record, mode=mode)
+            return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
 
     if record.record_type == 'member':
         member = record.to_member()
