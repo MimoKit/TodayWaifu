@@ -1515,6 +1515,42 @@ def _record_from_dict(data: dict[str, Any]) -> WifeRecord | None:
     return record
 
 
+# —— 老婆状态单一判定（四个流程统一调用，避免各处口径不一致）——
+# 沿用现有标记位，不新增持久化字段、不迁移历史数据：
+#   stolen_by / gifted_to ：记录已离手（被抢走 / 送出去），原主变“空”
+#   stolen_from / gifted_from ：记录来源（抢来的 / 别人送的），即“二手”
+def _wife_state(raw: Any) -> str:
+    """返回老婆记录的持有状态：owned 正常持有 / lost_stolen 被抢走 / lost_gifted 送出去。"""
+    if not isinstance(raw, dict):
+        return 'owned'
+    if raw.get('stolen_by'):
+        return 'lost_stolen'
+    if raw.get('gifted_to'):
+        return 'lost_gifted'
+    return 'owned'
+
+
+def _wife_origin(raw: Any) -> str:
+    """返回老婆记录的来源：self 自己抽到 / robbed 抢来的 / gifted 别人送的。"""
+    if not isinstance(raw, dict):
+        return 'self'
+    if raw.get('stolen_from'):
+        return 'robbed'
+    if raw.get('gifted_from'):
+        return 'gifted'
+    return 'self'
+
+
+def _is_secondhand_wife(raw: Any) -> bool:
+    """二手老婆 = 抢来的或别人送的（到手即终结，不能再流转）。"""
+    return _wife_origin(raw) in ('robbed', 'gifted')
+
+
+def _has_active_wife(raw: Any) -> bool:
+    """是否仍持有一个有效（未离手）的老婆。"""
+    return isinstance(raw, dict) and bool(raw.get('name')) and _wife_state(raw) == 'owned'
+
+
 def _get_event_target_user_id(ev: Event) -> str | None:
     for attr in ('at_list', 'at', 'target_id', 'target_user_id'):
         value = getattr(ev, attr, None)
@@ -1948,9 +1984,10 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             order = int(updated_at)
         except (TypeError, ValueError):
             order = 0
-        if raw_record.get('stolen_by'):
+        state = _wife_state(raw_record)
+        if state == 'lost_stolen':
             wife_name = '被抢走了~'
-        elif raw_record.get('gifted_to'):
+        elif state == 'lost_gifted':
             wife_name = '送出去了~'
         else:
             wife_name = record.name
@@ -2128,13 +2165,14 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         user_key = _user_key(ev)
         current_record = context['wives'].get(user_key)
 
-        if isinstance(current_record, dict) and current_record.get('stolen_by'):
+        # 离手即结算：被抢走 / 送出去后当天锁死，不再分配新角色
+        state = _wife_state(current_record)
+        if state == 'lost_stolen':
             wife_name = current_record.get('name', '老婆')
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已被抢，拒绝分配新角色')
             return await _send_prefixed(bot,f'你的{wife_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
-
-        if isinstance(current_record, dict) and current_record.get('gifted_to'):
+        if state == 'lost_gifted':
             wife_name = current_record.get('name', '老婆')
             gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆已送出，拒绝分配新角色')
@@ -2226,8 +2264,12 @@ async def _send_rob_wife(bot: Bot, ev: Event):
     context = _get_today_context(data, ev)
 
     target_data = context['wives'].get(_user_key(ev, target_user_id))
-    if isinstance(target_data, dict) and target_data.get('gifted_to'):
-        return await _send_prefixed(bot, '对方的老婆已经送出去了，抢不到了哦~')
+    # 离手即结算：对方老婆已被抢走 / 已送出，不能再抢（堵死复制 BUG 与链式抢）
+    if _wife_state(target_data) != 'owned':
+        return await _send_prefixed(bot, '对方的老婆已经不在身边了，抢不到了哦~')
+    # 到手即终结：抢来的 / 别人送的老婆不能再被抢走
+    if _is_secondhand_wife(target_data):
+        return await _send_prefixed(bot, '对方这个老婆是抢来或别人送的，抢不动哦~')
 
     attempts = context.setdefault('rob_attempts', {})
     is_master = _is_master(ev)
@@ -2283,15 +2325,20 @@ async def _send_gift_wife(bot: Bot, ev: Event):
     context = _get_today_context(data, ev)
 
     giver_data = context['wives'].get(giver_id)
-    if isinstance(giver_data, dict) and giver_data.get('stolen_by'):
+    # 离手即结算：自己的老婆已被抢走 / 已送出，没有老婆可送
+    giver_state = _wife_state(giver_data)
+    if giver_state == 'lost_stolen':
         return await _send_prefixed(bot, '你的老婆已经被抢走了，没有老婆可以送了~')
-    if isinstance(giver_data, dict) and giver_data.get('gifted_to'):
+    if giver_state == 'lost_gifted':
         return await _send_prefixed(bot, '你今天已经把老婆送出去了~')
+    # 到手即终结：抢来的 / 别人送的老婆不能再送出去
+    if _is_secondhand_wife(giver_data):
+        return await _send_prefixed(bot, '这个老婆是抢来或别人送的，不能再送出去哦~')
 
+    # 对方仍持有有效老婆时不需要再送（被抢走/送出后变“空”才可接收）
     target_existing = context['wives'].get(target_user_id)
-    if isinstance(target_existing, dict) and target_existing.get('name'):
-        if not target_existing.get('stolen_by') and not target_existing.get('gifted_to'):
-            return await _send_prefixed(bot, '对方今天已经有老婆了，不需要你送哦~')
+    if _has_active_wife(target_existing):
+        return await _send_prefixed(bot, '对方今天已经有老婆了，不需要你送哦~')
 
     logger.info(f'{LOG_PREFIX} 用户 {giver_id} 把老婆送给了 {target_user_id}')
     context['wives'][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
