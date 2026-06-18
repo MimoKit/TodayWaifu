@@ -248,13 +248,11 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             context['safe_wives'][user_key]['safe'] = True
             _save_wife_data(data)
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆被抢，补偿抽取: {safe_wife.name}')
-            await _send_prefixed(
-                bot,
-                f'你的{wife_name}已经被{stolen_by_name}抢走了…\n'
-                f'但你迎来了新的{title}{safe_wife.name}！\n'
-                f'（补偿老婆不能被抢也不能送哦）',
+            return await _send_role_image(
+                bot, safe_wife.to_role(), safe_wife.image,
+                text=f'你的{wife_name}已经被{stolen_by_name}抢走了…\n但你迎来了新的{title}{safe_wife.name}！',
+                user_id=ev.user_id,
             )
-            return await _send_record_image(bot, safe_wife, mode, ev.user_id)
         if state == 'lost_gifted':
             wife_name = current_record.get('name', '老婆')
             gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')

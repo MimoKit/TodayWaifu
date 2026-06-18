@@ -46,6 +46,9 @@ async def _send_rob_wife(bot: Bot, ev: Event):
     target_data = context['wives'].get(_user_key(ev, target_user_id))
     # 离手即结算：对方老婆已被抢走 / 已送出，不能再抢（堵死复制 BUG 与链式抢）
     if _wife_state(target_data) != 'owned':
+        # 对方有补偿老婆，给更明确提示
+        if isinstance(context.get('safe_wives', {}).get(_user_key(ev, target_user_id)), dict):
+            return await _send_prefixed(bot, '对方这个是补偿老婆，抢不动哦~')
         return await _send_prefixed(bot, '对方的老婆已经不在身边了，抢不到了哦~')
     # 到手即终结：抢来的 / 别人送的老婆不能再被抢走
     if _is_secondhand_wife(target_data):
