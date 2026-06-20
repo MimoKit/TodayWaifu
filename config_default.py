@@ -95,6 +95,16 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
         '你娶到的群友是{name}',
     ),
+    'DailyWifeMarryOwnerEnabled': GsBoolConfig(
+        '启用娶群主',
+        '开启后可使用「娶群主」命令；群主身份靠群主自己发过消息后被插件记下来识别，从未发言过的群主识别不到',
+        False,
+    ),
+    'DailyWifeMarryOwnerTextTemplate': GsStrConfig(
+        '娶群主文字模板',
+        '「娶群主」命令的文字说明模板，可用变量：{name} 群主昵称，{user_id} 群主 QQ',
+        '你娶到的群主是{name}',
+    ),
     'DailyWifeHusbandEnabled': GsBoolConfig(
         '启用今日老公',
         '开启后可使用「今日老公」命令，只抽取男角色；关闭后命令不生效',

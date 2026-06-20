@@ -23,6 +23,8 @@ def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
 def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
     if mode == 'marry':
         template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}')
+    elif mode == 'marry_owner':
+        template = str(_cfg('DailyWifeMarryOwnerTextTemplate') or '你娶到的群主是{name}')
     else:
         template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天的老婆是{name}')
     lines = [template.format(name=member.name, user_id=member.user_id)]
@@ -322,6 +324,29 @@ async def _send_group_member_wife(bot: Bot, ev: Event):
     await _send_local_image(bot, member.avatar, '本地群友头像文件不存在，请稍后重试。', text, ev.user_id)
 
 
+async def _send_group_owner_wife(bot: Bot, ev: Event):
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群主命令')
+    if not _marry_owner_enabled():
+        return await _send_prefixed(bot, '娶群主功能当前已关闭。')
+    if not ev.group_id:
+        return await _send_prefixed(bot, '这个命令只能在群聊里使用。')
+
+    owner = _get_recorded_owner(ev)
+    if owner is None:
+        return await _send_prefixed(bot, '暂时还没有识别到本群群主，等群主发一条消息后再试试吧。')
+
+    resolved = await _resolve_member_candidate_avatar(owner)
+    if resolved is None:
+        return await _send_prefixed(bot, '群主头像获取失败，请稍后重试。')
+
+    logger.info(
+        f'{LOG_PREFIX} marry_owner user={ev.user_id} group={ev.group_id} '
+        f'owner={resolved.name} qq={resolved.user_id} avatar={resolved.avatar}'
+    )
+    text = _build_member_text(resolved, 'marry_owner') if bool(_cfg('DailyWifeSendText')) else None
+    await _send_local_image(bot, resolved.avatar, '本地群主头像文件不存在，请稍后重试。', text, ev.user_id)
+
+
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
@@ -376,5 +401,10 @@ async def daily_husband_list(bot: Bot, ev: Event):
 @sv.on_fullmatch('娶群友', block=True)
 async def group_member_wife(bot: Bot, ev: Event):
     await _send_group_member_wife(bot, ev)
+
+
+@sv.on_fullmatch('娶群主', block=True)
+async def group_owner_wife(bot: Bot, ev: Event):
+    await _send_group_owner_wife(bot, ev)
 
 

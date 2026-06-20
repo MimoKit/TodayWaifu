@@ -16,6 +16,7 @@
 - `今日老公`：抽鸣潮男角色，需先在配置开启。
 - `今日萝莉`：从本地萝莉图库随机发一张，与老婆/老公/群友完全独立。
 - `娶群友`：只抽群友，不依赖 XWUID。
+- `娶群主`：只抽本群群主；群主身份靠群主自己发过消息后被插件记下来，没发言过识别不到。
 - `抢老婆 @对方`：抢走对方当天抽到的鸣潮角色老婆。
 - `送老婆 @对方`：把自己今天的老婆送给对方。
 - `老婆更新记录`：实时获取 GitHub 更新记录，通过 HTML 渲染成图片发送。
@@ -33,6 +34,7 @@
 | `今日老公` | 抽鸣潮老公 | `DailyWifeHusbandEnabled`；图库模式不可用 |
 | `今日萝莉` | 从萝莉图库随机发一张 | 需先由主人「下载萝莉图片」 |
 | `娶群友` | 只抽群友 | `DailyWifeMarryGroupMemberEnabled` |
+| `娶群主` | 只抽本群群主（需群主发过消息才能识别） | `DailyWifeMarryOwnerEnabled` |
 | `抢老婆 @对方` / `抢今日老婆` / `抢婆娘` | 抢对方当天老婆，每天一次 | `DailyWifeRobEnabled` |
 | `送老婆 @对方` / `送今日老婆` | 把自己今天的老婆送给对方 | `DailyWifeGiftEnabled` |
 | `老婆更新记录` / `今日老婆更新记录` / `老婆更新日志` | 实时获取 GitHub 更新记录并渲染成图片 | `DailyWifeUpdateLogEnabled` |
@@ -155,6 +157,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 老婆更新记录 | 否 | 实时请求 GitHub commits API，并通过 GSCore HTML 渲染组件生成图片 |
 | 老婆列表 / 老公列表 | 间接依赖 | 记录来自抽取结果 |
 | 今日老婆概率抽群友 / 娶群友 | 否 | 使用 GSCore 群成员缓存和 QQ 头像 |
+| 娶群主 | 否 | GSCore 本身不缓存群主身份，插件自己记录群主发言时的身份，没发言过识别不到 |
 | 今日萝莉 | 否 | 使用独立萝莉图库目录 |
 
 ## 常用配置
@@ -175,6 +178,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | `DailyWifeEnableGroupMember` | 关闭 | `今日老婆` 是否有概率抽群友 |
 | `DailyWifeGroupMemberProbability` | `0.1` | 抽群友概率 |
 | `DailyWifeMarryGroupMemberEnabled` | 关闭 | 是否启用 `娶群友` |
+| `DailyWifeMarryOwnerEnabled` | 关闭 | 是否启用 `娶群主` |
 | `DailyWifeHusbandEnabled` | 关闭 | 是否启用 `今日老公` |
 | `DailyWifeRobEnabled` | 开启 | 是否启用抢老婆 |
 | `DailyWifeRobSuccessRate` | `0.5` | 抢老婆成功概率 |
@@ -183,7 +187,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | `DailyWifeUpdateLogApiUrl` | `https://api.github.com/repos/nnlmc/TodayWaifu/commits?per_page=30` | GitHub commits API 地址 |
 | `DailyWifeUpdateLogLimit` | `6` | 单次渲染最近多少条更新记录 |
 
-文字模板类配置（`DailyWifeTextTemplate` / `DailyHusbandTextTemplate` / `DailyWifeGroupMemberTextTemplate` / `DailyWifeMarryGroupMemberTextTemplate` / `DailyWifeRobSuccessTemplate` / `DailyWifeGiftSuccessTemplate`）可在控制台自定义提示文案，支持 `{name}`、`{role_id}`、`{user_id}`、`{target}` 等变量。
+文字模板类配置（`DailyWifeTextTemplate` / `DailyHusbandTextTemplate` / `DailyWifeGroupMemberTextTemplate` / `DailyWifeMarryGroupMemberTextTemplate` / `DailyWifeMarryOwnerTextTemplate` / `DailyWifeRobSuccessTemplate` / `DailyWifeGiftSuccessTemplate`）可在控制台自定义提示文案，支持 `{name}`、`{role_id}`、`{user_id}`、`{target}` 等变量。
 
 ## 帮助图自定义
 
@@ -213,6 +217,10 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 ### `今日老公` / `娶群友` 没反应
 
 先在控制台开启 `DailyWifeHusbandEnabled` / `DailyWifeMarryGroupMemberEnabled`。
+
+### `娶群主` 提示识别不到群主
+
+开启 `DailyWifeMarryOwnerEnabled` 后，插件需要先"看到"群主自己发过一条消息才能记下其身份（GSCore 本身不缓存群主信息）；让群主在群里随便发一句话，再试一次即可。
 
 ### 抢不了别人老婆
 

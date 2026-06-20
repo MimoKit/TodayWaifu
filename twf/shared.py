@@ -89,13 +89,14 @@ __all__ = [
     '_custom_upload_role_pile_root', '_daily_rng', '_download_avatar', '_download_image',
     '_download_image_sync', '_event_rng', '_fetch_gallery_payload_sync', '_filter_by_mode',
     '_gallery_api_url', '_gallery_auth_header', '_gallery_mode_enabled',
-    '_get_event_target_user_id', '_get_existing_daily_wife_record', '_get_today_context',
+    '_get_event_target_user_id', '_get_existing_daily_wife_record', '_get_recorded_owner',
+    '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
     '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
-    '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
+    '_load_wife_data', '_loli_image_root', '_marry_member_enabled', '_marry_owner_enabled',
     '_member_avatar_cache_path', '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
@@ -919,6 +920,89 @@ async def _pick_group_member(ev: Event, rng: random.Random) -> MemberCandidate |
             return resolved
     logger.warning(f'{LOG_PREFIX} 未能成功获取任一群友的有效头像')
     return None
+
+
+# GsCore 没有持久化"本群群主是谁"的数据，user_pm 只是当前这条消息发送者的权限等级
+# （0 主人 / 1 超管 / 2 群主 / 3 管理员 / 6 普通用户）。这里仿照 CoreUser 的"路过记一笔"
+# 做法：群主自己发过消息时顺手记下来，没发过消息就识别不到。
+GROUP_OWNER_PERMISSION_LEVEL = 2
+
+
+def _owner_cache_path() -> Path:
+    return _custom_upload_data_root() / 'group_owner_cache.json'
+
+
+def _load_owner_cache() -> dict[str, Any]:
+    path = _owner_cache_path()
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 读取群主缓存失败: {exc}')
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_owner_cache(data: dict[str, Any]) -> None:
+    try:
+        path = _owner_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception as exc:
+        logger.error(f'{LOG_PREFIX} 保存群主缓存失败: {exc}')
+
+
+def _owner_group_key(ev: Event) -> str:
+    return f'{ev.bot_id}:{ev.group_id}'
+
+
+def _record_owner_sighting(ev: Event) -> None:
+    if not ev.group_id:
+        return
+    try:
+        user_pm = int(getattr(ev, 'user_pm', 6) or 6)
+    except (TypeError, ValueError):
+        return
+    if user_pm > GROUP_OWNER_PERMISSION_LEVEL:
+        return
+
+    user_id = str(ev.user_id)
+    name = _user_display_name(ev)
+    key = _owner_group_key(ev)
+    cache = _load_owner_cache()
+    existing = cache.get(key)
+    if isinstance(existing, dict) and existing.get('user_id') == user_id and existing.get('user_name') == name:
+        return
+    cache[key] = {'user_id': user_id, 'user_name': name, 'updated_at': int(time.time())}
+    _save_owner_cache(cache)
+    logger.debug(f'{LOG_PREFIX} 记录到群 {ev.group_id} 的群主: {name} ({user_id})')
+
+
+def _get_recorded_owner(ev: Event) -> MemberCandidate | None:
+    if not ev.group_id:
+        return None
+    cache = _load_owner_cache()
+    entry = cache.get(_owner_group_key(ev))
+    if not isinstance(entry, dict):
+        return None
+    user_id = _valid_member_text(entry.get('user_id'))
+    if not user_id:
+        return None
+    name = _valid_display_name(entry.get('user_name'), user_id) or user_id
+    return MemberCandidate(name=name, user_id=user_id, avatar='')
+
+
+def _marry_owner_enabled() -> bool:
+    return _cfg_bool('DailyWifeMarryOwnerEnabled', False)
+
+
+@sv.on_message(block=False)
+async def _watch_group_owner(bot: Bot, ev: Event) -> None:
+    try:
+        _record_owner_sighting(ev)
+    except Exception as exc:
+        logger.debug(f'{LOG_PREFIX} 记录群主缓存时出现异常（忽略）: {exc}')
 
 
 async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, rng: random.Random | None = None) -> WifeRecord | None:
