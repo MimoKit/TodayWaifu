@@ -437,7 +437,7 @@ async def daily_husband_list(bot: Bot, ev: Event):
     await _send_wife_list(bot, ev, mode='husband')
 
 
-@sv.on_fullmatch('娶群友', block=True)
+@sv.on_fullmatch(('娶群友', '取群友'), block=True)
 async def group_member_wife(bot: Bot, ev: Event):
     await _send_group_member_wife(bot, ev)
 
@@ -445,5 +445,4 @@ async def group_member_wife(bot: Bot, ev: Event):
 @sv.on_fullmatch('娶群主', block=True)
 async def group_owner_wife(bot: Bot, ev: Event):
     await _send_group_owner_wife(bot, ev)
-
 

@@ -739,15 +739,22 @@ def _valid_display_name(value: Any, user_id: str | int | None = None) -> str:
     return text
 
 
+def _display_name_from_mapping(data: Any, user_id: str | int | None = None) -> str:
+    if not isinstance(data, dict):
+        return ''
+    for field in ('card', 'nickname', 'name', 'username', 'user_name'):
+        value = _valid_display_name(data.get(field), user_id)
+        if value:
+            return value
+    return ''
+
+
 def _user_display_name(ev: Event, user_id: str | int | None = None) -> str:
     key = _user_key(ev, user_id)
     if user_id is None or key == str(ev.user_id):
-        sender = getattr(ev, 'sender', {}) or {}
-        if isinstance(sender, dict):
-            for field in ('card', 'nickname', 'name', 'username', 'user_name'):
-                value = _valid_display_name(sender.get(field), key)
-                if value:
-                    return value
+        value = _display_name_from_mapping(getattr(ev, 'sender', {}) or {}, key)
+        if value:
+            return value
     return key
 
 
@@ -843,7 +850,10 @@ def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
         return str(cache_path)
 
     source = _valid_member_text(avatar_source)
-    if source and not source.startswith(('http://', 'https://')):
+    if source.startswith(('http://', 'https://')):
+        if _download_avatar(source, cache_path):
+            return str(cache_path)
+    elif source:
         try:
             local_path = Path(source)
             if local_path.is_file():
@@ -888,7 +898,12 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
         user_id = str(getattr(user, 'user_id', '') or '').strip()
         if not user_id or user_id in excluded_user_ids:
             continue
-        name = _valid_display_name(getattr(user, 'user_name', ''), user_id) or user_id
+        name = ''
+        for field in ('user_name', 'nickname', 'name', 'username'):
+            name = _valid_display_name(getattr(user, field, ''), user_id)
+            if name:
+                break
+        name = name or user_id
         avatar = _valid_member_text(getattr(user, 'user_icon', ''))
         candidate = MemberCandidate(name=name, user_id=user_id, avatar=avatar)
         fallback[user_id] = candidate
@@ -1173,6 +1188,53 @@ def _has_active_wife(raw: Any) -> bool:
     return isinstance(raw, dict) and bool(raw.get('name')) and _wife_state(raw) == 'owned'
 
 
+def _normalise_target_user_id(value: Any) -> str:
+    if isinstance(value, bool) or value is None:
+        return ''
+    if isinstance(value, Message):
+        value = value.data
+    if isinstance(value, dict):
+        for field in ('user_id', 'qq', 'openid', 'open_id', 'id', 'data'):
+            user_id = _normalise_target_user_id(value.get(field))
+            if user_id:
+                return user_id
+        return ''
+    text = str(value).strip()
+    if not text or text.lower() in {'none', 'true', 'false', 'all'}:
+        return ''
+    return text
+
+
+def _target_user_id_from_text(text: str) -> str | None:
+    text = str(text or '').strip()
+    if not text:
+        return None
+
+    patterns = (
+        r'\[CQ:at,[^\]]*qq=([0-9A-Za-z_-]{5,})',
+        r'<at[^>]*(?:id|qq|user_id)=["\']?([0-9A-Za-z_-]{5,})',
+        r'(?:qq=|qq:|QQ=|QQ:|@)\s*([0-9A-Za-z_-]{5,})',
+        r'\b(\d{5,20})\b',
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _iter_event_messages(ev: Event):
+    for attr in ('content', 'message', 'original_message'):
+        value = getattr(ev, attr, None)
+        if not value:
+            continue
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                yield item
+        else:
+            yield value
+
+
 def _get_event_target_user_id(ev: Event) -> str | None:
     for attr in ('at_list', 'at', 'target_id', 'target_user_id'):
         value = getattr(ev, attr, None)
@@ -1180,25 +1242,32 @@ def _get_event_target_user_id(ev: Event) -> str | None:
             if isinstance(value, (list, tuple, set)):
                 value = next(iter(value), None)
 
-            if isinstance(value, bool):
-                continue
+            user_id = _normalise_target_user_id(value)
+            if user_id:
+                if 'CQ:at' in user_id or '<at' in user_id:
+                    parsed = _target_user_id_from_text(user_id)
+                    if parsed:
+                        return parsed
+                    continue
+                return user_id
 
-            v_str = str(value).strip()
-            if v_str and v_str.lower() not in ('none', 'true', 'false', 'all'):
-                match = re.search(r'(\d{5,20})', v_str)
-                if match:
-                    return match.group(1)
-                if 'CQ:at' not in v_str and '<at' not in v_str:
-                    return v_str
+    for item in _iter_event_messages(ev):
+        item_type = getattr(item, 'type', None)
+        if item_type in {'at', 'mention_user', 'mention'}:
+            user_id = _normalise_target_user_id(getattr(item, 'data', None))
+            if user_id:
+                return user_id
+        if isinstance(item, dict) and item.get('type') in {'at', 'mention_user', 'mention'}:
+            user_id = _normalise_target_user_id(item.get('data'))
+            if user_id:
+                return user_id
 
     for attr in ('text', 'raw_text', 'raw_message', 'message', 'original_message'):
         t = getattr(ev, attr, None)
         if t is not None:
-            t_str = str(t).strip()
-            if t_str:
-                match = re.search(r'(?:@|qq=|qq:|QQ=|QQ:)?(\d{5,20})', t_str)
-                if match:
-                    return match.group(1)
+            user_id = _target_user_id_from_text(str(t))
+            if user_id:
+                return user_id
 
     return None
 
@@ -1271,5 +1340,3 @@ async def _send_local_image(
         await _send_prefixed(bot,missing_hint)
         return
     await _send_prefixed(bot,messages if len(messages) > 1 else messages[0])
-
-
