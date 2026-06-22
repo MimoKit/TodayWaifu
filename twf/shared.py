@@ -43,6 +43,9 @@ Plugins(
 sv = SV('鸣潮今日老婆')
 upload_sv = SV('鸣潮今日老婆上传', pm=1)
 BASE_DIR = Path(__file__).parent.parent
+WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
+HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
+LEGACY_ROLE_MAP_PATH = BASE_DIR / 'role_id_map.txt'
 HELP_IMAGE_PATH = BASE_DIR / 'help.png'
 HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 DEFAULT_GALLERY_API_URL = 'https://img.xlinxc.cn/api/xwuid/roles'
@@ -322,19 +325,36 @@ def _configured_path(key: str) -> Path | None:
     return path
 
 
-def _resolve_role_map_path() -> Path | None:
-    configured = _configured_path('DailyWifeRoleMapPath')
+def _role_mode(mode: str) -> str:
+    return 'husband' if mode == 'husband' else 'wife'
+
+
+def _role_map_title(mode: str) -> str:
+    return '老公' if _role_mode(mode) == 'husband' else '老婆'
+
+
+def _resolve_role_map_path(mode: str = 'wife') -> Path | None:
+    role_mode = _role_mode(mode)
+    configured = _configured_path(
+        'DailyWifeHusbandRoleMapPath'
+        if role_mode == 'husband'
+        else 'DailyWifeWifeRoleMapPath'
+    )
+    legacy_configured = _configured_path('DailyWifeRoleMapPath') if role_mode == 'wife' else None
+    primary_builtin = HUSBAND_ROLE_MAP_PATH if role_mode == 'husband' else WIFE_ROLE_MAP_PATH
     candidates = [
         configured,
-        BASE_DIR / 'role_id_map.txt',
-        BASE_DIR.parent / '鸣潮面板id对照角色.txt',
-        Path.cwd() / '鸣潮面板id对照角色.txt',
+        legacy_configured,
+        primary_builtin,
+        LEGACY_ROLE_MAP_PATH,
+        BASE_DIR.parent / ('鸣潮老公面板id对照角色.txt' if role_mode == 'husband' else '鸣潮老婆面板id对照角色.txt'),
+        Path.cwd() / ('鸣潮老公面板id对照角色.txt' if role_mode == 'husband' else '鸣潮老婆面板id对照角色.txt'),
     ]
     for path in candidates:
         if path and path.is_file():
-            logger.debug(f'{LOG_PREFIX} 成功定位角色对照表文件: {path}')
+            logger.debug(f'{LOG_PREFIX} 成功定位{_role_map_title(role_mode)}角色对照表文件: {path}')
             return path
-    logger.warning(f'{LOG_PREFIX} 未能找到角色对照表文件')
+    logger.warning(f'{LOG_PREFIX} 未能找到{_role_map_title(role_mode)}角色对照表文件')
     return None
 
 
@@ -494,16 +514,27 @@ def _collect_role_candidates(
     return tuple(sorted(candidates, key=lambda item: item.name))
 
 
-def _load_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
-    logger.debug(f'{LOG_PREFIX} 开始从本地加载角色候选列表...')
-    role_map_path = _resolve_role_map_path()
+def _load_mode_role_map(mode: str = 'wife') -> dict[str, str]:
+    role_map_path = _resolve_role_map_path(mode)
+    return _load_role_map(role_map_path) if role_map_path else {}
+
+
+def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    role_mode = _role_mode(mode)
+    title = _role_map_title(role_mode)
+    logger.debug(f'{LOG_PREFIX} 开始从本地加载{title}角色候选列表...')
+    role_map_path = _resolve_role_map_path(role_mode)
     if role_map_path is None:
-        return None, '没有找到鸣潮角色 ID 对照表。'
+        return None, f'没有找到鸣潮{title}角色 ID 对照表。'
 
     pile_root = _resolve_role_pile_root()
     default_pile_root = _resolve_default_role_pile_root()
-    upload_pile_root = _custom_upload_role_pile_root()
-    if pile_root is None and default_pile_root is None and not upload_pile_root.is_dir():
+    upload_pile_root = _custom_upload_role_pile_root() if role_mode == 'wife' else None
+    if (
+        pile_root is None
+        and default_pile_root is None
+        and (upload_pile_root is None or not upload_pile_root.is_dir())
+    ):
         return None, '没有找到 custom_role_pile 或默认 role_pile 图片目录。'
 
     if pile_root is None:
@@ -511,8 +542,8 @@ def _load_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | No
 
     try:
         role_map = _load_role_map(role_map_path)
-        upload_role_map_path = _custom_upload_role_map_path()
-        if upload_role_map_path.is_file():
+        upload_role_map_path = _custom_upload_role_map_path() if role_mode == 'wife' else None
+        if upload_role_map_path and upload_role_map_path.is_file():
             role_map.update(_load_role_map(upload_role_map_path))
         candidates = _collect_role_candidates(role_map, pile_root, default_pile_root, upload_pile_root)
     except Exception as exc:
@@ -531,7 +562,11 @@ def _normalize_role_name(name: str) -> str:
 _MALE_ROLE_NAMES_NORM = {_normalize_role_name(n) for n in EXCLUDED_ROLE_NAMES}
 
 def _is_male_role(name: str) -> bool:
-    return _normalize_role_name(name) in _MALE_ROLE_NAMES_NORM
+    husband_names = {
+        _normalize_role_name(role_name)
+        for role_name in _load_mode_role_map('husband').values()
+    }
+    return _normalize_role_name(name) in (husband_names or _MALE_ROLE_NAMES_NORM)
 
 def _is_excluded_role(name: str) -> bool:
     return any(keyword in name for keyword in EXCLUDED_ROLE_KEYWORDS)
@@ -545,19 +580,23 @@ def _gallery_mode_enabled() -> bool:
 
 
 def _husband_unavailable_message() -> str:
-    if _gallery_mode_enabled():
-        return '图库模式下禁止使用今日老公'
     return '今日老公功能当前已关闭。'
 
 
 def _husband_available() -> bool:
-    return _husband_enabled() and not _gallery_mode_enabled()
+    return _husband_enabled()
 
 
 def _filter_by_mode(candidates: tuple['RoleCandidate', ...], mode: str) -> tuple['RoleCandidate', ...]:
-    if mode == 'husband':
-        return tuple(role for role in candidates if _is_male_role(role.name))
-    return tuple(role for role in candidates if not _is_male_role(role.name))
+    role_map = _load_mode_role_map(mode)
+    allowed_ids = set(role_map)
+    allowed_names = {_normalize_role_name(name) for name in role_map.values()}
+    return tuple(
+        role
+        for role in candidates
+        if any(role_id in allowed_ids for role_id in role.role_ids)
+        or _normalize_role_name(role.name) in allowed_names
+    )
 
 
 def _gallery_api_url() -> str:
@@ -611,21 +650,30 @@ def _fetch_gallery_payload_sync() -> dict[str, Any]:
     return payload
 
 
-def _parse_role_candidates(payload: dict[str, Any]) -> tuple[RoleCandidate, ...]:
+def _parse_role_candidates(
+    payload: dict[str, Any],
+    mode: str = 'wife',
+    role_map: dict[str, str] | None = None,
+) -> tuple[RoleCandidate, ...]:
     roles_data = payload.get('roles')
     if not isinstance(roles_data, list):
         return ()
 
+    role_map = role_map or _load_mode_role_map(mode)
     candidates: list[RoleCandidate] = []
     for item in roles_data:
         if not isinstance(item, dict):
             continue
-        name = str(item.get('name') or '').strip()
-        if not name or _is_excluded_role(name):
-            continue
 
         role_ids_data = item.get('role_ids') or []
-        role_ids = tuple(str(role_id) for role_id in role_ids_data if str(role_id).strip())
+        role_ids = tuple(str(role_id).strip() for role_id in role_ids_data if str(role_id).strip())
+        allowed_role_ids = tuple(role_id for role_id in role_ids if role_id in role_map)
+        if not allowed_role_ids:
+            continue
+
+        name = role_map[allowed_role_ids[0]]
+        if not name or _is_excluded_role(name):
+            continue
 
         images: list[str] = []
         for image_item in item.get('images') or []:
@@ -636,7 +684,7 @@ def _parse_role_candidates(payload: dict[str, Any]) -> tuple[RoleCandidate, ...]
             if url.startswith(('http://', 'https://')):
                 images.append(url)
         if images:
-            candidates.append(RoleCandidate(name=name, role_ids=role_ids, images=tuple(images)))
+            candidates.append(RoleCandidate(name=name, role_ids=allowed_role_ids, images=tuple(images)))
 
     logger.info(f'{LOG_PREFIX} 成功从图库解析候选角色 {len(candidates)} 名')
     return tuple(sorted(candidates, key=lambda role: role.name))
@@ -660,24 +708,29 @@ async def _download_image(url: str) -> bytes:
 
 
 
-async def _load_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     source = _image_source()
+    role_mode = _role_mode(mode)
     now = time.time()
-    cached = CANDIDATE_CACHE.get(source)
+    cache_key = f'{source}:{role_mode}'
+    cached = CANDIDATE_CACHE.get(cache_key)
     if cached and now - cached[0] < CACHE_TTL_SECONDS:
-        logger.debug(f'{LOG_PREFIX} 使用缓存的候选角色列表: {source}')
+        logger.debug(f'{LOG_PREFIX} 使用缓存的候选角色列表: {cache_key}')
         return cached[1], None
 
     if source == 'local':
-        candidates, error = await asyncio.to_thread(_load_local_candidates)
+        candidates, error = await asyncio.to_thread(_load_local_candidates, role_mode)
         if error or not candidates:
             return None, error
-        CANDIDATE_CACHE[source] = (now, candidates)
+        CANDIDATE_CACHE[cache_key] = (now, candidates)
         return candidates, None
 
     try:
+        role_map = _load_mode_role_map(role_mode)
+        if not role_map:
+            return None, f'没有找到鸣潮{_role_map_title(role_mode)}角色 ID 对照表。'
         payload = await asyncio.to_thread(_fetch_gallery_payload_sync)
-        candidates = _parse_role_candidates(payload)
+        candidates = _parse_role_candidates(payload, role_mode, role_map)
     except RuntimeError as exc:
         logger.warning(f'{LOG_PREFIX} 读取图库接口失败: {exc}')
         return None, str(exc)
@@ -688,7 +741,7 @@ async def _load_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | No
     if not candidates:
         return None, '图库接口里没有找到可用的角色立绘。'
 
-    CANDIDATE_CACHE[source] = (now, candidates)
+    CANDIDATE_CACHE[cache_key] = (now, candidates)
     return candidates, None
 
 

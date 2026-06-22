@@ -23,7 +23,17 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeRoleMapPath': GsStrConfig(
         '本地角色 ID 对照表路径',
-        '图片数据源为 local 时生效。留空时优先使用插件内置 role_id_map.txt；也可以手动填写自己的对照表路径',
+        '兼容旧配置。留空时今日老婆使用 wife_role_id_map.txt，今日老公使用 husband_role_id_map.txt',
+        '',
+    ),
+    'DailyWifeWifeRoleMapPath': GsStrConfig(
+        '今日老婆角色 ID 对照表路径',
+        '本地和图库模式均生效。留空时使用插件内置 wife_role_id_map.txt，只抽取表内角色',
+        '',
+    ),
+    'DailyWifeHusbandRoleMapPath': GsStrConfig(
+        '今日老公角色 ID 对照表路径',
+        '本地和图库模式均生效。留空时使用插件内置 husband_role_id_map.txt，只抽取表内角色',
         '',
     ),
     'DailyWifeGalleryApiUrl': GsStrConfig(

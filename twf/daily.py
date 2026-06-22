@@ -61,7 +61,7 @@ async def _ensure_daily_wife_record(
         chosen = await _roll_group_member_wife(ev, key)
 
     if chosen is None:
-        candidates, error = await _load_candidates()
+        candidates, error = await _load_candidates(mode)
         if error or not candidates:
             logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
             return None
@@ -206,9 +206,6 @@ async def _send_record_image(
 
 
 async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''):
-    if mode == 'husband' and _gallery_mode_enabled():
-        return await _send_prefixed(bot, _husband_unavailable_message())
-
     title = '老公' if mode == 'husband' else '老婆'
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 请求 {title} (指定: {specified_name or "无"})')
     
@@ -236,10 +233,9 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             # 未抽过补偿老婆：抽一个，写入 safe_wives
             wife_name = current_record.get('name', '老婆')
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
-            candidates, error = await _load_candidates()
+            candidates, error = await _load_candidates(mode)
             if error or not candidates:
                 return await _send_prefixed(bot, error or '没有找到可用角色。')
-            candidates = _filter_by_mode(candidates, mode)
             if not candidates:
                 return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
             rng = _daily_rng(ev, user_key, f'{mode}_safe')
@@ -265,10 +261,9 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
     if is_debug_active:
         logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
-        candidates, error = await _load_candidates()
+        candidates, error = await _load_candidates(mode)
         if error or not candidates:
             return await _send_prefixed(bot, error or '没有找到可用角色。')
-        candidates = _filter_by_mode(candidates, mode)
         if not candidates:
             return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
         if specified_name:
@@ -445,4 +440,3 @@ async def group_member_wife(bot: Bot, ev: Event):
 @sv.on_fullmatch('娶群主', block=True)
 async def group_owner_wife(bot: Bot, ev: Event):
     await _send_group_owner_wife(bot, ev)
-

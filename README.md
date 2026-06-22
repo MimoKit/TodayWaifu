@@ -91,7 +91,9 @@ gsuid_core/
 │           ├── __init__.py
 │           ├── config_default.py
 │           ├── daily_wife_config.py
-│           ├── role_id_map.txt
+│           ├── role_id_map.txt     # 旧版兼容对照表
+│           ├── wife_role_id_map.txt
+│           ├── husband_role_id_map.txt
 │           ├── ICON.png            # 插件图标（帮助一览用）
 │           ├── help.png            # 「今日老婆帮助」发送的图文卡片
 │           ├── help_preview.html   # 帮助图源文件（本地渲染用，已 gitignore）
@@ -138,9 +140,9 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 
 如不在默认位置，用 `DailyWifeCustomRolePilePath` 指定目录。
 
-图库模式使用 `DailyWifeGalleryApiUrl` / `DailyWifeGalleryUsername` / `DailyWifeGalleryPassword`。图库模式下强制禁用 `今日老公` / `老公列表`，会直接提示「图库模式下禁止使用今日老公」。
+图库模式使用 `DailyWifeGalleryApiUrl` / `DailyWifeGalleryUsername` / `DailyWifeGalleryPassword`。`今日老婆` 和 `今日老公` 都会按各自角色 ID 对照表过滤候选；图库接口返回的角色 ID 不在对应表内时会被跳过。
 
-角色 ID 与角色名由插件内置 `role_id_map.txt` 决定，也可用 `DailyWifeRoleMapPath` 指定自己的对照表。
+`今日老婆` 角色 ID 与角色名由插件内置 `wife_role_id_map.txt` 决定，`今日老公` 由 `husband_role_id_map.txt` 决定。也可分别用 `DailyWifeWifeRoleMapPath` / `DailyWifeHusbandRoleMapPath` 指定自己的对照表。旧配置 `DailyWifeRoleMapPath` 仍作为老婆表兼容兜底。
 
 ## 依赖说明
 
@@ -151,7 +153,7 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 功能 | 是否依赖 XWUID | 说明 |
 | --- | --- | --- |
 | 今日老婆 | 本地模式依赖；图库模式不依赖 | 本地读取角色图片，图库从接口获取 |
-| 今日老公 | 仅本地模式可用 | 图库模式下禁用并提示 |
+| 今日老公 | 本地模式依赖；图库模式不依赖 | 按老公角色 ID 对照表过滤候选 |
 | 抢老婆 | 是 | 抢的是别人当天抽到的鸣潮角色老婆 |
 | 送老婆 | 是 | 送的是自己当天抽到的鸣潮角色老婆 |
 | 老婆更新记录 | 否 | 实时请求 GitHub commits API，并通过 GSCore HTML 渲染组件生成图片 |
