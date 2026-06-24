@@ -391,6 +391,74 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     await _send_prefixed(bot,_wife_list_text_from_items(title_text, items))
 
 
+def _total_wife_rank_items() -> tuple[int, int, list[tuple[int, int, str]]]:
+    data = _load_wife_data()
+    days = data.get('days')
+    if not isinstance(days, dict):
+        return 0, 0, []
+
+    day_count = 0
+    total_count = 0
+    stats: dict[str, dict[str, int]] = {}
+
+    for day_key, contexts in days.items():
+        if not isinstance(contexts, dict):
+            continue
+        day_has_record = False
+        for context in contexts.values():
+            if not isinstance(context, dict):
+                continue
+            for bucket_name in ('wives', 'safe_wives'):
+                bucket = context.get(bucket_name)
+                if not isinstance(bucket, dict):
+                    continue
+                for raw_record in bucket.values():
+                    if not isinstance(raw_record, dict):
+                        continue
+                    wife_name = str(raw_record.get('name') or '').strip()
+                    if not wife_name:
+                        continue
+                    entry = stats.setdefault(wife_name, {'count': 0, 'updated_at': 0})
+                    entry['count'] += 1
+                    total_count += 1
+                    day_has_record = True
+                    try:
+                        updated_at = int(raw_record.get('updated_at') or 0)
+                    except (TypeError, ValueError):
+                        updated_at = 0
+                    if updated_at > entry['updated_at']:
+                        entry['updated_at'] = updated_at
+        if day_has_record and str(day_key or '').strip():
+            day_count += 1
+
+    items = [
+        (entry['count'], entry['updated_at'], wife_name)
+        for wife_name, entry in stats.items()
+    ]
+    items.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    return day_count, total_count, items
+
+
+def _total_wife_rank_text(day_count: int, total_count: int, items: list[tuple[int, int, str]]) -> str:
+    if not items:
+        return '今日老婆总排行\n本地还没有可统计的今日老婆记录。'
+    lines = [
+        '今日老婆总排行',
+        f'在过去 {day_count} 天里，本地共记录 {total_count} 次今日老婆结果。',
+    ]
+    lines.extend(
+        f'{index}. {wife_name}：被娶了 {count} 次'
+        for index, (count, _, wife_name) in enumerate(items, 1)
+    )
+    return '\n'.join(lines)
+
+
+async def _send_total_wife_rank(bot: Bot, ev: Event) -> None:
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 请求了今日老婆总排行')
+    day_count, total_count, items = _total_wife_rank_items()
+    await _send_prefixed(bot, MessageSegment.node([_total_wife_rank_text(day_count, total_count, items)]))
+
+
 
 @sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True)
 async def daily_wife_prefix(bot: Bot, ev: Event):
@@ -408,6 +476,11 @@ async def daily_wife_full(bot: Bot, ev: Event):
 @sv.on_fullmatch(('老婆列表', '今日老婆列表'), block=True)
 async def daily_wife_list(bot: Bot, ev: Event):
     await _send_wife_list(bot, ev)
+
+
+@sv.on_fullmatch(('今日老婆总排行', '老婆总排行'), block=True)
+async def daily_wife_total_rank(bot: Bot, ev: Event):
+    await _send_total_wife_rank(bot, ev)
 
 
 @sv.on_prefix('今日老公', block=True)
