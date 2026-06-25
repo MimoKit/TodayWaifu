@@ -8,6 +8,8 @@
 
 <p align="center">每日抽老婆 / 老公 / 群友，支持抢老婆、送老婆、自定义老婆图库、萝莉图库、GitHub 更新记录与图文帮助。</p>
 
+> 插件交流、图库账号密码获取请加群：`798949533`。
+>
 > 本项目采用 **GNU General Public License v3.0（GPLv3）** 开源。
 
 ## 功能一览
@@ -21,7 +23,7 @@
 - `送老婆 @对方`：把自己今天的老婆送给对方。
 - `老婆更新记录`：实时获取 GitHub 更新记录，通过 HTML 渲染成图片发送。
 - `老婆列表` / `老公列表`：查看本群当天记录。
-- `今日老婆总排行`：合并转发展示本地全部历史记录里每个老婆被娶次数排行。
+- `今日老婆总排行`：合并转发展示老婆被娶次数排行；配置图库账号后会同步本地记录并返回云端总排行。
 - `今日老婆帮助`：发送图文帮助卡片，并注册到 GSCore「core帮助」一览页。
 - 主人命令：创建 / 上传 / 查看 / 删除自定义老婆图片；下载 / 删除萝莉图库。
 
@@ -41,7 +43,7 @@
 | `老婆更新记录` / `今日老婆更新记录` / `老婆更新日志` | 实时获取 GitHub 更新记录并渲染成图片 | `DailyWifeUpdateLogEnabled` |
 | `老婆列表` / `今日老婆列表` | 查看本群今日老婆记录 | 无 |
 | `老公列表` / `今日老公列表` | 查看本群今日老公记录 | 无 |
-| `今日老婆总排行` / `老婆总排行` | 合并转发展示本地全部历史记录里每个老婆被娶次数排行 | 无 |
+| `今日老婆总排行` / `老婆总排行` | 合并转发展示老婆被娶次数排行；配置图库账号后同步云端总排行 | `DailyWifeCloudRankEnabled` |
 | `今日老婆帮助` | 发送图文帮助卡片 | 无 |
 
 ### 主人命令（自定义老婆）
@@ -174,6 +176,8 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | `DailyWifeGalleryApiUrl` | `https://img.xlinxc.cn/api/xwuid/roles` | 图库接口地址，图库模式生效 |
 | `DailyWifeGalleryUsername` | 空 | 图库账号 |
 | `DailyWifeGalleryPassword` | 空 | 图库密码 |
+| `DailyWifeCloudRankEnabled` | 开启 | 查询总排行时是否同步本地记录并返回云端总排行；未配置图库账号密码时自动回退本地排行 |
+| `DailyWifeCloudRankApiUrl` | 空 | 云端总排行接口，留空时自动从图库接口地址推导 |
 | `DailyWifeSendText` | 开启 | 发图片前是否带文字 |
 | `DailyWifeReplyPrefixEnabled` | 开启 | 回复是否带「[今日老婆]」前缀 |
 | `DailyWifeAtUser` | 开启 | 发送结果时是否艾特触发者 |

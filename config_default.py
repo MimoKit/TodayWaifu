@@ -51,6 +51,16 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '访问 XWUID 图库接口和图片所需的密码',
         '',
     ),
+    'DailyWifeCloudRankEnabled': GsBoolConfig(
+        '启用云端总排行',
+        '开启后查询「今日老婆总排行」时会把本地历史统计同步到图库服务，并返回云端汇总排行；未配置图库账号密码时自动回退本地排行',
+        True,
+    ),
+    'DailyWifeCloudRankApiUrl': GsStrConfig(
+        '云端总排行接口',
+        '留空时自动从图库接口地址推导，例如 https://img.xlinxc.cn/api/todaywaifu/rank',
+        '',
+    ),
     'DailyWifeSendText': GsBoolConfig(
         '发送文字说明',
         '开启后图片前附带“你今天的老婆是xxx”',

@@ -391,23 +391,25 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     await _send_prefixed(bot,_wife_list_text_from_items(title_text, items))
 
 
-def _total_wife_rank_items() -> tuple[int, int, list[tuple[int, int, str]]]:
+def _total_wife_rank_records() -> tuple[int, int, list[dict[str, Any]]]:
     data = _load_wife_data()
     days = data.get('days')
     if not isinstance(days, dict):
         return 0, 0, []
 
-    day_count = 0
-    total_count = 0
-    stats: dict[str, dict[str, int]] = {}
+    active_days: set[str] = set()
+    stats: dict[tuple[str, str, str], dict[str, int | str]] = {}
 
     for day_key, contexts in days.items():
         if not isinstance(contexts, dict):
             continue
-        day_has_record = False
-        for context in contexts.values():
+        day = str(day_key or '').strip()
+        if not day:
+            continue
+        for context_key, context in contexts.items():
             if not isinstance(context, dict):
                 continue
+            context_name = str(context_key or 'unknown').strip() or 'unknown'
             for bucket_name in ('wives', 'safe_wives'):
                 bucket = context.get(bucket_name)
                 if not isinstance(bucket, dict):
@@ -418,34 +420,86 @@ def _total_wife_rank_items() -> tuple[int, int, list[tuple[int, int, str]]]:
                     wife_name = str(raw_record.get('name') or '').strip()
                     if not wife_name:
                         continue
-                    entry = stats.setdefault(wife_name, {'count': 0, 'updated_at': 0})
-                    entry['count'] += 1
-                    total_count += 1
-                    day_has_record = True
                     try:
                         updated_at = int(raw_record.get('updated_at') or 0)
                     except (TypeError, ValueError):
                         updated_at = 0
+                    key = (day, context_name, wife_name)
+                    entry = stats.setdefault(key, {'count': 0, 'updated_at': 0})
+                    entry['count'] = int(entry['count']) + 1
                     if updated_at > entry['updated_at']:
                         entry['updated_at'] = updated_at
-        if day_has_record and str(day_key or '').strip():
-            day_count += 1
+                    active_days.add(day)
+
+    records = [
+        {
+            'day': day,
+            'context_key': context_key,
+            'name': wife_name,
+            'count': int(entry['count']),
+            'updated_at': int(entry['updated_at']),
+        }
+        for (day, context_key, wife_name), entry in stats.items()
+    ]
+    records.sort(key=lambda item: (str(item['day']), str(item['context_key']), str(item['name'])))
+    total_count = sum(int(item['count']) for item in records)
+    return len(active_days), total_count, records
+
+
+def _rank_items_from_records(records: list[dict[str, Any]]) -> list[tuple[int, int, str]]:
+    stats: dict[str, dict[str, int]] = {}
+    for record in records:
+        wife_name = str(record.get('name') or '').strip()
+        if not wife_name:
+            continue
+        try:
+            count = int(record.get('count') or 0)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0:
+            continue
+        try:
+            updated_at = int(record.get('updated_at') or 0)
+        except (TypeError, ValueError):
+            updated_at = 0
+        entry = stats.setdefault(wife_name, {'count': 0, 'updated_at': 0})
+        entry['count'] += count
+        if updated_at > entry['updated_at']:
+            entry['updated_at'] = updated_at
 
     items = [
         (entry['count'], entry['updated_at'], wife_name)
         for wife_name, entry in stats.items()
     ]
     items.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    return items
+
+
+def _total_wife_rank_items() -> tuple[int, int, list[tuple[int, int, str]]]:
+    day_count, total_count, records = _total_wife_rank_records()
+    items = _rank_items_from_records(records)
     return day_count, total_count, items
 
 
-def _total_wife_rank_text(day_count: int, total_count: int, items: list[tuple[int, int, str]]) -> str:
+def _total_wife_rank_text(
+    day_count: int,
+    total_count: int,
+    items: list[tuple[int, int, str]],
+    source_label: str = '本地',
+    note: str = '',
+) -> str:
     if not items:
-        return '今日老婆总排行\n本地还没有可统计的今日老婆记录。'
+        lines = ['今日老婆总排行']
+        if note:
+            lines.append(note)
+        lines.append(f'{source_label}还没有可统计的今日老婆记录。')
+        return '\n'.join(lines)
     lines = [
         '今日老婆总排行',
-        f'在过去 {day_count} 天里，本地共记录 {total_count} 次今日老婆结果。',
+        f'在过去 {day_count} 天里，{source_label}共记录 {total_count} 次今日老婆结果。',
     ]
+    if note:
+        lines.append(note)
     lines.extend(
         f'{index}. {wife_name}：被娶了 {count} 次'
         for index, (count, _, wife_name) in enumerate(items, 1)
@@ -453,10 +507,139 @@ def _total_wife_rank_text(day_count: int, total_count: int, items: list[tuple[in
     return '\n'.join(lines)
 
 
+def _cloud_rank_enabled() -> bool:
+    return _cfg_bool('DailyWifeCloudRankEnabled', True) and _gallery_auth_header() is not None
+
+
+def _cloud_rank_api_url() -> str:
+    configured = str(_cfg('DailyWifeCloudRankApiUrl') or '').strip()
+    if configured:
+        return configured
+
+    gallery_api = _gallery_api_url()
+    if gallery_api.endswith('/api/xwuid/roles'):
+        return gallery_api[: -len('/api/xwuid/roles')] + '/api/todaywaifu/rank'
+
+    parsed = urlparse(gallery_api)
+    if parsed.scheme and parsed.netloc:
+        return f'{parsed.scheme}://{parsed.netloc}/api/todaywaifu/rank'
+    return 'https://img.xlinxc.cn/api/todaywaifu/rank'
+
+
+def _cloud_rank_source_id_path() -> Path:
+    return _custom_upload_data_root() / 'cloud_rank_source_id.txt'
+
+
+def _cloud_rank_source_id() -> str:
+    path = _cloud_rank_source_id_path()
+    if path.is_file():
+        value = re.sub(r'[^0-9A-Za-z_.:-]+', '', path.read_text(encoding='utf-8').strip())
+        if value:
+            return value[:96]
+
+    seed = f'{time.time()}:{random.random()}:{_wife_data_path()}'
+    value = hashlib.sha256(seed.encode('utf-8')).hexdigest()[:32]
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(value, encoding='utf-8')
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 保存云端排行实例 ID 失败: {exc}')
+    return value
+
+
+def _post_cloud_rank_sync(records: list[dict[str, Any]]) -> dict[str, Any]:
+    payload = {
+        'source_id': _cloud_rank_source_id(),
+        'client': 'TodayWaifu',
+        'records': records,
+    }
+    body = json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    headers = _request_headers()
+    headers['Content-Type'] = 'application/json; charset=utf-8'
+    request = Request(_cloud_rank_api_url(), data=body, headers=headers)
+    try:
+        with urlopen(request, timeout=20) as response:
+            response_body = response.read(2 * 1024 * 1024)
+    except HTTPError as exc:
+        if exc.code == 401:
+            raise RuntimeError('云端排行账号或密码不正确，接口返回 401。') from exc
+        raise RuntimeError(f'云端排行接口返回 HTTP {exc.code}。') from exc
+    except URLError as exc:
+        raise RuntimeError(f'请求云端排行接口失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('请求云端排行接口超时。') from exc
+
+    try:
+        payload = json.loads(response_body.decode('utf-8'))
+    except Exception as exc:
+        raise RuntimeError('云端排行接口返回内容不是有效 JSON。') from exc
+    if not isinstance(payload, dict) or payload.get('ok') is not True:
+        message = payload.get('message') if isinstance(payload, dict) else ''
+        raise RuntimeError(str(message or '云端排行接口返回格式不正确。'))
+    return payload
+
+
+async def _fetch_cloud_total_wife_rank(
+    records: list[dict[str, Any]],
+) -> tuple[int, int, list[tuple[int, int, str]], int]:
+    payload = await asyncio.to_thread(_post_cloud_rank_sync, records)
+    rank = payload.get('rank')
+    if not isinstance(rank, dict):
+        raise RuntimeError('云端排行接口返回格式不正确。')
+    try:
+        day_count = int(rank.get('day_count') or 0)
+        total_count = int(rank.get('total_count') or 0)
+        source_count = int(rank.get('source_count') or 0)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError('云端排行统计字段格式不正确。') from exc
+
+    items: list[tuple[int, int, str]] = []
+    for raw_item in rank.get('items') or []:
+        if not isinstance(raw_item, dict):
+            continue
+        wife_name = str(raw_item.get('name') or '').strip()
+        if not wife_name:
+            continue
+        try:
+            count = int(raw_item.get('count') or 0)
+            updated_at = int(raw_item.get('updated_at') or 0)
+        except (TypeError, ValueError):
+            continue
+        if count > 0:
+            items.append((count, updated_at, wife_name))
+    items.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    return day_count, total_count, items, source_count
+
+
 async def _send_total_wife_rank(bot: Bot, ev: Event) -> None:
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 请求了今日老婆总排行')
-    day_count, total_count, items = _total_wife_rank_items()
-    await _send_prefixed(bot, MessageSegment.node([_total_wife_rank_text(day_count, total_count, items)]))
+    local_day_count, local_total_count, records = _total_wife_rank_records()
+    local_items = _rank_items_from_records(records)
+
+    if _cloud_rank_enabled():
+        try:
+            day_count, total_count, items, source_count = await _fetch_cloud_total_wife_rank(records)
+            note = f'已同步本地记录，当前汇总 {source_count} 个数据源。' if source_count else '已同步本地记录。'
+            await _send_prefixed(
+                bot,
+                MessageSegment.node([_total_wife_rank_text(day_count, total_count, items, '云端', note)]),
+            )
+            return
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} 同步云端总排行失败，回退本地排行: {exc}')
+            note = '云端同步失败，以下为本地排行。'
+            await _send_prefixed(
+                bot,
+                MessageSegment.node([
+                    _total_wife_rank_text(local_day_count, local_total_count, local_items, '本地', note)
+                ]),
+            )
+            return
+
+    await _send_prefixed(
+        bot,
+        MessageSegment.node([_total_wife_rank_text(local_day_count, local_total_count, local_items, '本地')]),
+    )
 
 
 
