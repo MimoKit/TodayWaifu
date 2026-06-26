@@ -8,6 +8,10 @@
 
 <p align="center">每日抽老婆 / 老公 / 群友，支持抢老婆、送老婆、自定义老婆图库、萝莉图库、GitHub 更新记录与图文帮助。</p>
 
+<p align="center">
+  <a href="https://github.com/nnlmc/TodayWaifu">GitHub</a> ｜ <a href="https://cnb.cool/nnlmc/TodayWaifu">CNB</a>
+</p>
+
 > 插件交流、图库账号密码获取请加群：`798949533`。
 >
 > 本项目采用 **GNU General Public License v3.0（GPLv3）** 开源。
