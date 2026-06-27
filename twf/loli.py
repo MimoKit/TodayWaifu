@@ -191,13 +191,17 @@ async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
     for hash_id, path in image_map.items():
         nodes.append(f'萝莉图片ID：{hash_id}')
         nodes.append(MessageSegment.image(path))
-    await _send_loli_text(bot, MessageSegment.node(nodes))
+    await bot.send(MessageSegment.node(nodes))
 
 
-async def _send_delete_single_loli(bot: Bot, ev: Event) -> None:
+async def _send_delete_loli(bot: Bot, ev: Event) -> None:
     hash_id = str(ev.text or '').strip().lower()
+    if not hash_id:
+        logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发删除全部萝莉图片命令')
+        count = await asyncio.to_thread(_delete_loli_images)
+        return await _send_loli_text(bot, f'已删除全部萝莉图片，共 {count} 张。')
     if not re.fullmatch(r'[0-9a-f]{8}', hash_id):
-        return await _send_loli_text(bot, '请提供 8 位图片ID，例如：删除萝莉图片 abcd1234')
+        return await _send_loli_text(bot, '请提供 8 位图片ID，例如：删除萝莉图片 abcd1234\n不加ID则删除全部')
     image_map = _loli_image_map()
     path = image_map.get(hash_id)
     if path is None:
@@ -210,12 +214,6 @@ async def _send_delete_single_loli(bot: Bot, ev: Event) -> None:
     await _send_loli_text(bot, f'已删除萝莉图片：{hash_id}')
 
 
-async def _send_delete_all_loli(bot: Bot, ev: Event) -> None:
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发删除全部萝莉图片命令')
-    count = await asyncio.to_thread(_delete_loli_images)
-    await _send_loli_text(bot, f'已删除全部萝莉图片，共 {count} 张。')
-
-
 # ── 触发器注册 ────────────────────────────────────────────────────────────────
 
 @sv.on_fullmatch('今日萝莉', block=True)
@@ -223,7 +221,7 @@ async def daily_loli(bot: Bot, ev: Event):
     await _send_loli_image(bot, ev)
 
 
-@upload_sv.on_prefix(('今日萝莉上传', '萝莉上传图片'), block=True)
+@upload_sv.on_command(('今日萝莉上传', '萝莉上传图片'), block=True)
 async def upload_loli(bot: Bot, ev: Event):
     await _send_upload_loli(bot, ev)
 
@@ -233,11 +231,6 @@ async def list_loli(bot: Bot, ev: Event):
     await _send_loli_image_list(bot, ev)
 
 
-@upload_sv.on_prefix('删除萝莉图片', block=True)
-async def delete_single_loli(bot: Bot, ev: Event):
-    await _send_delete_single_loli(bot, ev)
-
-
-@upload_sv.on_fullmatch('删除萝莉图片', block=True)
-async def delete_all_loli(bot: Bot, ev: Event):
-    await _send_delete_all_loli(bot, ev)
+@upload_sv.on_command('删除萝莉图片', block=True)
+async def delete_loli(bot: Bot, ev: Event):
+    await _send_delete_loli(bot, ev)
