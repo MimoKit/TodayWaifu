@@ -87,7 +87,7 @@ async def _send_rob_wife(bot: Bot, ev: Event) -> None:
     if random.random() >= _rob_success_rate():
         logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的老婆失败')
         _save_wife_data(data)
-        return await _send_prefixed(bot, '抢老婆失败了，还被对方痛扁了一顿！')
+        return await _send_prefixed(bot, '恭喜你,抢老婆失败了！')
 
     logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的老婆')
     context['wives'][robber_id] = _record_to_dict(target_record, ev, robber_id)
