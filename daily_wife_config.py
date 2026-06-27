@@ -24,3 +24,6 @@ DailyWifeConfig = StringConfig(
     CONFIG_PATH,
     CONFIG_DEFAULT,
 )
+# Junction 加载时 Path.resolve() 跟踪到真实路径，导致 plugin_name 自动检测失败
+# 手动补回正确值，确保 webconsole 能关联到本插件的配置
+DailyWifeConfig.plugin_name = 'TodayWaifu'
