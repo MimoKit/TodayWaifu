@@ -161,6 +161,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         _build_rob_success_text(role, target_user_id, kind),
         robber_id,
         ev.group_id is not None,
+        kind,
     )
 
 

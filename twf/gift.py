@@ -163,8 +163,9 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _set_pending_gift(ev, target_user_id, giver_id, kind)
     giver_name = _user_display_name(ev, giver_id)
     role = giver_record.to_role()
+    item_text = title if kind == 'loli' else f'{title}{role.name}'
     text = (
-        f'{giver_name} 想把今天的{title}{role.name}送给你！\n'
+        f'{giver_name} 想把今天的{item_text}送给你！\n'
         f'请在 {GIFT_CONFIRM_TIMEOUT_SECONDS} 秒内发送「同意送{title}」接受，'
         f'或发送「拒绝送{title}」拒绝，超时将自动取消。'
     )
@@ -223,6 +224,7 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         _build_gift_success_text(role, target_user_id, kind),
         giver_id,
         ev.group_id is not None,
+        kind,
     )
 
 

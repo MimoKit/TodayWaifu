@@ -44,6 +44,16 @@ class InteractionSourceTests(unittest.TestCase):
         self.assertIn("context['lolis']", source)
         self.assertIn('_record_to_dict', source)
 
+    def test_result_sender_calls_pass_kind_argument(self) -> None:
+        rob_source = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
+        gift_source = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
+        self.assertIn('ev.group_id is not None,\n        kind,', rob_source)
+        self.assertIn('ev.group_id is not None,\n        kind,', gift_source)
+
+    def test_loli_gift_request_does_not_include_image_id_name(self) -> None:
+        gift_source = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
+        self.assertIn("item_text = title if kind == 'loli' else f'{title}{role.name}'", gift_source)
+
 
 if __name__ == '__main__':
     unittest.main()
