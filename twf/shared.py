@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 from PIL import Image
@@ -68,6 +68,7 @@ CUSTOM_ROLE_DELETE_CONFIRM_SECONDS = 120
 LOLI_IMAGE_DIR_NAME = 'loli_images'
 LOLICONAPP_API_URL = 'https://api.lolicon.app/setu/v2'
 LOLICONAPP_TAGS = '萝莉|ロリ|loli|rori,-hololive'
+NSFW_CHECK_MAX_ATTEMPTS = 30
 LOLI_MOBILE_UA = (
     'Mozilla/5.0 (Linux; Android 13; Pixel 7) '
     'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -86,7 +87,7 @@ __all__ = [
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
     'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
-    'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS',
+    'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS', 'NSFW_CHECK_MAX_ATTEMPTS',
     'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins', 'REPLY_PREFIX',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
@@ -107,7 +108,9 @@ __all__ = [
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
     '_member_avatar_cache_path', '_member_feature_enabled', '_member_probability',
+    '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
+    '_pick_nsfw_checked_role_record',
     '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
@@ -122,7 +125,7 @@ __all__ = [
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
     'marry_member_sv', 'rob_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
-    'urlencode', 'urlopen', 'urlparse',
+    'parse_qsl', 'urlencode', 'urlopen', 'urlparse', 'urlunparse',
 ]
 
 
@@ -340,6 +343,199 @@ def _cfg_probability(key: str, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         value = default
     return max(0.0, min(1.0, value))
+
+
+def _nsfw_check_enabled() -> bool:
+    return _cfg_bool('DailyWifeNsfwCheckEnabled', False)
+
+
+def _nsfw_check_raw_url() -> str:
+    return str(_cfg('DailyWifeNsfwCheckUrl') or '').strip()
+
+
+def _nsfw_redact_url(raw_url: str) -> str:
+    try:
+        parsed = urlparse(raw_url)
+    except Exception:
+        return '<invalid-url>'
+
+    query_pairs = [
+        (key, '***' if key.lower() in {'token', 'x-token', 'x_token'} else value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+    ]
+    return urlunparse(parsed._replace(query=urlencode(query_pairs), fragment=''))
+
+
+def _nsfw_check_endpoint() -> tuple[str, str]:
+    raw_url = _nsfw_check_raw_url()
+    if not raw_url:
+        return '', ''
+
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+        logger.warning(f'{LOG_PREFIX} NSFW 检测地址无效: {_nsfw_redact_url(raw_url)}')
+        return '', ''
+
+    token = ''
+    query_pairs: list[tuple[str, str]] = []
+    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+        if key.lower() in {'token', 'x-token', 'x_token'} and not token:
+            token = value
+        else:
+            query_pairs.append((key, value))
+
+    for key, value in parse_qsl(parsed.fragment, keep_blank_values=True):
+        if key.lower() in {'token', 'x-token', 'x_token'} and not token:
+            token = value
+
+    path = parsed.path.rstrip('/')
+    if not path.endswith('/check/upload'):
+        path = f'{path}/check/upload' if path else '/check/upload'
+
+    cleaned = parsed._replace(
+        path=path,
+        query=urlencode(query_pairs),
+        fragment='',
+    )
+    return urlunparse(cleaned), token
+
+
+def _nsfw_multipart_body(image: bytes, filename: str = 'image.jpg') -> tuple[bytes, str]:
+    boundary = f'----TodayWaifuNsfw{hashlib.md5(image).hexdigest()}'
+    header = (
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        'Content-Type: image/jpeg\r\n\r\n'
+    ).encode('utf-8')
+    footer = f'\r\n--{boundary}--\r\n'.encode('utf-8')
+    return header + image + footer, boundary
+
+
+def _nsfw_response_passed(payload: dict[str, Any]) -> bool:
+    action = str(payload.get('action') or '').strip().lower()
+    if action:
+        return action == 'allow'
+
+    is_nsfw = payload.get('is_nsfw')
+    if isinstance(is_nsfw, bool):
+        return not is_nsfw
+
+    result = str(payload.get('result') or payload.get('label') or '').strip().lower()
+    if result in {'sfw', 'safe', 'normal', 'allow'}:
+        return True
+    if result in {'nsfw', 'porn', 'hentai', 'sexy', 'block', 'review'}:
+        return False
+
+    return True
+
+
+def _nsfw_check_image_bytes_sync(image: bytes, image_ref: str) -> tuple[bool, dict[str, Any]]:
+    endpoint, token = _nsfw_check_endpoint()
+    if not endpoint:
+        return True, {'reason': 'no_endpoint'}
+
+    body, boundary = _nsfw_multipart_body(image)
+    headers = {
+        'User-Agent': 'TodayWaifu/1.0',
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+    }
+    if token:
+        headers['X-Token'] = token
+
+    request = Request(endpoint, data=body, headers=headers, method='POST')
+    try:
+        with urlopen(request, timeout=20) as resp:
+            raw = resp.read()
+    except HTTPError as exc:
+        raise RuntimeError(f'NSFW 检测失败，HTTP {exc.code}') from exc
+    except URLError as exc:
+        raise RuntimeError(f'NSFW 检测失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('NSFW 检测超时') from exc
+
+    try:
+        payload = json.loads(raw.decode('utf-8'))
+    except Exception as exc:
+        raise RuntimeError('NSFW 检测服务返回内容不是有效 JSON') from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError('NSFW 检测服务返回格式不正确')
+
+    passed = _nsfw_response_passed(payload)
+    logger.debug(
+        f'{LOG_PREFIX} NSFW 检测完成: passed={passed} image={image_ref} '
+        f'action={payload.get("action")} result={payload.get("result") or payload.get("label")}'
+    )
+    return passed, payload
+
+
+async def _read_image_ref_bytes(image_ref: str) -> bytes | None:
+    if image_ref.startswith(('http://', 'https://')):
+        return await _download_image(image_ref)
+
+    path = Path(image_ref)
+    if not path.is_file():
+        logger.warning(f'{LOG_PREFIX} NSFW 检测跳过不存在的本地图片: {image_ref}')
+        return None
+    return await asyncio.to_thread(path.read_bytes)
+
+
+async def _nsfw_check_image_ref(image_ref: str) -> bool:
+    if not _nsfw_check_enabled():
+        return True
+
+    try:
+        image = await _read_image_ref_bytes(image_ref)
+        if image is None:
+            return True
+        passed, payload = await asyncio.to_thread(_nsfw_check_image_bytes_sync, image, image_ref)
+    except Exception as exc:
+        # 检测服务异常时不打断今日老婆流程，避免服务抖动导致全功能不可用。
+        logger.warning(f'{LOG_PREFIX} NSFW 检测异常，已按放行处理: {exc}')
+        return True
+
+    if not passed:
+        logger.info(f'{LOG_PREFIX} NSFW 检测未通过，静默重抽: image={image_ref} payload={payload}')
+    return passed
+
+
+async def _nsfw_record_passes(record: 'WifeRecord') -> bool:
+    if not _nsfw_check_enabled():
+        return True
+    if not record.image:
+        return True
+    return await _nsfw_check_image_ref(record.image)
+
+
+async def _pick_nsfw_checked_role_record(
+    candidates: tuple['RoleCandidate', ...],
+    rng: random.Random,
+    mode: str = 'wife',
+) -> 'WifeRecord | None':
+    if not candidates:
+        return None
+
+    if not _nsfw_check_enabled():
+        role = rng.choice(candidates)
+        return WifeRecord.from_role(role, rng.choice(role.images))
+
+    seen: set[tuple[str, str]] = set()
+    total_images = sum(len(role.images) for role in candidates)
+    max_attempts = max(1, min(NSFW_CHECK_MAX_ATTEMPTS, total_images))
+    for _ in range(max_attempts):
+        role = rng.choice(candidates)
+        image = rng.choice(role.images)
+        key = (role.name, image)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        record = WifeRecord.from_role(role, image)
+        if await _nsfw_record_passes(record):
+            return record
+
+    logger.warning(f'{LOG_PREFIX} NSFW 检测启用后未找到通过检测的 {mode} 图片，尝试次数={len(seen)}')
+    return None
 
 
 def _image_source() -> str:
