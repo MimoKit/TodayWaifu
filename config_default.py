@@ -86,7 +86,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeTextTemplate': GsStrConfig(
         '今日老婆文字模板',
         '今日老婆的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID',
-        '你今天的老婆是{name}。',
+        '你今天的老婆是{name}',
     ),
 
     '_DividerGroupMember': GsDivider('群友玩法', ''),
@@ -103,7 +103,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeGroupMemberTextTemplate': GsStrConfig(
         '今日老婆抽群友文字模板',
         '今日老婆命中群友时的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
-        '你今天抽到的群友是{name}。',
+        '你今天的老婆是{name}',
     ),
     'DailyWifeMarryGroupMemberEnabled': GsBoolConfig(
         '启用娶群友',
@@ -113,7 +113,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeMarryGroupMemberTextTemplate': GsStrConfig(
         '娶群友文字模板',
         '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
-        '你娶到的群友是{name}。',
+        '你娶到的群友是{name}',
     ),
 
     '_DividerDailyHusband': GsDivider('今日老公', ''),
@@ -125,7 +125,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyHusbandTextTemplate': GsStrConfig(
         '今日老公文字模板',
         '今日老公的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID',
-        '你今天的老公是{name}。',
+        '你今天的老公是{name}',
     ),
 
     '_DividerRob': GsDivider('抢夺设置', ''),
@@ -142,7 +142,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeRobSuccessTemplate': GsStrConfig(
         '抢老婆成功文案',
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID',
-        '得手了！{name}现在跟你走了。',
+        '抢老婆成功！你把对方今天的老婆{name}抢过来了！',
     ),
     'DailyHusbandRobEnabled': GsBoolConfig(
         '启用抢老公',
@@ -152,7 +152,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyHusbandRobSuccessTemplate': GsStrConfig(
         '抢老公成功文案',
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID',
-        '得手了！{name}现在跟你走了。',
+        '抢老公成功！你把对方今天的老公{name}抢过来了！',
     ),
     'DailyLoliRobEnabled': GsBoolConfig(
         '启用抢萝莉',
@@ -167,7 +167,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyLoliRobSuccessTemplate': GsStrConfig(
         '抢萝莉成功文案',
         '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID',
-        '得手了！对方今天的萝莉现在归你了。',
+        '抢萝莉成功！你把对方今天的萝莉抢过来了！',
     ),
 
     '_DividerGift': GsDivider('赠送设置', ''),
@@ -179,7 +179,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeGiftSuccessTemplate': GsStrConfig(
         '送老婆成功文案',
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收用户 ID',
-        '赠送成功，{name}已经送到对方手里。',
+        '你把今天的老婆{name}送给了对方！',
     ),
     'DailyHusbandGiftEnabled': GsBoolConfig(
         '启用送老公',
@@ -189,7 +189,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyHusbandGiftSuccessTemplate': GsStrConfig(
         '送老公成功文案',
         '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收用户 ID',
-        '赠送成功，{name}已经送到对方手里。',
+        '你把今天的老公{name}送给了对方！',
     ),
     'DailyLoliGiftEnabled': GsBoolConfig(
         '启用送萝莉',
@@ -199,7 +199,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyLoliGiftSuccessTemplate': GsStrConfig(
         '送萝莉成功文案',
         '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID',
-        '赠送成功，今天的萝莉已经送到对方手里。',
+        '你把今天的萝莉送给了对方！',
     ),
 }
 

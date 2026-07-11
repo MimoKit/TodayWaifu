@@ -29,10 +29,10 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     user_key = _user_key(ev)
     current = context[bucket].get(user_key)
     if not _has_active_wife(current):
-        return await _send_prefixed(bot, f'你今天还没有{title}，暂时离不了。', kind=kind)
+        return await _send_prefixed(bot, f'你今天没有可以离婚的{title}。', kind=kind)
 
     if not isinstance(current, dict):
-        return await _send_prefixed(bot, f'你今天还没有{title}，暂时离不了。', kind=kind)
+        return await _send_prefixed(bot, f'你今天没有可以离婚的{title}。', kind=kind)
 
     item_name = str(current.get('name') or title)
     current['divorced'] = True
@@ -40,8 +40,8 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _save_wife_data(data)
 
     if kind == 'loli':
-        return await _send_prefixed(bot, '已和今天的萝莉离婚。', kind=kind)
-    await _send_prefixed(bot, f'已和今天的{title}{item_name}离婚。', kind=kind)
+        return await _send_prefixed(bot, '你已经和今天的萝莉离婚了。', kind=kind)
+    await _send_prefixed(bot, f'你已经和今天的{title}{item_name}离婚了。', kind=kind)
 
 
 @divorce_sv.on_fullmatch(

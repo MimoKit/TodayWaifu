@@ -39,12 +39,12 @@ def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
     if mode == 'husband':
         template = str(
             _cfg('DailyHusbandTextTemplate')
-            or '你今天的老公是{name}。'
+            or '你今天的老公是{name}'
         )
     else:
         template = str(
             _cfg('DailyWifeTextTemplate')
-            or '你今天的老婆是{name}。'
+            or '你今天的老婆是{name}'
         )
     lines = [
         template.format(
@@ -59,9 +59,9 @@ def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
 
 def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
     if mode == 'marry':
-        template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}。')
+        template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}')
     else:
-        template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天抽到的群友是{name}。')
+        template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天的老婆是{name}')
     return template.format(name=member.name, user_id=member.user_id)
 
 
@@ -329,7 +329,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
             return await _send_prefixed(
                 bot,
-                f'来晚了，你的{item_name}已经被{stolen_by_name}抢走了。',
+                f'你的{item_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~',
                 kind=mode,
             )
         if state == 'lost_gifted':
@@ -338,14 +338,14 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 的{title}已送出，拒绝分配新角色')
             return await _send_prefixed(
                 bot,
-                f'你已经把{wife_name}送给{gifted_to_name}了，今天不能再抽。',
+                f'你的{wife_name}已经送给{gifted_to_name}了，今天就先忍忍吧~',
                 kind=mode,
             )
         if state == 'divorced':
             item_name = current_record.get('name', title) if isinstance(current_record, dict) else title
             return await _send_prefixed(
                 bot,
-                f'你今天已经和{item_name}离婚了，明天再来。',
+                f'你今天已经和{item_name}离婚了，明天再来吧~',
                 kind=mode,
             )
 
