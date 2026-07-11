@@ -39,7 +39,7 @@ def _help_column() -> int:
 
 
 @help_sv.on_fullmatch(
-    '今日老婆帮助',
+    ('今日老婆帮助', '老婆帮助'),
     block=True,
     to_ai="""查看 TodayWaifu 今日老婆插件帮助。
     当用户问“今日老婆怎么用”“今日老婆帮助”“老婆插件有什么命令”时调用。

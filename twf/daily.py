@@ -36,9 +36,15 @@ def _wife_list_markdown_from_items(
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
     if mode == 'husband':
-        template = str(_cfg('DailyHusbandTextTemplate') or '你今天的老公是{name}')
+        template = str(
+            _cfg('DailyHusbandTextTemplate')
+            or '你今天的老公是{name}。'
+        )
     else:
-        template = str(_cfg('DailyWifeTextTemplate') or '你今天的老婆是{name}')
+        template = str(
+            _cfg('DailyWifeTextTemplate')
+            or '你今天的老婆是{name}。'
+        )
     lines = [
         template.format(
             name=role.name,
@@ -52,9 +58,9 @@ def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
 
 def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
     if mode == 'marry':
-        template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}')
+        template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}。')
     else:
-        template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天的老婆是{name}')
+        template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天抽到的群友是{name}。')
     return template.format(name=member.name, user_id=member.user_id)
 
 
@@ -311,15 +317,15 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         if state == 'lost_stolen':
             item_name = current_record.get('name', title) if isinstance(current_record, dict) else title
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
-            return await _send_prefixed(bot, f'你的{item_name}已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
+            return await _send_prefixed(bot, f'来晚了，你的{item_name}已经被{stolen_by_name}抢走了。')
         if state == 'lost_gifted':
             wife_name = current_record.get('name', title)
             gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')
             logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 的{title}已送出，拒绝分配新角色')
-            return await _send_prefixed(bot,f'你的{wife_name}已经送给{gifted_to_name}了，今天就先忍忍吧~')
+            return await _send_prefixed(bot, f'你已经把{wife_name}送给{gifted_to_name}了，今天不能再抽。')
         if state == 'divorced':
             item_name = current_record.get('name', title) if isinstance(current_record, dict) else title
-            return await _send_prefixed(bot, f'你今天已经和{item_name}离婚了，明天再来吧~')
+            return await _send_prefixed(bot, f'你今天已经和{item_name}离婚了，明天再来。')
 
     record: WifeRecord | None = None
 
@@ -508,7 +514,7 @@ async def daily_wife_full(bot: Bot, ev: Event):
 
 
 @wife_list_sv.on_fullmatch(
-    '老婆列表',
+    ('老婆列表', '查看老婆列表'),
     block=True,
     to_ai="""查看可抽取的老婆角色列表。
     当用户询问“老婆列表”“有哪些老婆可以抽”时调用。
@@ -581,7 +587,7 @@ async def daily_husband_full(bot: Bot, ev: Event):
 
 
 @husband_list_sv.on_fullmatch(
-    '老公列表',
+    ('老公列表', '查看老公列表'),
     block=True,
     to_ai="""查看可抽取的老公角色列表。
     当用户询问“老公列表”“有哪些老公可以抽”时调用。

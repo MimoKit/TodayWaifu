@@ -154,12 +154,12 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         state = _wife_state(current)
         if state == 'lost_stolen':
             stolen_by_name = current.get('stolen_by_name') or current.get('stolen_by')
-            return await _send_loli_text(bot, f'你的萝莉已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
+            return await _send_loli_text(bot, f'来晚了，你的萝莉已经被{stolen_by_name}抢走了。')
         if state == 'lost_gifted':
             gifted_to_name = current.get('gifted_to_name') or current.get('gifted_to')
-            return await _send_loli_text(bot, f'你的萝莉已经送给{gifted_to_name}了，今天就先忍忍吧~')
+            return await _send_loli_text(bot, f'你已经把萝莉送给{gifted_to_name}了，今天不能再抽。')
         if state == 'divorced':
-            return await _send_loli_text(bot, '你今天已经和萝莉离婚了，明天再来吧~')
+            return await _send_loli_text(bot, '你今天已经和萝莉离婚了，明天再来。')
         record = _record_from_dict(current)
         if record is not None:
             return await _send_loli_record(bot, record)
@@ -170,7 +170,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         try:
             data = await asyncio.to_thread(lambda: _http_get(custom_url, timeout=15))
         except Exception:
-            return await _send_loli_text(bot, '暂无图片')
+            return await _send_loli_text(bot, '萝莉接口暂时没有返回图片。')
         record = WifeRecord(
             name='萝莉',
             role_ids=('接口',),
@@ -186,7 +186,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
 
     images = _loli_image_paths()
     if not images:
-        return await _send_loli_text(bot, '暂无图片')
+        return await _send_loli_text(bot, '本地萝莉图库还是空的。')
     image = random.choice(images)
     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，发送本地图片: {image}')
     record = WifeRecord(
@@ -205,7 +205,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
 async def _send_upload_loli(bot: Bot, ev: Event) -> None:
     refs = _loli_upload_refs(ev)
     if not refs:
-        return await _send_loli_text(bot, '请同时发送图片和命令，例如：今日萝莉上传 [图片]')
+        return await _send_loli_text(bot, '请同时发送图片和命令，例如：上传萝莉图片 [图片]')
 
     saved: list[Path] = []
     failed = 0
@@ -229,7 +229,7 @@ async def _send_upload_loli(bot: Bot, ev: Event) -> None:
 async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
     image_map = _loli_image_map()
     if not image_map:
-        return await _send_loli_text(bot, '本地还没有萝莉图片，使用「今日萝莉上传」上传图片。')
+        return await _send_loli_text(bot, '本地还没有萝莉图片，使用「上传萝莉图片」添加图片。')
     nodes: list[Any] = []
     for hash_id, path in image_map.items():
         nodes.append(f'萝莉图片ID：{hash_id}')
@@ -272,16 +272,16 @@ async def daily_loli(bot: Bot, ev: Event):
     await _send_loli_image(bot, ev)
 
 
-@loli_manage_sv.on_command(('今日萝莉上传', '萝莉上传图片'), block=True)
+@loli_manage_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)
 async def upload_loli(bot: Bot, ev: Event):
     await _send_upload_loli(bot, ev)
 
 
 @loli_manage_sv.on_fullmatch(
-    ('今日萝莉列表', '萝莉图片列表'),
+    ('查看萝莉图片', '今日萝莉列表', '萝莉图片列表'),
     block=True,
     to_ai="""查看今日萝莉图库列表。
-    当用户说“今日萝莉列表”“萝莉图片列表”“有哪些萝莉图”时调用。
+    当用户说“查看萝莉图片”“萝莉图片列表”“有哪些萝莉图”时调用。
     Args:
         text: 无需参数，留空。
     """,

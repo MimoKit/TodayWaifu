@@ -56,17 +56,17 @@
         "need_admin": false
       },
       {
-        "name": "同意送老婆",
+        "name": "接受老婆赠送",
         "desc": "同意接受对方的赠送",
-        "eg": "同意送老婆",
+        "eg": "接受老婆赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "拒绝送老婆",
+        "name": "拒绝老婆赠送",
         "desc": "拒绝对方的赠送请求",
-        "eg": "拒绝送老婆",
+        "eg": "拒绝老婆赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -88,33 +88,33 @@
         "need_admin": false
       },
       {
-        "name": "同意送老公",
+        "name": "接受老公赠送",
         "desc": "同意接受对方送来的老公",
-        "eg": "同意送老公",
+        "eg": "接受老公赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "拒绝送老公",
+        "name": "拒绝老公赠送",
         "desc": "拒绝对方的送老公请求",
-        "eg": "拒绝送老公",
+        "eg": "拒绝老公赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "离婚",
+        "name": "老婆离婚",
         "desc": "主动放弃今天的老婆，不触发补偿",
-        "eg": "离婚",
+        "eg": "老婆离婚",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "离婚老公",
+        "name": "老公离婚",
         "desc": "主动放弃今天的老公",
-        "eg": "离婚老公",
+        "eg": "老公离婚",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -157,41 +157,41 @@
         "need_admin": false
       },
       {
-        "name": "同意送萝莉",
+        "name": "接受萝莉赠送",
         "desc": "同意接受对方送来的萝莉",
-        "eg": "同意送萝莉",
+        "eg": "接受萝莉赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "拒绝送萝莉",
+        "name": "拒绝萝莉赠送",
         "desc": "拒绝对方的送萝莉请求",
-        "eg": "拒绝送萝莉",
+        "eg": "拒绝萝莉赠送",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "离婚萝莉",
+        "name": "萝莉离婚",
         "desc": "主动放弃今天的萝莉",
-        "eg": "离婚萝莉",
+        "eg": "萝莉离婚",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "今日萝莉上传",
+        "name": "上传萝莉图片",
         "desc": "上传萝莉图片到本地库（附图片发送，需主人权限）",
-        "eg": "今日萝莉上传 [图片]",
+        "eg": "上传萝莉图片 [图片]",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
       },
       {
-        "name": "今日萝莉列表",
+        "name": "查看萝莉图片",
         "desc": "查看本地萝莉图片列表及图片ID",
-        "eg": "今日萝莉列表",
+        "eg": "查看萝莉图片",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
@@ -210,33 +210,33 @@
     "desc": "上传并管理自己的老婆图片（需主人权限）",
     "data": [
       {
-        "name": "老婆创建",
+        "name": "创建老婆",
         "desc": "创建自定义老婆角色",
-        "eg": "老婆创建达妮娅",
+        "eg": "创建老婆 达妮娅",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
       },
       {
-        "name": "老婆上传图片",
+        "name": "上传老婆图片",
         "desc": "上传图片绑定到角色（附图片发送）",
-        "eg": "老婆上传图片达妮娅",
+        "eg": "上传老婆图片 达妮娅",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
       },
       {
-        "name": "老婆图片列表",
+        "name": "查看老婆图片",
         "desc": "查看角色已上传的图片列表",
-        "eg": "老婆图片列表达妮娅",
+        "eg": "查看老婆图片 达妮娅",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
       },
       {
-        "name": "老婆删除",
+        "name": "删除老婆",
         "desc": "删除自定义老婆角色（需二次确认）",
-        "eg": "老婆删除达妮娅",
+        "eg": "删除老婆 达妮娅",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true

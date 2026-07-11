@@ -52,10 +52,10 @@ def _gift_enabled(kind: str) -> bool:
 
 def _gift_success_template(kind: str) -> str:
     if kind == 'husband':
-        return str(_cfg('DailyHusbandGiftSuccessTemplate') or '你把今天的老公{name}送给了对方！')
+        return str(_cfg('DailyHusbandGiftSuccessTemplate') or '赠送成功，{name}已经送到对方手里。')
     if kind == 'loli':
-        return str(_cfg('DailyLoliGiftSuccessTemplate') or '你把今天的萝莉送给了对方！')
-    return str(_cfg('DailyWifeGiftSuccessTemplate') or '你把今天的老婆{name}送给了对方！')
+        return str(_cfg('DailyLoliGiftSuccessTemplate') or '赠送成功，今天的萝莉已经送到对方手里。')
+    return str(_cfg('DailyWifeGiftSuccessTemplate') or '赠送成功，{name}已经送到对方手里。')
 
 
 def _build_gift_success_text(role: RoleCandidate, target_user_id: str, kind: str) -> str:
@@ -127,19 +127,19 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if kind == 'husband' and not _husband_available():
         return await _send_prefixed(bot, _husband_unavailable_message())
     if not _gift_enabled(kind):
-        return await _send_prefixed(bot, f'送{title}功能当前已关闭。')
+        return await _send_prefixed(bot, f'{title}赠送功能当前未开启。')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, '要送给谁？请艾特对方或在命令后面写对方 QQ。')
+        return await _send_prefixed(bot, f'准备把{title}送给谁？请艾特对方或填写对方 QQ。')
 
     giver_id = _user_key(ev)
     if target_user_id == giver_id:
-        return await _send_prefixed(bot, f'不能把{title}送给自己哦！')
+        return await _send_prefixed(bot, f'{title}本来就在你这里，不用再送给自己。')
 
     giver_record = _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
-        return await _send_prefixed(bot, f'你今天还没有{title}，先去抽一个吧~')
+        return await _send_prefixed(bot, f'你今天还没有{title}，先去抽取再来赠送。')
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
@@ -148,17 +148,17 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     state = _wife_state(giver_data)
     if state == 'lost_stolen':
-        return await _send_prefixed(bot, f'你的{title}已经被抢走了，没有{title}可以送了~')
+        return await _send_prefixed(bot, f'你的{title}已经被抢走了，现在没法送人。')
     if state == 'lost_gifted':
-        return await _send_prefixed(bot, f'你今天已经把{title}送出去了~')
+        return await _send_prefixed(bot, f'你今天已经把{title}送出去了。')
     if state == 'divorced':
-        return await _send_prefixed(bot, f'你今天已经和{title}离婚了，没有{title}可以送了~')
+        return await _send_prefixed(bot, f'你今天已经和{title}离婚了，现在没法送人。')
     if _is_secondhand_wife(giver_data):
-        return await _send_prefixed(bot, f'这个{title}是抢来或别人送的，不能再送出去哦~')
+        return await _send_prefixed(bot, f'这个{title}是抢来或别人送的，不能再次转送。')
 
     target_key = _user_key(ev, target_user_id)
     if _has_active_wife(context[bucket].get(target_key)):
-        return await _send_prefixed(bot, f'对方今天已经有{title}了，不需要你送哦~')
+        return await _send_prefixed(bot, f'对方今天已经有{title}了，不能再接收。')
 
     if _get_pending_gift(ev, target_user_id, kind) is not None:
         return await _send_prefixed(bot, f'对方已经有一个待确认的送{title}请求，请等待处理或超时后再试~')
@@ -169,8 +169,8 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     item_text = title if kind == 'loli' else f'{title}{role.name}'
     text = (
         f'{giver_name} 想把今天的{item_text}送给你！\n'
-        f'请在 {GIFT_CONFIRM_TIMEOUT_SECONDS} 秒内发送「同意送{title}」接受，'
-        f'或发送「拒绝送{title}」拒绝，超时将自动取消。'
+        f'请在 {GIFT_CONFIRM_TIMEOUT_SECONDS} 秒内发送「接受{title}赠送」，'
+        f'或发送「拒绝{title}赠送」，超时自动取消。'
     )
     await _send_prefixed(bot, [MessageSegment.at(target_user_id), '\n', text])
 
@@ -305,10 +305,10 @@ async def gift_wife_at(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '同意送老婆',
+    ('接受老婆赠送', '同意送老婆'),
     block=True,
     to_ai="""同意接收别人赠送的今日老婆。
-    当用户说“同意送老婆”“接受老婆赠送”时调用。
+    当用户说“接受老婆赠送”“同意送老婆”时调用。
     Args:
         text: 无需参数，留空。
     """,
@@ -318,10 +318,10 @@ async def gift_wife_accept(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '拒绝送老婆',
+    ('拒绝老婆赠送', '拒绝送老婆'),
     block=True,
     to_ai="""拒绝接收别人赠送的今日老婆。
-    当用户说“拒绝送老婆”“不要这个老婆赠送”时调用。
+    当用户说“拒绝老婆赠送”“拒绝送老婆”时调用。
     Args:
         text: 无需参数，留空。
     """,
@@ -357,10 +357,10 @@ async def gift_husband_at(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '同意送老公',
+    ('接受老公赠送', '同意送老公'),
     block=True,
     to_ai="""同意接收别人赠送的今日老公。
-    当用户说“同意送老公”“接受老公赠送”时调用。
+    当用户说“接受老公赠送”“同意送老公”时调用。
     Args:
         text: 无需参数，留空。
     """,
@@ -370,10 +370,10 @@ async def gift_husband_accept(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '拒绝送老公',
+    ('拒绝老公赠送', '拒绝送老公'),
     block=True,
     to_ai="""拒绝接收别人赠送的今日老公。
-    当用户说“拒绝送老公”“不要这个老公赠送”时调用。
+    当用户说“拒绝老公赠送”“拒绝送老公”时调用。
     Args:
         text: 无需参数，留空。
     """,
@@ -409,10 +409,10 @@ async def gift_loli_at(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '同意送萝莉',
+    ('接受萝莉赠送', '同意送萝莉'),
     block=True,
     to_ai="""同意接收别人赠送的今日萝莉。
-    当用户说“同意送萝莉”“接受萝莉赠送”时调用。
+    当用户说“接受萝莉赠送”“同意送萝莉”时调用。
     Args:
         text: 无需参数，留空。
     """,
@@ -422,10 +422,10 @@ async def gift_loli_accept(bot: Bot, ev: Event):
 
 
 @gift_sv.on_fullmatch(
-    '拒绝送萝莉',
+    ('拒绝萝莉赠送', '拒绝送萝莉'),
     block=True,
     to_ai="""拒绝接收别人赠送的今日萝莉。
-    当用户说“拒绝送萝莉”“不要这个萝莉赠送”时调用。
+    当用户说“拒绝萝莉赠送”“拒绝送萝莉”时调用。
     Args:
         text: 无需参数，留空。
     """,
