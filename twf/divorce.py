@@ -11,17 +11,12 @@ from .shared import (
     _has_active_wife,
     _load_wife_data,
     _save_wife_data,
-    _send_loli_text,
     _send_prefixed,
     _user_key,
     divorce_sv,
     logger,
     time,
 )
-
-
-def _divorce_reply_sender(kind: str):
-    return _send_loli_text if kind == 'loli' else _send_prefixed
 
 
 async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
@@ -33,13 +28,11 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     bucket = _daily_bucket_name(kind)
     user_key = _user_key(ev)
     current = context[bucket].get(user_key)
-    send_text = _divorce_reply_sender(kind)
-
     if not _has_active_wife(current):
-        return await send_text(bot, f'你今天还没有{title}，暂时离不了。')
+        return await _send_prefixed(bot, f'你今天还没有{title}，暂时离不了。', kind=kind)
 
     if not isinstance(current, dict):
-        return await send_text(bot, f'你今天还没有{title}，暂时离不了。')
+        return await _send_prefixed(bot, f'你今天还没有{title}，暂时离不了。', kind=kind)
 
     item_name = str(current.get('name') or title)
     current['divorced'] = True
@@ -47,8 +40,8 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _save_wife_data(data)
 
     if kind == 'loli':
-        return await send_text(bot, '已和今天的萝莉离婚。')
-    await send_text(bot, f'已和今天的{title}{item_name}离婚。')
+        return await _send_prefixed(bot, '已和今天的萝莉离婚。', kind=kind)
+    await _send_prefixed(bot, f'已和今天的{title}{item_name}离婚。', kind=kind)
 
 
 @divorce_sv.on_fullmatch(

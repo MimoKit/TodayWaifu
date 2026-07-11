@@ -27,10 +27,11 @@ def _blockquote_markdown(text: str) -> str:
 def _wife_list_markdown_from_items(
     title_text: str,
     items: list[tuple[int, str, str]],
+    mode: str = 'wife',
 ) -> str:
     text = _wife_list_text_from_items(title_text, items)
     if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
-        text = _reply_text(text)
+        text = _reply_text(text, mode)
     return _blockquote_markdown(text)
 
 
@@ -253,9 +254,17 @@ async def _send_record_image(
 ) -> None:
     text = _record_text(record, mode) if bool(_cfg('DailyWifeSendText')) else None
     if record.record_type == 'member':
-        await _send_local_image(bot, record.image, '本地群友头像文件不存在，请稍后重试。', text, user_id, is_group)
+        await _send_local_image(
+            bot,
+            record.image,
+            '本地群友头像文件不存在，请稍后重试。',
+            text,
+            user_id,
+            is_group,
+            mode,
+        )
         return
-    await _send_role_image(bot, record.to_role(), record.image, text, user_id, is_group)
+    await _send_role_image(bot, record.to_role(), record.image, text, user_id, is_group, mode)
 
 
 
@@ -295,15 +304,15 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
             candidates, error = await _load_candidates(mode)
             if error or not candidates:
-                return await _send_prefixed(bot, error or '没有找到可用角色。')
+                return await _send_prefixed(bot, error or '没有找到可用角色。', kind=mode)
             if not candidates:
-                return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+                return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
             rng = _daily_rng(ev, user_key, f'{mode}_safe')
             candidates = _filter_by_mode(candidates, mode)
             safe_wife = await _pick_nsfw_checked_role_record(candidates, rng, mode)
             if safe_wife is None:
                 logger.warning(f'{LOG_PREFIX} 补偿抽取没有通过 NSFW 检测的图片')
-                return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+                return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
             context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
             context['safe_wives'][user_key]['safe'] = True
             _save_wife_data(data)
@@ -313,19 +322,32 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                 text=f'你的{wife_name}已经被{stolen_by_name}抢走了…\n但你迎来了新的{title}{safe_wife.name}！',
                 user_id=ev.user_id,
                 is_group=ev.group_id is not None,
+                kind=mode,
             )
         if state == 'lost_stolen':
             item_name = current_record.get('name', title) if isinstance(current_record, dict) else title
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
-            return await _send_prefixed(bot, f'来晚了，你的{item_name}已经被{stolen_by_name}抢走了。')
+            return await _send_prefixed(
+                bot,
+                f'来晚了，你的{item_name}已经被{stolen_by_name}抢走了。',
+                kind=mode,
+            )
         if state == 'lost_gifted':
             wife_name = current_record.get('name', title)
             gifted_to_name = current_record.get('gifted_to_name') or current_record.get('gifted_to')
             logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 的{title}已送出，拒绝分配新角色')
-            return await _send_prefixed(bot, f'你已经把{wife_name}送给{gifted_to_name}了，今天不能再抽。')
+            return await _send_prefixed(
+                bot,
+                f'你已经把{wife_name}送给{gifted_to_name}了，今天不能再抽。',
+                kind=mode,
+            )
         if state == 'divorced':
             item_name = current_record.get('name', title) if isinstance(current_record, dict) else title
-            return await _send_prefixed(bot, f'你今天已经和{item_name}离婚了，明天再来。')
+            return await _send_prefixed(
+                bot,
+                f'你今天已经和{item_name}离婚了，明天再来。',
+                kind=mode,
+            )
 
     record: WifeRecord | None = None
 
@@ -333,13 +355,17 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
         candidates, error = await _load_candidates(mode)
         if error or not candidates:
-            return await _send_prefixed(bot, error or '没有找到可用角色。')
+            return await _send_prefixed(bot, error or '没有找到可用角色。', kind=mode)
         if not candidates:
-            return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+            return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
         if specified_name:
             target_candidates = [c for c in candidates if c.name == specified_name]
             if not target_candidates:
-                return await _send_prefixed(bot, f'未找到名为“{specified_name}”的{title}角色。')
+                return await _send_prefixed(
+                    bot,
+                    f'未找到名为“{specified_name}”的{title}角色。',
+                    kind=mode,
+                )
             candidates = tuple(target_candidates)
         else:
             candidates = _filter_by_mode(candidates, mode)
@@ -347,15 +373,19 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         record = await _pick_nsfw_checked_role_record(candidates, random, mode)
         if record is None:
             logger.warning(f'{LOG_PREFIX} Debug 抽取没有通过 NSFW 检测的图片')
-            return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+            return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
     else:
         if specified_name:
             logger.warning(f'{LOG_PREFIX} 普通用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝')
-            return await _send_prefixed(bot, f'只有在 Debug 模式下主人才能指定{title}哦。')
+            return await _send_prefixed(
+                bot,
+                f'只有在 Debug 模式下主人才能指定{title}哦。',
+                kind=mode,
+            )
 
         record = await _ensure_daily_wife_record(ev, mode=mode)
         if record is None:
-            return await _send_prefixed(bot, f'没有找到可用的{title}角色。')
+            return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
 
     if record.record_type == 'member':
         member = record.to_member()
@@ -474,13 +504,17 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
     title_text, items = await _wife_list_items(ev, mode)
     if _is_official_markdown_event(ev):
-        markdown = _wife_list_markdown_from_items(title_text, items)
+        markdown = _wife_list_markdown_from_items(title_text, items, mode)
         await _safe_send(bot, MessageSegment.markdown(markdown))
         return
     if len(items) > LIST_FORWARD_THRESHOLD:
-        await _send_prefixed(bot,MessageSegment.node([_wife_list_text_from_items(title_text, items)]))
+        await _send_prefixed(
+            bot,
+            MessageSegment.node([_wife_list_text_from_items(title_text, items)]),
+            kind=mode,
+        )
         return
-    await _send_prefixed(bot,_wife_list_text_from_items(title_text, items))
+    await _send_prefixed(bot, _wife_list_text_from_items(title_text, items), kind=mode)
 
 
 @daily_wife_sv.on_prefix(
@@ -564,7 +598,7 @@ async def assign_wife_usage(bot: Bot, ev: Event):
 )
 async def daily_husband_prefix(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
     specified_name = str(ev.text or '').strip()
     if specified_name == '列表':
         return await _send_wife_list(bot, ev, mode='husband')
@@ -582,7 +616,7 @@ async def daily_husband_prefix(bot: Bot, ev: Event):
 )
 async def daily_husband_full(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
     await _send_daily_wife(bot, ev, mode='husband', specified_name='')
 
 
@@ -597,7 +631,7 @@ async def daily_husband_full(bot: Bot, ev: Event):
 )
 async def daily_husband_list(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
     await _send_wife_list(bot, ev, mode='husband')
 
 

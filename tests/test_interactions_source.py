@@ -48,6 +48,24 @@ class InteractionConfigSourceTests(unittest.TestCase):
 
 
 class InteractionSourceTests(unittest.TestCase):
+    def test_reply_prefixes_are_selected_by_kind(self) -> None:
+        shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        for declaration in (
+            "REPLY_PREFIX = '[今日老婆]'",
+            "HUSBAND_REPLY_PREFIX = '[今日老公]'",
+            "LOLI_REPLY_PREFIX = '[今日萝莉]'",
+            "def _get_reply_prefix(kind: str = 'wife') -> str:",
+            "def _reply_text(text: str, kind: str = 'wife') -> str:",
+            "def _prefix_outgoing_message(message: Any, kind: str = 'wife') -> Any:",
+            "kind: str = 'wife',",
+        ):
+            self.assertIn(declaration, shared_source)
+
+    def test_mode_aware_modules_forward_reply_kind(self) -> None:
+        for module_name in ('daily.py', 'rob.py', 'gift.py', 'divorce.py'):
+            source = (ROOT / 'twf' / module_name).read_text(encoding='utf-8')
+            self.assertRegex(source, r'_send_prefixed\([\s\S]*?kind=(?:mode|kind)')
+
     def test_rob_and_gift_register_husband_and_loli_commands(self) -> None:
         rob_source = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
         gift_source = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')

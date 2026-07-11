@@ -25,14 +25,12 @@ from .shared import (
     _is_secondhand_wife,
     _load_wife_data,
     _record_to_dict,
-    _safe_send,
     _save_wife_data,
     _send_prefixed,
     _send_role_image,
     _user_display_name,
     _user_key,
     _wife_state,
-    _with_loli_reply_prefix,
     logger,
     gift_sv,
 )
@@ -81,17 +79,17 @@ async def _send_gift_result_image(
     kind: str,
 ) -> None:
     if kind != 'loli':
-        await _send_role_image(bot, role, image, text, user_id, is_group)
+        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return
 
     messages: list[object] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')
-    messages.append(_with_loli_reply_prefix(text))
+    messages.append(text)
     image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
     messages.append(MessageSegment.image(image_ref))
-    await _safe_send(bot, messages)
+    await _send_prefixed(bot, messages, kind=kind)
 
 
 def _get_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> dict[str, Any] | None:
@@ -125,21 +123,21 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起送{title}')
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
     if not _gift_enabled(kind):
-        return await _send_prefixed(bot, f'{title}赠送功能当前未开启。')
+        return await _send_prefixed(bot, f'{title}赠送功能当前未开启。', kind=kind)
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, f'准备把{title}送给谁？请艾特对方或填写对方 QQ。')
+        return await _send_prefixed(bot, f'准备把{title}送给谁？请艾特对方或填写对方 QQ。', kind=kind)
 
     giver_id = _user_key(ev)
     if target_user_id == giver_id:
-        return await _send_prefixed(bot, f'{title}本来就在你这里，不用再送给自己。')
+        return await _send_prefixed(bot, f'{title}本来就在你这里，不用再送给自己。', kind=kind)
 
     giver_record = _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
-        return await _send_prefixed(bot, f'你今天还没有{title}，先去抽取再来赠送。')
+        return await _send_prefixed(bot, f'你今天还没有{title}，先去抽取再来赠送。', kind=kind)
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
@@ -148,20 +146,24 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     state = _wife_state(giver_data)
     if state == 'lost_stolen':
-        return await _send_prefixed(bot, f'你的{title}已经被抢走了，现在没法送人。')
+        return await _send_prefixed(bot, f'你的{title}已经被抢走了，现在没法送人。', kind=kind)
     if state == 'lost_gifted':
-        return await _send_prefixed(bot, f'你今天已经把{title}送出去了。')
+        return await _send_prefixed(bot, f'你今天已经把{title}送出去了。', kind=kind)
     if state == 'divorced':
-        return await _send_prefixed(bot, f'你今天已经和{title}离婚了，现在没法送人。')
+        return await _send_prefixed(bot, f'你今天已经和{title}离婚了，现在没法送人。', kind=kind)
     if _is_secondhand_wife(giver_data):
-        return await _send_prefixed(bot, f'这个{title}是抢来或别人送的，不能再次转送。')
+        return await _send_prefixed(bot, f'这个{title}是抢来或别人送的，不能再次转送。', kind=kind)
 
     target_key = _user_key(ev, target_user_id)
     if _has_active_wife(context[bucket].get(target_key)):
-        return await _send_prefixed(bot, f'对方今天已经有{title}了，不能再接收。')
+        return await _send_prefixed(bot, f'对方今天已经有{title}了，不能再接收。', kind=kind)
 
     if _get_pending_gift(ev, target_user_id, kind) is not None:
-        return await _send_prefixed(bot, f'对方已经有一个待确认的送{title}请求，请等待处理或超时后再试~')
+        return await _send_prefixed(
+            bot,
+            f'对方已经有一个待确认的送{title}请求，请等待处理或超时后再试~',
+            kind=kind,
+        )
 
     _set_pending_gift(ev, target_user_id, giver_id, kind)
     giver_name = _user_display_name(ev, giver_id)
@@ -172,7 +174,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         f'请在 {GIFT_CONFIRM_TIMEOUT_SECONDS} 秒内发送「接受{title}赠送」，'
         f'或发送「拒绝{title}赠送」，超时自动取消。'
     )
-    await _send_prefixed(bot, [MessageSegment.at(target_user_id), '\n', text])
+    await _send_prefixed(bot, [MessageSegment.at(target_user_id), '\n', text], kind=kind)
 
 
 async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
@@ -180,19 +182,27 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     target_user_id = _user_key(ev)
     pending = _get_pending_gift(ev, target_user_id, kind)
     if pending is None:
-        return await _send_prefixed(bot, f'没有待确认的送{title}请求，可能已经超时或被取消了~')
+        return await _send_prefixed(
+            bot,
+            f'没有待确认的送{title}请求，可能已经超时或被取消了~',
+            kind=kind,
+        )
 
     giver_id = str(pending['giver_id'])
     _clear_pending_gift(ev, target_user_id, kind)
 
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
     if not _gift_enabled(kind):
-        return await _send_prefixed(bot, f'送{title}功能已关闭，这次赠送已失效。')
+        return await _send_prefixed(bot, f'送{title}功能已关闭，这次赠送已失效。', kind=kind)
 
     giver_record = _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
-        return await _send_prefixed(bot, f'对方现在已经没有{title}可以送给你了，赠送已失效~')
+        return await _send_prefixed(
+            bot,
+            f'对方现在已经没有{title}可以送给你了，赠送已失效~',
+            kind=kind,
+        )
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
@@ -201,16 +211,20 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     state = _wife_state(giver_data)
     if state == 'lost_stolen':
-        return await _send_prefixed(bot, f'对方的{title}已经被抢走了，赠送已失效~')
+        return await _send_prefixed(bot, f'对方的{title}已经被抢走了，赠送已失效~', kind=kind)
     if state == 'lost_gifted':
-        return await _send_prefixed(bot, f'对方已经把{title}送给别人了，赠送已失效~')
+        return await _send_prefixed(bot, f'对方已经把{title}送给别人了，赠送已失效~', kind=kind)
     if state == 'divorced':
-        return await _send_prefixed(bot, f'对方已经和{title}离婚了，赠送已失效~')
+        return await _send_prefixed(bot, f'对方已经和{title}离婚了，赠送已失效~', kind=kind)
     if _is_secondhand_wife(giver_data):
-        return await _send_prefixed(bot, f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~')
+        return await _send_prefixed(
+            bot,
+            f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~',
+            kind=kind,
+        )
 
     if _has_active_wife(context[bucket].get(target_user_id)):
-        return await _send_prefixed(bot, f'你现在已经有{title}了，不需要接受赠送啦~')
+        return await _send_prefixed(bot, f'你现在已经有{title}了，不需要接受赠送啦~', kind=kind)
 
     context[bucket][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
     context[bucket][target_user_id]['gifted_from'] = giver_id
@@ -237,9 +251,9 @@ async def _reject_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     target_user_id = _user_key(ev)
     if _get_pending_gift(ev, target_user_id, kind) is None:
-        return await _send_prefixed(bot, f'没有待确认的送{title}请求。')
+        return await _send_prefixed(bot, f'没有待确认的送{title}请求。', kind=kind)
     _clear_pending_gift(ev, target_user_id, kind)
-    await _send_prefixed(bot, f'已拒绝对方的送{title}请求。')
+    await _send_prefixed(bot, f'已拒绝对方的送{title}请求。', kind=kind)
 
 
 async def _send_gift_wife(bot: Bot, ev: Event) -> None:

@@ -25,14 +25,12 @@ from .shared import (
     _is_secondhand_wife,
     _load_wife_data,
     _record_to_dict,
-    _safe_send,
     _save_wife_data,
     _send_prefixed,
     _send_role_image,
     _user_display_name,
     _user_key,
     _wife_state,
-    _with_loli_reply_prefix,
     logger,
     rob_sv,
 )
@@ -83,38 +81,38 @@ async def _send_rob_result_image(
     kind: str,
 ) -> None:
     if kind != 'loli':
-        await _send_role_image(bot, role, image, text, user_id, is_group)
+        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return
 
     messages: list[object] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')
-    messages.append(_with_loli_reply_prefix(text))
+    messages.append(text)
     image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
     messages.append(MessageSegment.image(image_ref))
-    await _safe_send(bot, messages)
+    await _send_prefixed(bot, messages, kind=kind)
 
 
 async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起抢{title}')
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message())
+        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
     if not _rob_enabled(kind):
-        return await _send_prefixed(bot, f'抢{title}功能当前未开启。')
+        return await _send_prefixed(bot, f'抢{title}功能当前未开启。', kind=kind)
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, f'准备抢谁的{title}？请艾特对方或填写对方 QQ。')
+        return await _send_prefixed(bot, f'准备抢谁的{title}？请艾特对方或填写对方 QQ。', kind=kind)
 
     robber_id = _user_key(ev)
     if target_user_id == robber_id:
-        return await _send_prefixed(bot, f'{title}本来就在你这里，没必要抢自己。')
+        return await _send_prefixed(bot, f'{title}本来就在你这里，没必要抢自己。', kind=kind)
 
     target_record = _get_existing_daily_record(ev, target_user_id, kind)
     if target_record is None:
-        return await _send_prefixed(bot, f'对方今天还没有{title}，你扑了个空。')
+        return await _send_prefixed(bot, f'对方今天还没有{title}，你扑了个空。', kind=kind)
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
@@ -123,18 +121,18 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     target_data = context[bucket].get(target_key)
 
     if _wife_state(target_data) != 'owned':
-        return await _send_prefixed(bot, f'对方的{title}已经不在身边了，你来晚了。')
+        return await _send_prefixed(bot, f'对方的{title}已经不在身边了，你来晚了。', kind=kind)
     if _is_secondhand_wife(target_data):
-        return await _send_prefixed(bot, f'对方这个{title}是抢来或别人送的，不能再次抢夺。')
+        return await _send_prefixed(bot, f'对方这个{title}是抢来或别人送的，不能再次抢夺。', kind=kind)
     if not _has_active_wife(target_data):
-        return await _send_prefixed(bot, f'对方今天还没有{title}，你扑了个空。')
+        return await _send_prefixed(bot, f'对方今天还没有{title}，你扑了个空。', kind=kind)
 
     attempts = context.setdefault('rob_attempts', {})
     is_master = _is_master(ev)
     attempt_key = _rob_attempt_key(kind, robber_id)
     if not is_master and (attempts.get(attempt_key) or (kind == 'wife' and attempts.get(robber_id))):
         logger.info(f'{LOG_PREFIX} 用户 {robber_id} 今天抢{title}次数已用尽')
-        return await _send_prefixed(bot, f'今天的抢夺机会已经用完，明天再来。')
+        return await _send_prefixed(bot, f'今天的抢夺机会已经用完，明天再来。', kind=kind)
 
     if not is_master:
         attempts[attempt_key] = True
@@ -142,7 +140,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if random.random() >= _rob_success_rate(kind):
         logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的{title}失败')
         _save_wife_data(data)
-        return await _send_prefixed(bot, f'没抢到{title}，本次抢夺失败。')
+        return await _send_prefixed(bot, f'没抢到{title}，本次抢夺失败。', kind=kind)
 
     logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的{title}')
     context[bucket][robber_id] = _record_to_dict(target_record, ev, robber_id)

@@ -77,6 +77,7 @@ LOLI_MOBILE_UA = (
 LOG_PREFIX = '[鸣潮今日老婆]'
 LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
 REPLY_PREFIX = '[今日老婆]'
+HUSBAND_REPLY_PREFIX = '[今日老公]'
 LOLI_REPLY_PREFIX = '[今日萝莉]'
 
 __all__ = [
@@ -87,7 +88,7 @@ __all__ = [
     'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS', 'NSFW_CHECK_MAX_ATTEMPTS',
-    'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
+    'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins', 'REPLY_PREFIX',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
     'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
@@ -110,7 +111,7 @@ __all__ = [
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_nsfw_checked_role_record',
-    '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
+    '_get_reply_prefix', '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
@@ -129,13 +130,7 @@ __all__ = [
 
 
 def _with_loli_reply_prefix(text: str) -> str:
-    if not text.strip():
-        return text
-    stripped = text.lstrip()
-    leading = text[: len(text) - len(stripped)]
-    if stripped.startswith(LOLI_REPLY_PREFIX):
-        return text
-    return f'{leading}{LOLI_REPLY_PREFIX}{stripped}'
+    return _reply_text(text, 'loli')
 
 
 def _is_xwuid_group_activity_hook_error(exc: Exception) -> bool:
@@ -205,29 +200,38 @@ async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
 
 
 async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
-    return await _safe_send(bot, _with_loli_reply_prefix(text), *args, **kwargs)
+    return await _send_prefixed(bot, text, *args, kind='loli', **kwargs)
 
 
 
-def _reply_text(text: str) -> str:
+def _get_reply_prefix(kind: str = 'wife') -> str:
+    if kind == 'husband':
+        return HUSBAND_REPLY_PREFIX
+    if kind == 'loli':
+        return LOLI_REPLY_PREFIX
+    return REPLY_PREFIX
+
+
+def _reply_text(text: str, kind: str = 'wife') -> str:
     if not text.strip():
         return text
     stripped = text.lstrip()
     leading = text[: len(text) - len(stripped)]
-    if stripped.startswith(REPLY_PREFIX):
+    prefix = _get_reply_prefix(kind)
+    if stripped.startswith(prefix):
         return text
-    return f'{leading}{REPLY_PREFIX}{stripped}'
+    return f'{leading}{prefix}{stripped}'
 
 
-def _prefix_outgoing_message(message: Any) -> Any:
+def _prefix_outgoing_message(message: Any, kind: str = 'wife') -> Any:
     prefixed = False
 
     def prefix_node_item(item: Any) -> Any:
         if isinstance(item, str):
-            return _reply_text(item) if item.strip() else item
+            return _reply_text(item, kind) if item.strip() else item
         if isinstance(item, Message):
             if item.type == 'text' and isinstance(item.data, str):
-                return Message(type=item.type, data=_reply_text(item.data)) if item.data.strip() else item
+                return Message(type=item.type, data=_reply_text(item.data, kind)) if item.data.strip() else item
             if item.type == 'node' and isinstance(item.data, list):
                 return Message(type=item.type, data=[prefix_node_item(part) for part in item.data])
         return item
@@ -237,13 +241,13 @@ def _prefix_outgoing_message(message: Any) -> Any:
         if isinstance(item, str):
             if not prefixed and item.strip():
                 prefixed = True
-                return _reply_text(item)
+                return _reply_text(item, kind)
             return item
         if isinstance(item, Message):
             if item.type == 'text' and isinstance(item.data, str):
                 if not prefixed and item.data.strip():
                     prefixed = True
-                    return Message(type=item.type, data=_reply_text(item.data))
+                    return Message(type=item.type, data=_reply_text(item.data, kind))
                 return item
             if item.type == 'node' and isinstance(item.data, list):
                 return Message(type=item.type, data=[prefix_node_item(part) for part in item.data])
@@ -254,10 +258,16 @@ def _prefix_outgoing_message(message: Any) -> Any:
     return prefix_item(message)
 
 
-async def _send_prefixed(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
+async def _send_prefixed(
+    bot: Bot,
+    message: Any,
+    *args: Any,
+    kind: str = 'wife',
+    **kwargs: Any,
+) -> Any:
     if not _cfg_bool('DailyWifeReplyPrefixEnabled', True):
         return await _safe_send(bot, message, *args, **kwargs)
-    return await _safe_send(bot, _prefix_outgoing_message(message), *args, **kwargs)
+    return await _safe_send(bot, _prefix_outgoing_message(message, kind), *args, **kwargs)
 
 # 本地图片读取相关常量
 ROLE_MAP_RE = re.compile(r'^\s*(\d+)\s*[:：]\s*(.+?)\s*$')
@@ -1569,6 +1579,7 @@ async def _send_role_image(
     text: str | None = None,
     user_id: str | int | None = None,
     is_group: bool = True,
+    kind: str = 'wife',
 ) -> None:
     is_gallery_image = image_url.startswith(('http://', 'https://'))
     if is_gallery_image:
@@ -1576,12 +1587,12 @@ async def _send_role_image(
             image: Any = await _download_image(image_url)
         except RuntimeError as exc:
             logger.warning(f'{LOG_PREFIX} 下载图库图片失败: {exc}')
-            await _send_prefixed(bot, str(exc))
+            await _send_prefixed(bot, str(exc), kind=kind)
             return
     else:
         if not Path(image_url).is_file():
             logger.warning(f'{LOG_PREFIX} 本地图片不存在: {image_url}')
-            await _send_prefixed(bot,'本地图片文件不存在，请检查 custom_role_pile 目录。')
+            await _send_prefixed(bot, '本地图片文件不存在，请检查 custom_role_pile 目录。', kind=kind)
             return
         image = Path(image_url)
 
@@ -1592,7 +1603,7 @@ async def _send_role_image(
     if text:
         messages.append(text)
     messages.append(MessageSegment.image(image))
-    await _send_prefixed(bot,messages if len(messages) > 1 else messages[0])
+    await _send_prefixed(bot, messages if len(messages) > 1 else messages[0], kind=kind)
 
 
 async def _send_local_image(
@@ -1602,6 +1613,7 @@ async def _send_local_image(
     text: str | None = None,
     user_id: str | int | None = None,
     is_group: bool = True,
+    kind: str = 'wife',
 ) -> None:
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
@@ -1613,12 +1625,12 @@ async def _send_local_image(
         if not Path(image_url).is_file():
             logger.warning(f'{LOG_PREFIX} 本地图片不存在: {image_url}')
             if not text:
-                await _send_prefixed(bot,missing_hint)
+                await _send_prefixed(bot, missing_hint, kind=kind)
                 return
         else:
             messages.append(MessageSegment.image(Path(image_url)))
 
     if not messages:
-        await _send_prefixed(bot,missing_hint)
+        await _send_prefixed(bot, missing_hint, kind=kind)
         return
-    await _send_prefixed(bot,messages if len(messages) > 1 else messages[0])
+    await _send_prefixed(bot, messages if len(messages) > 1 else messages[0], kind=kind)
