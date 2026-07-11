@@ -37,6 +37,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '图库角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
         'https://img.xlinxc.cn/api/xwuid/roles',
     ),
+    'DailyWifeLoliApiUrl': GsStrConfig(
+        '今日萝莉接口地址',
+        'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
+        'https://loli.xlinxc.cn',
+    ),
     '_DividerNsfwCheck': GsDivider('NSFW 检测', ''),
     'DailyWifeNsfwCheckEnabled': GsBoolConfig(
         '启用 NSFW 检测',
@@ -121,14 +126,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '今日老公文字模板',
         '今日老公的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID',
         '你今天的老公是{name}',
-    ),
-
-    '_DividerLolicon': GsDivider('今日萝莉', ''),
-    'DailyWifeLoliconCustomUrl': GsStrConfig(
-        '今日萝莉接口地址',
-        '【免责声明】第三方 API，作者不对其内容负责，使用风险自行承担。'
-        '填入 GET 直接返回图片内容的接口地址，留空则禁用今日萝莉功能',
-        'https://loli.xlinxc.cn',
     ),
 
     '_DividerRob': GsDivider('抢夺设置', ''),

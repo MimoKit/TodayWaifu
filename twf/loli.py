@@ -164,7 +164,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         if record is not None:
             return await _send_loli_record(bot, record)
 
-    custom_url = str(_cfg('DailyWifeLoliconCustomUrl') or '').strip()
+    custom_url = str(_cfg('DailyWifeLoliApiUrl') or '').strip()
     if custom_url:
         logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，接口: {custom_url}')
         try:
