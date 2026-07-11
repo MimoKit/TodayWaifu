@@ -30,6 +30,8 @@ from gsuid_core.sv import Plugins, SV
 from gsuid_core.utils.database.models import CoreUser
 
 from ..daily_wife_config import DailyWifeConfig
+from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
+from .storage import atomic_write_json, read_json_dict
 
 Plugins(
     name='TodayWaifu',
@@ -83,7 +85,8 @@ LOLI_REPLY_PREFIX = '[今日萝莉]'
 __all__ = [
     'Any', 'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
     'CUSTOM_ROLE_DELETE_CONFIRM_SECONDS', 'CUSTOM_ROLE_DELETE_PENDING',
-    'CUSTOM_ROLE_ID_START', 'CoreUser', 'DEFAULT_GALLERY_API_URL', 'DailyWifeConfig',
+    'CUSTOM_ROLE_ID_START', 'CoreUser', 'DAILY_KIND_METADATA', 'DEFAULT_GALLERY_API_URL',
+    'DailyKindMetadata', 'DailyWifeConfig',
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
     'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
@@ -98,7 +101,7 @@ __all__ = [
     '_custom_upload_role_pile_root', '_daily_rng', '_download_avatar', '_download_image',
     '_download_image_sync', '_event_rng', '_fetch_gallery_payload_sync', '_filter_by_mode',
     '_gallery_api_url', '_gallery_mode_enabled',
-    '_daily_bucket_name', '_daily_item_title', '_get_event_target_user_id',
+    '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
@@ -116,7 +119,7 @@ __all__ = [
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text',
-    '_safe_send', '_send_prefixed', '_send_role_image',
+    '_safe_send', '_send_daily_result_image', '_send_prefixed', '_send_role_image',
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
@@ -562,11 +565,11 @@ def _configured_path(key: str) -> Path | None:
 
 
 def _role_mode(mode: str) -> str:
-    return 'husband' if mode == 'husband' else 'wife'
+    return _daily_kind_metadata(mode).role_mode
 
 
 def _role_map_title(mode: str) -> str:
-    return '老公' if _role_mode(mode) == 'husband' else '老婆'
+    return _daily_kind_metadata(mode).title
 
 
 def _resolve_role_map_path(mode: str = 'wife') -> Path | None:
@@ -1324,23 +1327,20 @@ def _load_wife_data() -> dict[str, Any]:
     if not path.is_file():
         logger.debug(f'{LOG_PREFIX} 数据文件不存在，将创建新数据')
         return {'days': {}}
-    try:
-        data = json.loads(path.read_text(encoding='utf-8'))
-        logger.debug(f'{LOG_PREFIX} 成功加载数据文件: {path.name}')
-    except Exception as exc:
-        logger.exception(f'{LOG_PREFIX} 读取数据文件失败，将使用空数据: {exc}')
+    data = read_json_dict(path)
+    if not data:
+        logger.warning(f'{LOG_PREFIX} 读取数据文件失败或内容为空，将使用空数据: {path}')
         return {'days': {}}
-    if not isinstance(data, dict):
-        return {'days': {}}
+    logger.debug(f'{LOG_PREFIX} 成功加载数据文件: {path.name}')
     data.setdefault('days', {})
     return data
 
 
 def _save_wife_data(data: dict[str, Any]) -> None:
     try:
-        _wife_data_path().write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        atomic_write_json(_wife_data_path(), data)
         logger.debug(f'{LOG_PREFIX} 数据文件已保存')
-    except Exception as exc:
+    except OSError as exc:
         logger.error(f'{LOG_PREFIX} 保存数据文件失败: {exc}')
 
 
@@ -1357,19 +1357,15 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
 
 
 def _daily_bucket_name(kind: str) -> str:
-    if kind == 'husband':
-        return 'husbands'
-    if kind == 'loli':
-        return 'lolis'
-    return 'wives'
+    return _daily_kind_metadata(kind).bucket
 
 
 def _daily_item_title(kind: str) -> str:
-    if kind == 'husband':
-        return '老公'
-    if kind == 'loli':
-        return '萝莉'
-    return '老婆'
+    return _daily_kind_metadata(kind).title
+
+
+def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
+    return daily_kind_metadata(kind)
 
 
 def _record_to_dict(record: WifeRecord, ev: Event | None = None, user_id: str | int | None = None) -> dict[str, Any]:
@@ -1604,6 +1600,29 @@ async def _send_role_image(
         messages.append(text)
     messages.append(MessageSegment.image(image))
     await _send_prefixed(bot, messages if len(messages) > 1 else messages[0], kind=kind)
+
+
+async def _send_daily_result_image(
+    bot: Bot,
+    role: RoleCandidate,
+    image: str,
+    text: str,
+    user_id: str,
+    is_group: bool,
+    kind: str,
+) -> None:
+    if kind != 'loli':
+        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
+        return
+
+    messages: list[Any] = []
+    if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
+        messages.append(MessageSegment.at(user_id))
+        messages.append('\n')
+    messages.append(_with_loli_reply_prefix(text))
+    image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
+    messages.append(MessageSegment.image(image_ref))
+    await _safe_send(bot, messages)
 
 
 async def _send_local_image(

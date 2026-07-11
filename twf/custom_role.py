@@ -2,6 +2,13 @@
 from __future__ import annotations
 
 from .shared import *  # noqa: F403
+from .image_input import (
+    collect_image_refs,
+    detect_image_suffix,
+    image_hash_id,
+    image_suffix_from_source,
+    read_image_bytes,
+)
 
 
 def _role_ids_by_name(role_map: dict[str, str], role_name: str) -> tuple[str, ...]:
@@ -64,78 +71,19 @@ def _create_or_get_custom_role(role_name: str) -> tuple[str, bool, str | None]:
 
 
 def _upload_image_refs(ev: Event) -> tuple[str, ...]:
-    refs: list[str] = []
-    for content in ev.content or []:
-        if content.type in {'image', 'img'} and isinstance(content.data, str):
-            ref = content.data.strip()
-            if ref:
-                refs.append(ref)
-    for item in ev.image_list or []:
-        if isinstance(item, str) and item.strip():
-            refs.append(item.strip())
-    if isinstance(ev.image, str) and ev.image.strip():
-        refs.append(ev.image.strip())
-    return tuple(dict.fromkeys(refs))
+    return collect_image_refs(ev)
 
 
 def _image_suffix_from_source(source: str) -> str:
-    text = str(source or '').strip()
-    if text.startswith('link://'):
-        text = text[7:]
-    try:
-        path_text = urlparse(text).path if text.startswith(('http://', 'https://')) else text
-        suffix = Path(path_text.split('?', 1)[0]).suffix.lower()
-    except Exception:
-        suffix = ''
-    return suffix if suffix in IMAGE_EXTENSIONS else ''
+    return image_suffix_from_source(source)
 
 
 def _detect_upload_image_suffix(data: bytes, source: str) -> str:
-    if data.startswith(b'\xff\xd8\xff'):
-        return '.jpg'
-    if data.startswith(b'\x89PNG\r\n\x1a\n'):
-        return '.png'
-    if data.startswith(b'GIF87a') or data.startswith(b'GIF89a'):
-        return '.gif'
-    if data.startswith(b'BM'):
-        return '.bmp'
-    if len(data) >= 12 and data[:4] == b'RIFF' and data[8:12] == b'WEBP':
-        return '.webp'
-    return _image_suffix_from_source(source)
+    return detect_image_suffix(data, source)
 
 
 def _read_upload_image_bytes(source: str) -> tuple[bytes, str] | None:
-    text = str(source or '').strip()
-    if not text:
-        return None
-
-    try:
-        if text.startswith('data:image/') and ',' in text:
-            data = base64.b64decode(text.split(',', 1)[1], validate=False)
-        elif text.startswith('base64://'):
-            data = base64.b64decode(text[9:], validate=False)
-        else:
-            if text.startswith('link://'):
-                text = text[7:]
-            if text.startswith(('http://', 'https://')):
-                request = Request(text, headers={'User-Agent': 'Mozilla/5.0'})
-                with urlopen(request, timeout=15) as response:
-                    data = response.read(UPLOAD_IMAGE_MAX_BYTES + 1)
-            else:
-                path = Path(text)
-                if not path.is_file():
-                    return None
-                data = path.read_bytes()
-    except (OSError, ValueError, binascii.Error) as exc:
-        logger.warning(f'{LOG_PREFIX} 读取上传图片失败: {exc}')
-        return None
-
-    if not data or len(data) > UPLOAD_IMAGE_MAX_BYTES:
-        return None
-    suffix = _detect_upload_image_suffix(data, source)
-    if suffix not in IMAGE_EXTENSIONS:
-        return None
-    return data, suffix
+    return read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES)
 
 
 def _unique_upload_image_path(role_dir: Path, role_id: str, suffix: str, index: int) -> Path:
@@ -150,7 +98,7 @@ def _unique_upload_image_path(role_dir: Path, role_id: str, suffix: str, index: 
 
 
 def _custom_image_hash_id(path: Path | str) -> str:
-    return hashlib.sha256(Path(path).name.encode()).hexdigest()[:8]
+    return image_hash_id(path)
 
 
 def _custom_role_image_map(role_id: str) -> dict[str, Path]:

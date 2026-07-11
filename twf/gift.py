@@ -9,13 +9,13 @@ from .shared import (
     Event,
     LOG_PREFIX,
     MessageSegment,
-    Path,
     RoleCandidate,
     _cfg,
     _cfg_bool,
     _context_key,
     _daily_bucket_name,
     _daily_item_title,
+    _daily_kind_metadata,
     _get_event_target_user_id,
     _get_existing_daily_record,
     _get_today_context,
@@ -26,8 +26,8 @@ from .shared import (
     _load_wife_data,
     _record_to_dict,
     _save_wife_data,
+    _send_daily_result_image,
     _send_prefixed,
-    _send_role_image,
     _user_display_name,
     _user_key,
     _wife_state,
@@ -41,19 +41,12 @@ _GIFT_PENDING: dict[str, dict[str, Any]] = {}
 
 
 def _gift_enabled(kind: str) -> bool:
-    if kind == 'husband':
-        return _cfg_bool('DailyHusbandGiftEnabled', True)
-    if kind == 'loli':
-        return _cfg_bool('DailyLoliGiftEnabled', True)
-    return _cfg_bool('DailyWifeGiftEnabled', True)
+    return _cfg_bool(_daily_kind_metadata(kind).gift_enabled_key, True)
 
 
 def _gift_success_template(kind: str) -> str:
-    if kind == 'husband':
-        return str(_cfg('DailyHusbandGiftSuccessTemplate') or '你把今天的老公{name}送给了对方！')
-    if kind == 'loli':
-        return str(_cfg('DailyLoliGiftSuccessTemplate') or '你把今天的萝莉送给了对方！')
-    return str(_cfg('DailyWifeGiftSuccessTemplate') or '你把今天的老婆{name}送给了对方！')
+    metadata = _daily_kind_metadata(kind)
+    return str(_cfg(metadata.gift_success_key) or metadata.gift_success_default)
 
 
 def _build_gift_success_text(role: RoleCandidate, target_user_id: str, kind: str) -> str:
@@ -78,18 +71,7 @@ async def _send_gift_result_image(
     is_group: bool,
     kind: str,
 ) -> None:
-    if kind != 'loli':
-        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
-        return
-
-    messages: list[object] = []
-    if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
-        messages.append(MessageSegment.at(user_id))
-        messages.append('\n')
-    messages.append(text)
-    image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
-    messages.append(MessageSegment.image(image_ref))
-    await _send_prefixed(bot, messages, kind=kind)
+    await _send_daily_result_image(bot, role, image, text, user_id, is_group, kind)
 
 
 def _get_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> dict[str, Any] | None:
@@ -129,7 +111,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, f'要送给谁？请艾特对方或在命令后面写对方 QQ。', kind=kind)
+        return await _send_prefixed(bot, '要送给谁？请艾特对方或在命令后面写对方 QQ。', kind=kind)
 
     giver_id = _user_key(ev)
     if target_user_id == giver_id:

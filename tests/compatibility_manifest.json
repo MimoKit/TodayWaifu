@@ -1,0 +1,414 @@
+{
+  "base_commit": "0d0aaf7",
+  "configs": {
+    "CONFIG_DEFAULT": [
+      {
+        "key": "_DividerImageSource",
+        "expr": "GsDivider('图片数据源', '')"
+      },
+      {
+        "key": "DailyWifeImageSource",
+        "expr": "GsStrConfig('图片数据源', '选择 local 使用本地 XWUID 图片目录；选择 gallery 使用远程图库接口。图库图片可能存在内容风险，请自行决定是否启用；使用风险自行承担，插件作者不承担责任', 'local', options=['local', 'gallery'])"
+      },
+      {
+        "key": "DailyWifeCustomRolePilePath",
+        "expr": "GsStrConfig('本地角色图片目录', '图片数据源为 local 时生效。留空时自动查找 gsuid_core/data/XutheringWavesUID/custom_role_pile', '')"
+      },
+      {
+        "key": "DailyWifeRoleMapPath",
+        "expr": "GsStrConfig('角色 ID 对照表路径', '留空时使用插件内置 wife_role_id_map.txt', '')"
+      },
+      {
+        "key": "DailyWifeGalleryApiUrl",
+        "expr": "GsStrConfig('图库接口地址', '图库角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担', 'https://img.xlinxc.cn/api/xwuid/roles')"
+      },
+      {
+        "key": "DailyWifeLoliApiUrl",
+        "expr": "GsStrConfig('今日萝莉接口地址', 'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库', 'https://loli.xlinxc.cn')"
+      },
+      {
+        "key": "_DividerNsfwCheck",
+        "expr": "GsDivider('NSFW 检测', '')"
+      },
+      {
+        "key": "DailyWifeNsfwCheckEnabled",
+        "expr": "GsBoolConfig('启用 NSFW 检测', '开启后发送今日老婆/老公图片前会调用检测服务；未通过的图片会静默重抽，不直接发出。默认关闭', False)"
+      },
+      {
+        "key": "DailyWifeNsfwCheckUrl",
+        "expr": "GsStrConfig('NSFW 检测地址', '检测服务地址。可填服务根地址，也可填完整 /check/upload；如需鉴权可按检测服务要求配置查询参数', '', secret=True)"
+      },
+      {
+        "key": "_DividerBasicReply",
+        "expr": "GsDivider('基础回复设置', '')"
+      },
+      {
+        "key": "DailyWifeSendText",
+        "expr": "GsBoolConfig('发送文字说明', '开启后图片前附带\"你今天的老婆是xxx\"', True)"
+      },
+      {
+        "key": "DailyWifeReplyPrefixEnabled",
+        "expr": "GsBoolConfig('启用回复前缀', '开启后插件回复会自动添加\"[今日老婆]\"前缀', True)"
+      },
+      {
+        "key": "DailyWifeAtUser",
+        "expr": "GsBoolConfig('发送时艾特触发者', '开启后发送今日老婆结果时会艾特触发者', True)"
+      },
+      {
+        "key": "DailyWifeShowRoleId",
+        "expr": "GsBoolConfig('显示角色 ID', '开启后文字说明会额外附带一行\"角色ID：xxx\"', False)"
+      },
+      {
+        "key": "DailyWifeDebugMode",
+        "expr": "GsBoolConfig('主人 Debug 模式', '开启后机器人主人可以用\"今日老婆 角色名\"指定抽取的角色，便于调试', False)"
+      },
+      {
+        "key": "_DividerDailyWife",
+        "expr": "GsDivider('今日老婆', '')"
+      },
+      {
+        "key": "DailyWifeTextTemplate",
+        "expr": "GsStrConfig('今日老婆文字模板', '今日老婆的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID', '你今天的老婆是{name}')"
+      },
+      {
+        "key": "_DividerGroupMember",
+        "expr": "GsDivider('群友玩法', '')"
+      },
+      {
+        "key": "DailyWifeEnableGroupMember",
+        "expr": "GsBoolConfig('今日老婆概率抽群友', '开启后「今日老婆」会按配置概率从本群 GSCore 成员缓存里抽取群友，未命中或获取失败时仍抽鸣潮角色', False)"
+      },
+      {
+        "key": "DailyWifeGroupMemberProbability",
+        "expr": "GsStrConfig('今日老婆抽群友概率', '0 到 1 之间的小数，例如 0.1 表示 10% 概率抽群友；仅在开启今日老婆概率抽群友后生效', '0.1')"
+      },
+      {
+        "key": "DailyWifeGroupMemberTextTemplate",
+        "expr": "GsStrConfig('今日老婆抽群友文字模板', '今日老婆命中群友时的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ', '你今天的老婆是{name}')"
+      },
+      {
+        "key": "DailyWifeMarryGroupMemberEnabled",
+        "expr": "GsBoolConfig('启用娶群友', '开启后可使用「娶群友」命令，从本群 GSCore 成员缓存里抽取群友', False)"
+      },
+      {
+        "key": "DailyWifeMarryGroupMemberTextTemplate",
+        "expr": "GsStrConfig('娶群友文字模板', '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ', '你娶到的群友是{name}')"
+      },
+      {
+        "key": "_DividerDailyHusband",
+        "expr": "GsDivider('今日老公', '')"
+      },
+      {
+        "key": "DailyWifeHusbandEnabled",
+        "expr": "GsBoolConfig('启用今日老公', '开启后可使用「今日老公」命令，只抽取男角色；关闭后命令不生效', False)"
+      },
+      {
+        "key": "DailyHusbandTextTemplate",
+        "expr": "GsStrConfig('今日老公文字模板', '今日老公的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID', '你今天的老公是{name}')"
+      },
+      {
+        "key": "_DividerRob",
+        "expr": "GsDivider('抢夺设置', '')"
+      },
+      {
+        "key": "DailyWifeRobEnabled",
+        "expr": "GsBoolConfig('启用抢老婆', '开启后可以使用\"抢老婆 @对方\"抢对方当天老婆', True)"
+      },
+      {
+        "key": "DailyWifeRobSuccessRate",
+        "expr": "GsStrConfig('抢老婆/老公成功率', '0 到 1 之间的小数，例如 0.5 表示 50%；抢老公也复用这个成功率', '0.5')"
+      },
+      {
+        "key": "DailyWifeRobSuccessTemplate",
+        "expr": "GsStrConfig('抢老婆成功文案', '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID', '抢老婆成功！你把对方今天的老婆{name}抢过来了！')"
+      },
+      {
+        "key": "DailyHusbandRobEnabled",
+        "expr": "GsBoolConfig('启用抢老公', '开启后可以使用\"抢老公 @对方\"抢对方当天老公', True)"
+      },
+      {
+        "key": "DailyHusbandRobSuccessTemplate",
+        "expr": "GsStrConfig('抢老公成功文案', '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 被抢用户 ID', '抢老公成功！你把对方今天的老公{name}抢过来了！')"
+      },
+      {
+        "key": "DailyLoliRobEnabled",
+        "expr": "GsBoolConfig('启用抢萝莉', '开启后可以使用\"抢萝莉 @对方\"抢对方当天萝莉', True)"
+      },
+      {
+        "key": "DailyLoliRobSuccessRate",
+        "expr": "GsStrConfig('抢萝莉成功率', '0 到 1 之间的小数，例如 0.5 表示 50%', '0.5')"
+      },
+      {
+        "key": "DailyLoliRobSuccessTemplate",
+        "expr": "GsStrConfig('抢萝莉成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID', '抢萝莉成功！你把对方今天的萝莉抢过来了！')"
+      },
+      {
+        "key": "_DividerGift",
+        "expr": "GsDivider('赠送设置', '')"
+      },
+      {
+        "key": "DailyWifeGiftEnabled",
+        "expr": "GsBoolConfig('启用送老婆', '开启后可以使用“送老婆 @对方”，对方发送“接受老婆赠送”后完成赠送', True)"
+      },
+      {
+        "key": "DailyWifeGiftSuccessTemplate",
+        "expr": "GsStrConfig('送老婆成功文案', '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收用户 ID', '你把今天的老婆{name}送给了对方！')"
+      },
+      {
+        "key": "DailyHusbandGiftEnabled",
+        "expr": "GsBoolConfig('启用送老公', '开启后可以使用“送老公 @对方”，对方发送“接受老公赠送”后完成赠送', True)"
+      },
+      {
+        "key": "DailyHusbandGiftSuccessTemplate",
+        "expr": "GsStrConfig('送老公成功文案', '可用变量：{name} 角色名，{role_id} 数字 ID，{target} 接收用户 ID', '你把今天的老公{name}送给了对方！')"
+      },
+      {
+        "key": "DailyLoliGiftEnabled",
+        "expr": "GsBoolConfig('启用送萝莉', '开启后可以使用“送萝莉 @对方”，对方发送“接受萝莉赠送”后完成赠送', True)"
+      },
+      {
+        "key": "DailyLoliGiftSuccessTemplate",
+        "expr": "GsStrConfig('送萝莉成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID', '你把今天的萝莉送给了对方！')"
+      }
+    ],
+    "APPEARANCE_CONFIG_DEFAULT": [
+      {
+        "key": "DailyWifeHelpBannerBgUpload",
+        "expr": "GsImageConfig('帮助横幅图', '自定义「今日老婆帮助」顶部横幅图，留空或文件不存在时使用插件默认横幅', str(SHOW_CONFIG_PATH / 'help_banner.png'), str(SHOW_CONFIG_PATH), 'help_banner', 'png')"
+      },
+      {
+        "key": "DailyWifeHelpBgUpload",
+        "expr": "GsImageConfig('帮助背景图', '自定义「今日老婆帮助」整体背景图，留空或文件不存在时使用插件默认背景', str(SHOW_CONFIG_PATH / 'help_bg.png'), str(SHOW_CONFIG_PATH), 'help_bg', 'png')"
+      },
+      {
+        "key": "DailyWifeHelpIconUpload",
+        "expr": "GsImageConfig('帮助头像', '自定义「今日老婆帮助」左上角头像，建议使用方形图片', str(SHOW_CONFIG_PATH / 'help_icon.png'), str(SHOW_CONFIG_PATH), 'help_icon', 'png')"
+      },
+      {
+        "key": "DailyWifeHelpColumn",
+        "expr": "GsIntConfig('帮助展示行数', '控制帮助图每组展示数量，默认 3，可按需要改成 4、5 等', 3, 10)"
+      }
+    ]
+  },
+  "triggers": [
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_create",
+      "decorator": "custom_role_sv.on_prefix(('创建老婆', '老婆创建'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_upload",
+      "decorator": "custom_role_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_image_list",
+      "decorator": "custom_role_sv.on_prefix(('查看老婆图片', '老婆图片列表', '老婆图片'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_delete_image",
+      "decorator": "custom_role_sv.on_prefix(('删除老婆图片', '老婆删除图片', '老婆删图片'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_confirm_delete",
+      "decorator": "custom_role_sv.on_fullmatch(('确认删除老婆', '老婆删除确认'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_cancel_delete",
+      "decorator": "custom_role_sv.on_fullmatch(('取消删除老婆', '老婆删除取消'), block=True)"
+    },
+    {
+      "file": "twf/custom_role.py",
+      "function": "custom_wife_delete_role",
+      "decorator": "custom_role_sv.on_regex('^(?:删除老婆|老婆删除)(?!图片|确认|取消)(?P<role>.+)$', block=True)"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_wife_prefix",
+      "decorator": "daily_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_wife_full",
+      "decorator": "daily_wife_sv.on_fullmatch(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='随机抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“我今天老婆是谁”“帮我娶个老婆”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_wife_list",
+      "decorator": "wife_list_sv.on_fullmatch(('老婆列表', '查看老婆列表'), block=True, to_ai='查看可抽取的老婆角色列表。\\n    当用户询问“老婆列表”“有哪些老婆可以抽”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "assign_wife",
+      "decorator": "assign_wife_sv.on_prefix(('分配老婆', '分配今日老婆'), block=True, to_ai='为指定用户分配今日老婆。\\n    当管理员或用户说“给某人分配老婆”“分配今日老婆 @某人 角色名”时调用。\\n    Args:\\n        text: 分配参数，通常包含目标用户和老婆名，例如“@用户 今汐”。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "assign_wife_usage",
+      "decorator": "assign_wife_sv.on_fullmatch(('分配老婆', '分配今日老婆'), block=True, to_ai='显示分配今日老婆的用法。\\n    当用户只说“分配老婆”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_husband_prefix",
+      "decorator": "daily_husband_sv.on_prefix('今日老公', block=True, to_ai='抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天的老公是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_husband_full",
+      "decorator": "daily_husband_sv.on_fullmatch('今日老公', block=True, to_ai='随机抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天老公是谁”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_husband_list",
+      "decorator": "husband_list_sv.on_fullmatch(('老公列表', '查看老公列表'), block=True, to_ai='查看可抽取的老公角色列表。\\n    当用户询问“老公列表”“有哪些老公可以抽”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "group_member_wife",
+      "decorator": "marry_member_sv.on_fullmatch(('娶群友', '取群友'), block=True, to_ai='随机抽取当前群里的一个群友作为今日互动对象。\\n    当用户说“娶群友”“随机娶一个群友”“帮我抽个群友”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_wife",
+      "decorator": "divorce_sv.on_fullmatch(('老婆离婚', '离婚', '离婚老婆', '今日老婆离婚', '和老婆离婚'), block=True, to_ai='和当前用户今天的老婆离婚。\\n    当用户说“我要和老婆离婚”“离婚老婆”“今日老婆离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_husband",
+      "decorator": "divorce_sv.on_fullmatch(('老公离婚', '离婚老公', '今日老公离婚', '和老公离婚'), block=True, to_ai='和当前用户今天的老公离婚。\\n    当用户说“我要和老公离婚”“老公离婚”“今日老公离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_loli",
+      "decorator": "divorce_sv.on_fullmatch(('萝莉离婚', '离婚萝莉', '今日萝莉离婚', '和萝莉离婚'), block=True, to_ai='和当前用户今天的萝莉离婚。\\n    当用户说“我要和萝莉离婚”“萝莉离婚”“今日萝莉离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_wife",
+      "decorator": "gift_sv.on_prefix(('送老婆', '送今日老婆'), block=True, to_ai='把当前用户今天的老婆送给指定用户。\\n    当用户说“把我的老婆送给某人”“送老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_wife_at",
+      "decorator": "gift_sv.on_fullmatch(('送老婆', '送今日老婆'), block=True, to_ai='显示送老婆的用法。\\n    当用户只说“送老婆”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_wife_accept",
+      "decorator": "gift_sv.on_fullmatch(('接受老婆赠送', '同意送老婆'), block=True, to_ai='同意接收别人赠送的今日老婆。\\n    当用户说“接受老婆赠送”“同意送老婆”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_wife_reject",
+      "decorator": "gift_sv.on_fullmatch(('拒绝老婆赠送', '拒绝送老婆'), block=True, to_ai='拒绝接收别人赠送的今日老婆。\\n    当用户说“拒绝老婆赠送”“拒绝送老婆”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_husband",
+      "decorator": "gift_sv.on_prefix(('送老公', '送今日老公'), block=True, to_ai='把当前用户今天的老公送给指定用户。\\n    当用户说“把我的老公送给某人”“送老公 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_husband_at",
+      "decorator": "gift_sv.on_fullmatch(('送老公', '送今日老公'), block=True, to_ai='显示送老公的用法。\\n    当用户只说“送老公”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_husband_accept",
+      "decorator": "gift_sv.on_fullmatch(('接受老公赠送', '同意送老公'), block=True, to_ai='同意接收别人赠送的今日老公。\\n    当用户说“接受老公赠送”“同意送老公”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_husband_reject",
+      "decorator": "gift_sv.on_fullmatch(('拒绝老公赠送', '拒绝送老公'), block=True, to_ai='拒绝接收别人赠送的今日老公。\\n    当用户说“拒绝老公赠送”“拒绝送老公”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_loli",
+      "decorator": "gift_sv.on_prefix(('送萝莉', '送今日萝莉'), block=True, to_ai='把当前用户今天的萝莉送给指定用户。\\n    当用户说“把我的萝莉送给某人”“送萝莉 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_loli_at",
+      "decorator": "gift_sv.on_fullmatch(('送萝莉', '送今日萝莉'), block=True, to_ai='显示送萝莉的用法。\\n    当用户只说“送萝莉”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_loli_accept",
+      "decorator": "gift_sv.on_fullmatch(('接受萝莉赠送', '同意送萝莉'), block=True, to_ai='同意接收别人赠送的今日萝莉。\\n    当用户说“接受萝莉赠送”“同意送萝莉”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/gift.py",
+      "function": "gift_loli_reject",
+      "decorator": "gift_sv.on_fullmatch(('拒绝萝莉赠送', '拒绝送萝莉'), block=True, to_ai='拒绝接收别人赠送的今日萝莉。\\n    当用户说“拒绝萝莉赠送”“拒绝送萝莉”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/help.py",
+      "function": "daily_wife_help",
+      "decorator": "help_sv.on_fullmatch(('今日老婆帮助', '老婆帮助'), block=True, to_ai='查看 TodayWaifu 今日老婆插件帮助。\\n    当用户问“今日老婆怎么用”“今日老婆帮助”“老婆插件有什么命令”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/loli.py",
+      "function": "daily_loli",
+      "decorator": "loli_sv.on_fullmatch('今日萝莉', block=True, to_ai='随机抽取当前用户今天的萝莉图片。\\n    当用户说“今日萝莉”“抽一张萝莉”“我今天的萝莉是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/loli.py",
+      "function": "upload_loli",
+      "decorator": "loli_manage_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)"
+    },
+    {
+      "file": "twf/loli.py",
+      "function": "list_loli",
+      "decorator": "loli_manage_sv.on_fullmatch(('查看萝莉图片', '今日萝莉列表', '萝莉图片列表'), block=True, to_ai='查看今日萝莉图库列表。\\n    当用户说“查看萝莉图片”“萝莉图片列表”“有哪些萝莉图”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/loli.py",
+      "function": "delete_loli",
+      "decorator": "loli_manage_sv.on_command('删除萝莉图片', block=True)"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_wife",
+      "decorator": "rob_sv.on_prefix(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='抢夺指定用户今天的老婆。\\n    当用户说“抢某人的老婆”“抢老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_wife_at",
+      "decorator": "rob_sv.on_fullmatch(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='显示抢老婆的用法。\\n    当用户只说“抢老婆”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_husband",
+      "decorator": "rob_sv.on_prefix(('抢老公', '抢今日老公'), block=True, to_ai='抢夺指定用户今天的老公。\\n    当用户说“抢某人的老公”“抢老公 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_husband_at",
+      "decorator": "rob_sv.on_fullmatch(('抢老公', '抢今日老公'), block=True, to_ai='显示抢老公的用法。\\n    当用户只说“抢老公”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_loli",
+      "decorator": "rob_sv.on_prefix(('抢萝莉', '抢今日萝莉'), block=True, to_ai='抢夺指定用户今天的萝莉。\\n    当用户说“抢某人的萝莉”“抢萝莉 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
+    },
+    {
+      "file": "twf/rob.py",
+      "function": "rob_loli_at",
+      "decorator": "rob_sv.on_fullmatch(('抢萝莉', '抢今日萝莉'), block=True, to_ai='显示抢萝莉的用法。\\n    当用户只说“抢萝莉”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    }
+  ],
+  "resources": [
+    "wife_role_id_map.txt",
+    "husband_role_id_map.txt",
+    "help.json",
+    "ICON.png",
+    "fb93f5370f556a51db172863420aa50e.png",
+    "texture2d/bg.jpg",
+    "texture2d/icons"
+  ]
+}

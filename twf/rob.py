@@ -7,14 +7,13 @@ from .shared import (
     Bot,
     Event,
     LOG_PREFIX,
-    MessageSegment,
-    Path,
     RoleCandidate,
     _cfg,
     _cfg_bool,
     _cfg_probability,
     _daily_bucket_name,
     _daily_item_title,
+    _daily_kind_metadata,
     _get_event_target_user_id,
     _get_existing_daily_record,
     _get_today_context,
@@ -26,8 +25,8 @@ from .shared import (
     _load_wife_data,
     _record_to_dict,
     _save_wife_data,
+    _send_daily_result_image,
     _send_prefixed,
-    _send_role_image,
     _user_display_name,
     _user_key,
     _wife_state,
@@ -37,25 +36,17 @@ from .shared import (
 
 
 def _rob_enabled(kind: str) -> bool:
-    if kind == 'husband':
-        return _cfg_bool('DailyHusbandRobEnabled', True)
-    if kind == 'loli':
-        return _cfg_bool('DailyLoliRobEnabled', True)
-    return _cfg_bool('DailyWifeRobEnabled', True)
+    return _cfg_bool(_daily_kind_metadata(kind).rob_enabled_key, True)
 
 
 def _rob_success_rate(kind: str) -> float:
-    if kind == 'loli':
-        return _cfg_probability('DailyLoliRobSuccessRate', 0.5)
-    return _cfg_probability('DailyWifeRobSuccessRate', 0.5)
+    metadata = _daily_kind_metadata(kind)
+    return _cfg_probability(metadata.rob_success_rate_key, 0.5)
 
 
 def _rob_success_template(kind: str) -> str:
-    if kind == 'husband':
-        return str(_cfg('DailyHusbandRobSuccessTemplate') or '抢老公成功！你把对方今天的老公{name}抢过来了！')
-    if kind == 'loli':
-        return str(_cfg('DailyLoliRobSuccessTemplate') or '抢萝莉成功！你把对方今天的萝莉抢过来了！')
-    return str(_cfg('DailyWifeRobSuccessTemplate') or '抢老婆成功！你把对方今天的老婆{name}抢过来了！')
+    metadata = _daily_kind_metadata(kind)
+    return str(_cfg(metadata.rob_success_key) or metadata.rob_success_default)
 
 
 def _build_rob_success_text(role: RoleCandidate, target_user_id: str, kind: str) -> str:
@@ -80,18 +71,7 @@ async def _send_rob_result_image(
     is_group: bool,
     kind: str,
 ) -> None:
-    if kind != 'loli':
-        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
-        return
-
-    messages: list[object] = []
-    if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
-        messages.append(MessageSegment.at(user_id))
-        messages.append('\n')
-    messages.append(text)
-    image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
-    messages.append(MessageSegment.image(image_ref))
-    await _send_prefixed(bot, messages, kind=kind)
+    await _send_daily_result_image(bot, role, image, text, user_id, is_group, kind)
 
 
 async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:

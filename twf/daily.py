@@ -36,16 +36,8 @@ def _wife_list_markdown_from_items(
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
-    if mode == 'husband':
-        template = str(
-            _cfg('DailyHusbandTextTemplate')
-            or '你今天的老公是{name}'
-        )
-    else:
-        template = str(
-            _cfg('DailyWifeTextTemplate')
-            or '你今天的老婆是{name}'
-        )
+    metadata = _daily_kind_metadata(mode)
+    template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
     lines = [
         template.format(
             name=role.name,
