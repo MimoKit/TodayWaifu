@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import binascii
 import hashlib
 import json
@@ -97,7 +96,7 @@ __all__ = [
     '_custom_upload_data_root', '_custom_upload_role_map_path',
     '_custom_upload_role_pile_root', '_daily_rng', '_download_avatar', '_download_image',
     '_download_image_sync', '_event_rng', '_fetch_gallery_payload_sync', '_filter_by_mode',
-    '_gallery_api_url', '_gallery_auth_header', '_gallery_mode_enabled',
+    '_gallery_api_url', '_gallery_mode_enabled',
     '_daily_bucket_name', '_daily_item_title', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
     '_get_today_context',
@@ -120,7 +119,7 @@ __all__ = [
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
-    'asyncio', 'base64', 'binascii', 'core_config', 'date', 'get_res_path',
+    'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
     'marry_member_sv', 'rob_sv', 'wife_list_sv',
@@ -892,21 +891,8 @@ def _gallery_api_url() -> str:
     return str(_cfg('DailyWifeGalleryApiUrl') or DEFAULT_GALLERY_API_URL).strip()
 
 
-def _gallery_auth_header() -> str | None:
-    username = str(_cfg('DailyWifeGalleryUsername') or '').strip()
-    password = str(_cfg('DailyWifeGalleryPassword') or '').strip()
-    if not username or not password:
-        return None
-    token = base64.b64encode(f'{username}:{password}'.encode('utf-8')).decode('ascii')
-    return f'Basic {token}'
-
-
 def _request_headers() -> dict[str, str]:
-    headers = {'User-Agent': 'TodayWaifu/1.0'}
-    auth = _gallery_auth_header()
-    if auth:
-        headers['Authorization'] = auth
-    return headers
+    return {'User-Agent': 'TodayWaifu/1.0'}
 
 
 def _http_get(url: str, *, timeout: int = 15) -> bytes:
