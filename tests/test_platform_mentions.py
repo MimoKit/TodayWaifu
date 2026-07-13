@@ -14,127 +14,108 @@ class FakeMessage:
         self.data = data
 
 
-class FakeMessageSegment:
-    @staticmethod
-    def markdown(content: str) -> list[FakeMessage]:
-        return [FakeMessage('markdown', content)]
-
-
-def _load_mention_functions() -> dict[str, Any]:
+def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> dict[str, Any]:
     source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
     tree = ast.parse(source)
-    names = {
-        '_needs_qq_markdown_mention',
-        '_official_image_gallery_url',
-        '_is_at_message',
-        '_remove_private_mentions',
-        '_convert_official_qq_mentions',
-        '_adapt_mentions_for_platform',
-    }
     body = [
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name in names
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
     ]
+    values = config or {}
     namespace: dict[str, Any] = {
         'Any': Any,
         'Bot': object,
         'Message': FakeMessage,
-        'MessageSegment': FakeMessageSegment,
-        'QQ_MARKDOWN_MENTION_BOT_IDS': {'qqgroup'},
-        '_cfg': lambda key: 'https://gallery.example.test' if key == 'DailyWifeOfficialImageGalleryUrl' else '',
+        'QQ_OFFICIAL_BOT_IDS': {'qqgroup'},
+        '_cfg': lambda key: values.get(key, ''),
+        '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
+        '_reply_text': lambda text, kind='wife': f'[{kind}]{text}',
     }
     exec(compile(ast.Module(body=body, type_ignores=[]), 'mentions', 'exec'), namespace)
     return namespace
 
 
 class PlatformMentionTests(unittest.TestCase):
-    def test_runtime_platform_conversion(self) -> None:
-        functions = _load_mention_functions()
+    def test_platform_detection_only_matches_qq_official(self) -> None:
+        functions = _load_functions({'_is_official_qq_bot'})
+        detect = functions['_is_official_qq_bot']
+        official = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqgroup:official-1', bot_id='qqgroup'))
+        personal = SimpleNamespace(ev=SimpleNamespace(real_bot_id='onebot:llbot', bot_id='onebot'))
+        guild = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqguild:channel', bot_id='qqguild'))
+        self.assertTrue(detect(official))
+        self.assertFalse(detect(personal))
+        self.assertFalse(detect(guild))
+
+    def test_generic_send_boundary_only_removes_private_mentions(self) -> None:
+        functions = _load_functions(
+            {'_is_at_message', '_remove_private_mentions', '_adapt_mentions_for_platform'}
+        )
         adapt = functions['_adapt_mentions_for_platform']
-        at = FakeMessage('at', 'OPENID_123')
-        image = FakeMessage('image', 'base64://image')
-        outgoing = [at, '\n', '[今日老婆]你今天的老婆是今汐', image]
+        outgoing = [FakeMessage('at', 'OPENID_123'), '\n', '结果文字', FakeMessage('image', 'x')]
 
-        official_bot = SimpleNamespace(
-            ev=SimpleNamespace(
-                real_bot_id='qqgroup:official-1',
-                bot_id='qqgroup',
-                user_type='group',
-            )
-        )
-        official = adapt(official_bot, outgoing)
-        self.assertEqual(official[0].type, 'markdown')
-        self.assertEqual(
-            official[0].data,
-            '<@OPENID_123>\n[今日老婆]你今天的老婆是今汐',
-        )
-        self.assertIs(official[1], image)
+        group_bot = SimpleNamespace(ev=SimpleNamespace(user_type='group'))
+        self.assertIs(adapt(group_bot, outgoing), outgoing)
 
-        personal_bot = SimpleNamespace(
-            ev=SimpleNamespace(
-                real_bot_id='onebot:llbot',
-                bot_id='onebot',
-                user_type='group',
-            )
-        )
-        self.assertIs(adapt(personal_bot, outgoing), outgoing)
-
-        guild_bot = SimpleNamespace(
-            ev=SimpleNamespace(
-                real_bot_id='qqguild:official-channel',
-                bot_id='qqguild',
-                user_type='group',
-            )
-        )
-        self.assertIs(adapt(guild_bot, outgoing), outgoing)
-
-        direct_bot = SimpleNamespace(
-            ev=SimpleNamespace(
-                real_bot_id='qqgroup:official-1',
-                bot_id='qqgroup',
-                user_type='direct',
-            )
-        )
+        direct_bot = SimpleNamespace(ev=SimpleNamespace(user_type='direct'))
         direct = adapt(direct_bot, outgoing)
-        self.assertEqual(direct[0], '[今日老婆]你今天的老婆是今汐')
-        self.assertIs(direct[1], image)
+        self.assertEqual(direct[0], '结果文字')
+        self.assertEqual(direct[1].type, 'image')
 
-    def test_all_mentions_are_adapted_at_the_send_boundary(self) -> None:
-        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
-        self.assertIn(
-            'message = _adapt_mentions_for_platform(bot, message)',
-            source,
+    def test_official_markdown_combines_mention_text_and_image(self) -> None:
+        functions = _load_functions(
+            {'_official_markdown_image_size', '_build_official_qq_image_markdown'},
+            {
+                'DailyWifeAtUser': True,
+                'DailyWifeReplyPrefixEnabled': True,
+            },
         )
-        self.assertIn("QQ_MARKDOWN_MENTION_BOT_IDS = {'qqgroup'}", source)
-        self.assertIn("_cfg('DailyWifeOfficialImageGalleryUrl')", source)
-        self.assertIn("markdown_parts.append(f'<@{item.data}>')", source)
-        self.assertIn('return _remove_private_mentions(message)', source)
-        self.assertIn('return message', source)
-
-    def test_empty_gallery_address_disables_official_markdown_mentions(self) -> None:
-        functions = _load_mention_functions()
-        functions['_cfg'] = lambda key: ''
-        bot = SimpleNamespace(
-            ev=SimpleNamespace(
-                real_bot_id='qqgroup:official-1',
-                bot_id='qqgroup',
-                user_type='group',
-            )
+        markdown = functions['_build_official_qq_image_markdown'](
+            'https://gallery.example.test/todaywaifu.png',
+            (1000, 1500),
+            '你今天的老婆是今汐',
+            'OPENID_123',
+            True,
+            'wife',
         )
-        self.assertFalse(functions['_needs_qq_markdown_mention'](bot))
+        self.assertEqual(
+            markdown,
+            '<@OPENID_123>\n\n[wife]你今天的老婆是今汐\n\n'
+            '![image #240px #360px](https://gallery.example.test/todaywaifu.png)',
+        )
 
-    def test_image_senders_keep_one_cross_platform_at_segment(self) -> None:
+    def test_official_private_markdown_has_no_mention(self) -> None:
+        functions = _load_functions(
+            {'_official_markdown_image_size', '_build_official_qq_image_markdown'},
+            {
+                'DailyWifeAtUser': True,
+                'DailyWifeReplyPrefixEnabled': True,
+            },
+        )
+        markdown = functions['_build_official_qq_image_markdown'](
+            'https://gallery.example.test/todaywaifu.png',
+            (800, 1200),
+            '你今天的老婆是今汐',
+            'OPENID_123',
+            False,
+            'wife',
+        )
+        self.assertNotIn('<@', markdown)
+        self.assertIn('[wife]你今天的老婆是今汐', markdown)
+
+    def test_repository_defaults_do_not_contain_private_gallery_config(self) -> None:
+        source = (ROOT / 'config_default.py').read_text(encoding='utf-8')
+        self.assertIn("'DailyWifeOfficialImageGalleryUrl'", source)
+        self.assertIn("'DailyWifeOfficialImageGalleryToken'", source)
+        self.assertNotIn('qq.xlinxc.cn', source)
+
+    def test_all_result_image_senders_try_plugin_scoped_markdown(self) -> None:
         source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
-        for function_name in (
-            '_send_role_image',
-            '_send_loli_result_image',
-            '_send_local_image',
-        ):
+        for function_name in ('_send_role_image', '_send_loli_result_image', '_send_local_image'):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
             block = source[start:next_function if next_function >= 0 else None]
-            self.assertIn('messages.append(MessageSegment.at(user_id))', block)
+            self.assertIn('_try_send_official_qq_image_markdown(', block)
 
     def test_daily_loli_results_use_the_shared_sender(self) -> None:
         source = (ROOT / 'twf' / 'loli.py').read_text(encoding='utf-8')

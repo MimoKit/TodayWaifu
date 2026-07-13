@@ -60,6 +60,8 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 角色 ID 对照表路径 | 空 | 留空使用内置 `wife_role_id_map.txt` |
 | 图库接口地址 | 默认指向官方图库 | 图库模式生效，可在控制台自行更换 |
 | 今日萝莉接口地址 | `https://loli.xlinxc.cn` | GET 直接返回随机图片 |
+| 官方机器人图库地址 | 空 | QQ 官方机器人专用；填写图库服务根地址后，将结果图片上传并合并为一条 Markdown |
+| 官方机器人图库上传令牌 | 空 | 图库 `/upload` 接口的 Bearer Token，仅保存在部署者自己的运行配置中 |
 | 发送文字说明 | 开启 | 图片前附带“你今天的老婆是xxx” |
 | 显示角色 ID | 关闭 | 开启后文字说明额外附带一行角色 ID |
 | 主人 Debug 模式 | 关闭 | 开启后主人可指定抽取的角色，便于调试 |
@@ -82,6 +84,28 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 送老公成功文案 | `你把今天的老公{name}送给了对方！` | 支持 `{name}`、`{role_id}`、`{target}` |
 | 启用送萝莉 | 开启 | 开启后可使用送萝莉命令 |
 | 送萝莉成功文案 | `你把今天的萝莉送给了对方！` | 支持 `{name}`、`{role_id}`、`{target}` |
+
+### QQ 官方机器人图库 Markdown
+
+配置「官方机器人图库地址」后，插件只会对 `qqgroup` 平台的今日老婆结果图启用图库 Markdown。
+群聊消息会将 `@用户`、回复文字和图片合并在一条 Markdown 中；私聊不会添加 `@`。个人号机器人及其他插件不受影响。
+
+图库服务需要提供：
+
+```text
+POST {图库地址}/upload
+Authorization: Bearer {上传令牌}
+Content-Type: application/octet-stream
+X-Filename: todaywaifu-<sha256>.<ext>
+```
+
+成功时返回：
+
+```json
+{"url": "https://gallery.example.com/todaywaifu-xxx.png"}
+```
+
+仓库中的图库地址和上传令牌默认均为空，不包含任何部署者的私人配置。参考后端见 `tools/qq_gallery_server.py`。
 
 ## 数据
 
