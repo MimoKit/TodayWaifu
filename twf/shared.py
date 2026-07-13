@@ -119,7 +119,8 @@ __all__ = [
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text',
-    '_safe_send', '_send_daily_result_image', '_send_prefixed', '_send_role_image',
+    '_safe_send', '_send_daily_result_image', '_send_loli_result_image',
+    '_send_prefixed', '_send_role_image',
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
@@ -192,7 +193,79 @@ async def _target_send_without_bot_hooks(
     )
 
 
+QQ_MARKDOWN_MENTION_BOT_IDS = {'qqgroup'}
+
+
+def _official_image_gallery_url() -> str:
+    return str(_cfg('DailyWifeOfficialImageGalleryUrl') or '').strip().rstrip('/')
+
+
+def _needs_qq_markdown_mention(bot: Bot) -> bool:
+    if not _official_image_gallery_url():
+        return False
+    platform = str(bot.ev.real_bot_id or bot.ev.bot_id or '')
+    return platform.split(':', 1)[0].strip().lower() in QQ_MARKDOWN_MENTION_BOT_IDS
+
+
+def _is_at_message(item: Any) -> bool:
+    return isinstance(item, Message) and item.type == 'at'
+
+
+def _remove_private_mentions(message: Any) -> Any:
+    items = message if isinstance(message, list) else [message]
+    result: list[Any] = []
+    skip_linebreak = False
+    for item in items:
+        if _is_at_message(item):
+            skip_linebreak = True
+            continue
+        if skip_linebreak and isinstance(item, str) and item in ('\n', '\r\n'):
+            skip_linebreak = False
+            continue
+        skip_linebreak = False
+        result.append(item)
+
+    if isinstance(message, list):
+        return result
+    return result[0] if result else ''
+
+
+def _convert_official_qq_mentions(message: Any) -> Any:
+    items = message if isinstance(message, list) else [message]
+    markdown_parts: list[str] = []
+    passthrough: list[Any] = []
+    has_mention = False
+
+    for item in items:
+        if _is_at_message(item):
+            has_mention = True
+            markdown_parts.append(f'<@{item.data}>')
+        elif isinstance(item, str):
+            markdown_parts.append(item)
+        elif isinstance(item, Message) and item.type == 'text' and isinstance(item.data, str):
+            markdown_parts.append(item.data)
+        else:
+            passthrough.append(item)
+
+    if not has_mention:
+        return message
+
+    converted = [*MessageSegment.markdown(''.join(markdown_parts)), *passthrough]
+    if isinstance(message, list) or len(converted) > 1:
+        return converted
+    return converted[0]
+
+
+def _adapt_mentions_for_platform(bot: Bot, message: Any) -> Any:
+    if bot.ev.user_type == 'direct':
+        return _remove_private_mentions(message)
+    if _needs_qq_markdown_mention(bot):
+        return _convert_official_qq_mentions(message)
+    return message
+
+
 async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
+    message = _adapt_mentions_for_platform(bot, message)
     try:
         return await bot.send(message, *args, **kwargs)
     except AttributeError as exc:
@@ -1576,7 +1649,6 @@ async def _send_role_image(
     user_id: str | int | None = None,
     is_group: bool = True,
     kind: str = 'wife',
-    official_qq_mention: bool = False,
 ) -> None:
     is_gallery_image = image_url.startswith(('http://', 'https://'))
     if is_gallery_image:
@@ -1595,18 +1667,8 @@ async def _send_role_image(
 
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
-        if official_qq_mention:
-            mention_text = f'<@{user_id}>'
-            if text:
-                reply_text = text
-                if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
-                    reply_text = _reply_text(reply_text, kind)
-                mention_text = f'{mention_text}\n{reply_text}'
-                text = None
-            messages.extend(MessageSegment.markdown(mention_text))
-        else:
-            messages.append(MessageSegment.at(user_id))
-            messages.append('\n')
+        messages.append(MessageSegment.at(user_id))
+        messages.append('\n')
     if text:
         messages.append(text)
     messages.append(MessageSegment.image(image))
@@ -1626,14 +1688,28 @@ async def _send_daily_result_image(
         await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return
 
+    await _send_loli_result_image(bot, image, text, user_id, is_group)
+
+
+async def _send_loli_result_image(
+    bot: Bot,
+    image: Any,
+    text: str,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')
-    messages.append(_with_loli_reply_prefix(text))
-    image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
+    messages.append(text)
+    if isinstance(image, str):
+        image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
+    else:
+        image_ref = image
     messages.append(MessageSegment.image(image_ref))
-    await _safe_send(bot, messages)
+    await _send_prefixed(bot, messages, kind='loli')
 
 
 async def _send_local_image(

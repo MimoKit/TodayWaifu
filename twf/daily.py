@@ -477,7 +477,6 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
         f'已把今天的老婆{role.name}分配给对方。',
         target_key,
         ev.group_id is not None,
-        official_qq_mention=_is_official_markdown_event(ev),
     )
 
 

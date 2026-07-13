@@ -42,6 +42,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
         'https://loli.xlinxc.cn',
     ),
+    'DailyWifeOfficialImageGalleryUrl': GsStrConfig(
+        '官方机器人图库地址',
+        '用于启用 QQ 官方机器人合并 Markdown 发送。留空时不启用；图片上传与可用性检查由官方机器人适配器负责',
+        '',
+    ),
     '_DividerNsfwCheck': GsDivider('NSFW 检测', ''),
     'DailyWifeNsfwCheckEnabled': GsBoolConfig(
         '启用 NSFW 检测',

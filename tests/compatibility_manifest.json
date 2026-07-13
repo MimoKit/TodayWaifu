@@ -27,6 +27,10 @@
         "expr": "GsStrConfig('今日萝莉接口地址', 'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库', 'https://loli.xlinxc.cn')"
       },
       {
+        "key": "DailyWifeOfficialImageGalleryUrl",
+        "expr": "GsStrConfig('官方机器人图库地址', '用于启用 QQ 官方机器人合并 Markdown 发送。留空时不启用；图片上传与可用性检查由官方机器人适配器负责', '')"
+      },
+      {
         "key": "_DividerNsfwCheck",
         "expr": "GsDivider('NSFW 检测', '')"
       },

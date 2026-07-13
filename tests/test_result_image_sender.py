@@ -31,7 +31,7 @@ class ResultImageSenderTests(unittest.TestCase):
         self.assertIn("async def _send_daily_result_image(", source)
         self.assertIn("if kind != 'loli':", source)
         self.assertIn("_send_role_image(bot, role, image, text, user_id, is_group, kind)", source)
-        self.assertIn("_with_loli_reply_prefix(text)", source)
+        self.assertIn("_send_loli_result_image(bot, image, text, user_id, is_group)", source)
 
 
 if __name__ == "__main__":

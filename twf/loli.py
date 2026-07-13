@@ -91,8 +91,19 @@ def _loli_record_name(image: str) -> str:
     return f'萝莉图{_loli_image_hash_id(image)}'
 
 
-async def _send_loli_record(bot: Bot, record: WifeRecord, text: str = '你今天的萝莉来啦！') -> None:
-    await _safe_send(bot, [_with_loli_reply_prefix(text), MessageSegment.image(record.image)])
+async def _send_loli_record(
+    bot: Bot,
+    ev: Event,
+    record: WifeRecord,
+    text: str = '你今天的萝莉来啦！',
+) -> None:
+    await _send_loli_result_image(
+        bot,
+        record.image,
+        text,
+        ev.user_id,
+        ev.group_id is not None,
+    )
 
 
 async def _send_loli_image(bot: Bot, ev: Event) -> None:
@@ -112,7 +123,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
             return await _send_loli_text(bot, '你今天已经和萝莉离婚了，明天再来吧~')
         record = _record_from_dict(current)
         if record is not None:
-            return await _send_loli_record(bot, record)
+            return await _send_loli_record(bot, ev, record)
 
     custom_url = str(_cfg('DailyWifeLoliApiUrl') or '').strip()
     if custom_url:
@@ -131,7 +142,13 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         save_context = _get_today_context(save_data, ev)
         save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
         _save_wife_data(save_data)
-        await _safe_send(bot, [_with_loli_reply_prefix('你今天的萝莉是'), MessageSegment.image(data)])
+        await _send_loli_result_image(
+            bot,
+            data,
+            '你今天的萝莉是',
+            ev.user_id,
+            ev.group_id is not None,
+        )
         return
 
     images = _loli_image_paths()
@@ -149,7 +166,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
     save_context = _get_today_context(save_data, ev)
     save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
     _save_wife_data(save_data)
-    await _send_loli_record(bot, record)
+    await _send_loli_record(bot, ev, record)
 
 
 async def _send_upload_loli(bot: Bot, ev: Event) -> None:
