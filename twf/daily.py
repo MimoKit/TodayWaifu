@@ -470,7 +470,15 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
         f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, '
         f'ids={role.role_ids} image={image}'
     )
-    await _send_role_image(bot, role, image, f'已把今天的老婆{role.name}分配给对方。', target_key, ev.group_id is not None)
+    await _send_role_image(
+        bot,
+        role,
+        image,
+        f'已把今天的老婆{role.name}分配给对方。',
+        target_key,
+        ev.group_id is not None,
+        official_qq_mention=_is_official_markdown_event(ev),
+    )
 
 
 async def _send_group_member_wife(bot: Bot, ev: Event):

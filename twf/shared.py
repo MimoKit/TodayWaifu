@@ -1576,6 +1576,7 @@ async def _send_role_image(
     user_id: str | int | None = None,
     is_group: bool = True,
     kind: str = 'wife',
+    official_qq_mention: bool = False,
 ) -> None:
     is_gallery_image = image_url.startswith(('http://', 'https://'))
     if is_gallery_image:
@@ -1594,8 +1595,18 @@ async def _send_role_image(
 
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
-        messages.append(MessageSegment.at(user_id))
-        messages.append('\n')
+        if official_qq_mention:
+            mention_text = f'<@{user_id}>'
+            if text:
+                reply_text = text
+                if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
+                    reply_text = _reply_text(reply_text, kind)
+                mention_text = f'{mention_text}\n{reply_text}'
+                text = None
+            messages.extend(MessageSegment.markdown(mention_text))
+        else:
+            messages.append(MessageSegment.at(user_id))
+            messages.append('\n')
     if text:
         messages.append(text)
     messages.append(MessageSegment.image(image))
