@@ -80,7 +80,7 @@ class PlatformMentionTests(unittest.TestCase):
         )
         self.assertEqual(
             markdown,
-            '<@OPENID_123>\n\n[wife]你今天的老婆是今汐\n\n'
+            '<@OPENID_123> [wife]你今天的老婆是今汐\n\n'
             '![image #240px #360px](https://gallery.example.test/todaywaifu.png)',
         )
 

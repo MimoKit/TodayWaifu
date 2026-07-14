@@ -332,14 +332,15 @@ def _build_official_qq_image_markdown(
     is_group: bool,
     kind: str,
 ) -> str:
-    parts: list[str] = []
+    header_parts: list[str] = []
     if is_group and user_id is not None and _cfg_bool('DailyWifeAtUser', True):
-        parts.append(f'<@{user_id}>')
+        header_parts.append(f'<@{user_id}>')
     if text:
         if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
             text = _reply_text(text, kind)
-        parts.append(text)
+        header_parts.append(text)
     width, height = _official_markdown_image_size(size)
+    parts = [' '.join(header_parts)] if header_parts else []
     parts.append(f'![image #{width}px #{height}px]({image_url})')
     return '\n\n'.join(parts)
 
