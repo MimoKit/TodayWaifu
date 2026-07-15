@@ -60,7 +60,7 @@ class CompatibilityContractTests(unittest.TestCase):
 
     def test_plugin_loading_order_remains_compatible(self) -> None:
         source = (ROOT / "__init__.py").read_text(encoding="utf-8-sig")
-        modules = ["shared", "help", "daily", "rob", "gift", "divorce", "loli", "custom_role"]
+        modules = ["shared", "help", "daily", "pgr", "rob", "gift", "divorce", "loli", "custom_role"]
         positions = [source.index(f"from .twf import {name}") for name in modules]
         self.assertEqual(positions, sorted(positions))
 

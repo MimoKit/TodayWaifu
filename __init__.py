@@ -15,6 +15,7 @@ Plugins(
 from .twf import shared       # 公共层：SV 实例、数据模型、工具函数
 from .twf import help         # 帮助命令 + register_help（须在 daily 之前）  # noqa: F811
 from .twf import daily        # 每日抽取 / 列表 / 娶群友 / 老公
+from .twf import pgr          # 战双本地文件夹图库每日抽取
 from .twf import rob          # 抢老婆
 from .twf import gift         # 送老婆
 from .twf import divorce      # 离婚

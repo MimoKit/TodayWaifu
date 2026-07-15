@@ -55,6 +55,7 @@ divorce_sv = SV('今日老婆-离婚', priority=3)
 loli_sv = SV('今日老婆-今日萝莉', priority=3)
 daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
+pgr_wife_sv = SV('今日老婆-今日战双老婆', priority=10)
 BASE_DIR = Path(__file__).parent.parent
 WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
 HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
@@ -82,6 +83,7 @@ LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
 REPLY_PREFIX = '[今日老婆]'
 HUSBAND_REPLY_PREFIX = '[今日老公]'
 LOLI_REPLY_PREFIX = '[今日萝莉]'
+PGR_REPLY_PREFIX = '[今日战双老婆]'
 
 __all__ = [
     'Any', 'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
@@ -92,7 +94,7 @@ __all__ = [
     'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS', 'NSFW_CHECK_MAX_ATTEMPTS',
-    'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
+    'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'PGR_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins', 'REPLY_PREFIX',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
     'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
@@ -128,7 +130,7 @@ __all__ = [
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
-    'marry_member_sv', 'rob_sv', 'wife_list_sv',
+    'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'parse_qsl', 'urlencode', 'urlopen', 'urlparse', 'urlunparse',
 ]
@@ -394,6 +396,8 @@ def _get_reply_prefix(kind: str = 'wife') -> str:
         return HUSBAND_REPLY_PREFIX
     if kind == 'loli':
         return LOLI_REPLY_PREFIX
+    if kind == 'pgr':
+        return PGR_REPLY_PREFIX
     return REPLY_PREFIX
 
 
@@ -1532,6 +1536,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('wives', {})
     context.setdefault('husbands', {})
     context.setdefault('lolis', {})
+    context.setdefault('pgr_wives', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
