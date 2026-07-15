@@ -19,14 +19,6 @@
         "need_admin": false
       },
       {
-        "name": "今日战双老婆",
-        "desc": "从本地战双角色文件夹图库抽取今日老婆",
-        "eg": "今日战双老婆 / jrzslp",
-        "need_ck": false,
-        "need_sk": false,
-        "need_admin": false
-      },
-      {
         "name": "老婆列表",
         "desc": "查看本群今日老婆汇总",
         "eg": "老婆列表",

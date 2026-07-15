@@ -380,11 +380,6 @@
       "decorator": "loli_manage_sv.on_command('删除萝莉图片', block=True)"
     },
     {
-      "file": "twf/pgr.py",
-      "function": "daily_pgr_wife",
-      "decorator": "pgr_wife_sv.on_fullmatch(('今日战双老婆', 'jrzslp'), block=True, to_ai='随机抽取当前用户今天的战双老婆。\\n    当用户说“今日战双老婆”“jrzslp”“我今天的战双老婆是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
       "file": "twf/rob.py",
       "function": "rob_wife",
       "decorator": "rob_sv.on_prefix(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='抢夺指定用户今天的老婆。\\n    当用户说“抢某人的老婆”“抢老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
