@@ -1,5 +1,5 @@
 {
-  "base_commit": "efde3ae",
+  "base_commit": "fc02294",
   "configs": {
     "CONFIG_DEFAULT": [
       {
@@ -44,7 +44,7 @@
       },
       {
         "key": "DailyWifeNteMixedEnabled",
-        "expr": "GsBoolConfig('启用鸣潮异环混合抽取', '开启后“今日老婆”会同时从鸣潮和异环角色中随机抽取', False)"
+        "expr": "GsBoolConfig('启用多游戏混合抽取', '开启后“今日老婆”会同时从鸣潮、异环和本地战双图库中随机抽取；图库为空时自动跳过', False)"
       },
       {
         "key": "DailyWifeNteRoleMapPath",
@@ -61,6 +61,22 @@
       {
         "key": "DailyWifeNteTextTemplate",
         "expr": "GsStrConfig('今日异环老婆文字模板', '可用变量：{name} 角色名，{role_id} 角色 ID', '你今天的异环老婆是{name}。')"
+      },
+      {
+        "key": "_DividerPgrWife",
+        "expr": "GsDivider('战双老婆', '')"
+      },
+      {
+        "key": "DailyWifePgrEnabled",
+        "expr": "GsBoolConfig('启用今日战双老婆', '开启后可使用“今日战双老婆”或“jrzslp”从本地战双图库抽取', True)"
+      },
+      {
+        "key": "DailyWifePgrGalleryPath",
+        "expr": "GsStrConfig('战双老婆图库目录', '留空使用 data/TodayWaifu/pgr_wife；每个角色建一个同名文件夹，图片可放在其任意子目录', '')"
+      },
+      {
+        "key": "DailyWifePgrTextTemplate",
+        "expr": "GsStrConfig('今日战双老婆文字模板', '可用变量：{name} 角色名，{role_id} 文件夹名称', '你今天的战双老婆是{name}。')"
       },
       {
         "key": "_DividerNsfwCheck",
@@ -416,6 +432,11 @@
       "file": "twf/loli.py",
       "function": "delete_loli",
       "decorator": "loli_manage_sv.on_command('删除萝莉图片', block=True)"
+    },
+    {
+      "file": "twf/pgr.py",
+      "function": "daily_pgr_wife",
+      "decorator": "pgr_wife_sv.on_fullmatch(('今日战双老婆', 'jrzslp'), block=True, to_ai='随机抽取当前用户今天的战双老婆。\\n    当用户说“今日战双老婆”“jrzslp”“我今天的战双老婆是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/rob.py",

@@ -174,18 +174,16 @@ class NteCandidateBehaviorTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].images, (str(default_image),))
 
-    def test_mixed_mode_defaults_off_and_can_include_both_candidate_types(self) -> None:
+    def test_mixed_mode_defaults_off_and_includes_all_game_candidate_types(self) -> None:
         entries = _config_entries()
         mixed = [
             entry
             for entry in entries
-            if all(
-                term in f'{entry[0]} {entry[1]} {entry[2]}'
-                for term in ('鸣潮', '异环', '混合')
-            )
+            if '混合' in f'{entry[0]} {entry[1]} {entry[2]}'
+            and '抽取' in f'{entry[0]} {entry[1]} {entry[2]}'
             and _bool_default(entry[3]) is not None
         ]
-        self.assertEqual(len(mixed), 1, '应有且仅有一个“鸣潮异环混合模式”布尔开关')
+        self.assertEqual(len(mixed), 1, '应有且仅有一个多游戏混合模式布尔开关')
         self.assertFalse(_bool_default(mixed[0][3]))
 
         config_key = mixed[0][0]
@@ -205,10 +203,13 @@ class NteCandidateBehaviorTests(unittest.TestCase):
         )
         wuwa = (_RoleCandidate('今汐', ('1304',), ('wuwa.png',)),)
         nte = (_RoleCandidate('早雾', ('1003',), ('nte.png',)),)
+        pgr = (_RoleCandidate('露西亚', ('露西亚',), ('pgr.png',)),)
 
-        result = merge(wuwa, nte)
+        result = merge(merge(wuwa, nte), pgr)
 
-        self.assertEqual({candidate.name for candidate in result}, {'今汐', '早雾'})
+        self.assertEqual({candidate.name for candidate in result}, {'今汐', '早雾', '露西亚'})
+
+        self.assertIn('_load_pgr_local_candidates()', runtime_source)
 
 
 if __name__ == '__main__':

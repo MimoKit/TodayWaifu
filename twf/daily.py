@@ -266,6 +266,14 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} '
         f'请求 {title} (指定: {specified_name or "无"})'
     )
+
+    other_wife_name = _get_other_daily_wife_name(ev, mode)
+    if other_wife_name:
+        return await _send_prefixed(
+            bot,
+            f'你今天已经有{other_wife_name}了，不要贪心！',
+            kind=mode,
+        )
     
     is_master = _is_master(ev)
     is_debug = _cfg_bool('DailyWifeDebugMode', False)

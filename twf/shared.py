@@ -32,6 +32,7 @@ from gsuid_core.sv import Plugins, SV
 from gsuid_core.utils.database.models import CoreUser
 
 from ..daily_wife_config import DailyWifeConfig
+from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
 from .storage import atomic_write_json, read_json_dict
 
@@ -57,6 +58,7 @@ loli_sv = SV('今日老婆-今日萝莉', priority=3)
 daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
 daily_nte_wife_sv = SV('今日老婆-异环老婆', priority=10)
+pgr_wife_sv = SV('今日老婆-战双老婆', priority=10)
 BASE_DIR = Path(__file__).parent.parent
 WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
 HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
@@ -65,6 +67,7 @@ LEGACY_ROLE_MAP_PATH = BASE_DIR / 'role_id_map.txt'
 HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 DEFAULT_GALLERY_API_URL = 'https://img.xlinxc.cn/api/xwuid/roles'
 NTE_DETAIL_CDN_BASE = 'https://webstatic.tajiduo.com/bbs/yh-game-records-web-source/character/detail'
+PGR_WIFE_DIR_NAME = 'pgr_wife'
 CACHE_TTL_SECONDS = 300
 MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
 LIST_FORWARD_THRESHOLD = 10
@@ -86,6 +89,7 @@ LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
 REPLY_PREFIX = '[今日老婆]'
 HUSBAND_REPLY_PREFIX = '[今日老公]'
 LOLI_REPLY_PREFIX = '[今日萝莉]'
+PGR_REPLY_PREFIX = '[今日战双老婆]'
 
 __all__ = [
     'Any', 'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
@@ -96,7 +100,7 @@ __all__ = [
     'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS', 'NSFW_CHECK_MAX_ATTEMPTS',
-    'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
+    'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'PGR_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins', 'REPLY_PREFIX',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
     'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
@@ -108,12 +112,14 @@ __all__ = [
     '_gallery_api_url', '_gallery_mode_enabled',
     '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
+    '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
     '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
+    '_load_pgr_local_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
     '_member_avatar_cache_path', '_member_feature_enabled', '_member_probability',
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
@@ -133,7 +139,7 @@ __all__ = [
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
-    'marry_member_sv', 'rob_sv', 'wife_list_sv',
+    'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'parse_qsl', 'urlencode', 'urlopen', 'urlparse', 'urlunparse',
 ]
@@ -399,6 +405,8 @@ def _get_reply_prefix(kind: str = 'wife') -> str:
         return HUSBAND_REPLY_PREFIX
     if kind == 'loli':
         return LOLI_REPLY_PREFIX
+    if kind == 'pgr':
+        return PGR_REPLY_PREFIX
     return REPLY_PREFIX
 
 
@@ -1180,6 +1188,21 @@ def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
     return tuple(candidates), None
 
 
+def _pgr_wife_root() -> Path:
+    configured = str(_cfg('DailyWifePgrGalleryPath') or '').strip().strip('"')
+    if configured:
+        return Path(configured).expanduser()
+    return get_res_path('TodayWaifu') / PGR_WIFE_DIR_NAME
+
+
+def _load_pgr_local_candidates() -> tuple[RoleCandidate, ...]:
+    rows = scan_named_role_directories(_pgr_wife_root(), IMAGE_EXTENSIONS)
+    return tuple(
+        RoleCandidate(name=name, role_ids=(name,), images=images)
+        for name, images in rows
+    )
+
+
 def _normalize_role_name(name: str) -> str:
     return name.replace('・', '·').replace('•', '·').strip()
 
@@ -1397,9 +1420,17 @@ async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
 
     nte_candidates, nte_error = await _load_nte_candidates()
     if nte_error or not nte_candidates:
-        logger.warning(f'{LOG_PREFIX} 鸣潮异环混合抽取未加载到异环候选: {nte_error}')
-        return candidates, None
-    return _merge_role_candidates(candidates, nte_candidates), None
+        logger.warning(f'{LOG_PREFIX} 混合抽取未加载到异环候选: {nte_error}')
+    else:
+        candidates = _merge_role_candidates(candidates, nte_candidates)
+
+    if _cfg_bool('DailyWifePgrEnabled', True):
+        pgr_candidates = _load_pgr_local_candidates()
+        if not pgr_candidates:
+            logger.warning(f'{LOG_PREFIX} 混合抽取未加载到战双候选，继续使用其他图库')
+        else:
+            candidates = _merge_role_candidates(candidates, pgr_candidates)
+    return candidates, None
 
 
 def _daily_rng(ev: Event, user_id: str | int | None = None, salt: str = '') -> random.Random:
@@ -1709,6 +1740,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('wives', {})
     context.setdefault('husbands', {})
     context.setdefault('nte_wives', {})
+    context.setdefault('pgr_wives', {})
     context.setdefault('lolis', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
@@ -1726,6 +1758,28 @@ def _daily_item_title(kind: str) -> str:
 
 def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
     return daily_kind_metadata(kind)
+
+
+DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
+
+
+def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
+    """返回用户今天在其他老婆池已有的角色名。"""
+    if requested_kind not in DAILY_WIFE_KINDS:
+        return None
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    user_key = _user_key(ev)
+    for kind in DAILY_WIFE_KINDS:
+        if kind == requested_kind:
+            continue
+        raw = context[_daily_bucket_name(kind)].get(user_key)
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get('name') or '').strip()
+        if name:
+            return name
+    return None
 
 
 def _record_to_dict(record: WifeRecord, ev: Event | None = None, user_id: str | int | None = None) -> dict[str, Any]:

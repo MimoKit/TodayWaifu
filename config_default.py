@@ -61,8 +61,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         False,
     ),
     'DailyWifeNteMixedEnabled': GsBoolConfig(
-        '启用鸣潮异环混合抽取',
-        '开启后“今日老婆”会同时从鸣潮和异环角色中随机抽取',
+        '启用多游戏混合抽取',
+        '开启后“今日老婆”会同时从鸣潮、异环和本地战双图库中随机抽取；图库为空时自动跳过',
         False,
     ),
     'DailyWifeNteRoleMapPath': GsStrConfig(
@@ -84,6 +84,22 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '今日异环老婆文字模板',
         '可用变量：{name} 角色名，{role_id} 角色 ID',
         '你今天的异环老婆是{name}。',
+    ),
+    '_DividerPgrWife': GsDivider('战双老婆', ''),
+    'DailyWifePgrEnabled': GsBoolConfig(
+        '启用今日战双老婆',
+        '开启后可使用“今日战双老婆”或“jrzslp”从本地战双图库抽取',
+        True,
+    ),
+    'DailyWifePgrGalleryPath': GsStrConfig(
+        '战双老婆图库目录',
+        '留空使用 data/TodayWaifu/pgr_wife；每个角色建一个同名文件夹，图片可放在其任意子目录',
+        '',
+    ),
+    'DailyWifePgrTextTemplate': GsStrConfig(
+        '今日战双老婆文字模板',
+        '可用变量：{name} 角色名，{role_id} 文件夹名称',
+        '你今天的战双老婆是{name}。',
     ),
     '_DividerNsfwCheck': GsDivider('NSFW 检测', ''),
     'DailyWifeNsfwCheckEnabled': GsBoolConfig(
