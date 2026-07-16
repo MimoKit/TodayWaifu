@@ -15,6 +15,7 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn("'DailyWifePgrEnabled'", config)
         self.assertIn("'DailyWifePgrGalleryPath'", config)
         self.assertIn("'DailyWifePgrTextTemplate'", config)
+        self.assertIn("'DailyWifeImageUploadWhitelist'", config)
         self.assertTrue(
             any(
                 isinstance(node, ast.AsyncFunctionDef)
@@ -23,6 +24,26 @@ class PgrFeatureSourceTests(unittest.TestCase):
             )
         )
         self.assertIn("('今日战双老婆', 'jrzslp')", source)
+        self.assertIn("('上传战双老婆图片', '战双老婆上传图片')", source)
+
+    def test_all_image_uploads_share_global_whitelist(self) -> None:
+        shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        custom = (ROOT / 'twf' / 'custom_role.py').read_text(encoding='utf-8-sig')
+        loli = (ROOT / 'twf' / 'loli.py').read_text(encoding='utf-8-sig')
+        pgr = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+
+        self.assertIn("image_upload_sv = SV('今日老婆-图片上传'", shared)
+        self.assertIn("_cfg('DailyWifeImageUploadWhitelist')", shared)
+        for source in (custom, loli, pgr):
+            self.assertIn('if not _can_upload_images(ev):', source)
+            self.assertIn('@image_upload_sv.', source)
+
+    def test_pgr_upload_requires_existing_role_directory(self) -> None:
+        source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+
+        self.assertIn('find_named_role_directory(_pgr_wife_root(), role_name)', source)
+        self.assertIn('不存在角色文件夹', source)
+        self.assertNotIn('role_dir.mkdir(', source)
 
     def test_pgr_uses_independent_daily_bucket_and_configurable_gallery(self) -> None:
         shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')

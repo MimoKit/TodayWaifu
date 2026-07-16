@@ -170,6 +170,9 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
 
 
 async def _send_upload_loli(bot: Bot, ev: Event) -> None:
+    if not _can_upload_images(ev):
+        return await _send_loli_text(bot, '你不在图片上传白名单中。')
+
     refs = _loli_upload_refs(ev)
     if not refs:
         return await _send_loli_text(bot, '请同时发送图片和命令，例如：上传萝莉图片 [图片]')
@@ -239,7 +242,7 @@ async def daily_loli(bot: Bot, ev: Event):
     await _send_loli_image(bot, ev)
 
 
-@loli_manage_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)
+@image_upload_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)
 async def upload_loli(bot: Bot, ev: Event):
     await _send_upload_loli(bot, ev)
 

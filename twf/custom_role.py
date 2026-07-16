@@ -260,6 +260,9 @@ async def _send_create_custom_wife_role(bot: Bot, ev: Event):
 
 
 async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
+    if not _can_upload_images(ev):
+        return await _send_prefixed(bot, '你不在图片上传白名单中。')
+
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     if not role_name:
         return await _send_prefixed(bot, '请输入角色名，例如：上传老婆图片 达妮娅，并附带图片。')
@@ -379,7 +382,7 @@ async def custom_wife_create(bot: Bot, ev: Event):
     await _send_create_custom_wife_role(bot, ev)
 
 
-@custom_role_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)
+@image_upload_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)
 async def custom_wife_upload(bot: Bot, ev: Event):
     await _send_upload_custom_wife_images(bot, ev)
 
@@ -407,5 +410,4 @@ async def custom_wife_cancel_delete(bot: Bot, ev: Event):
 @custom_role_sv.on_regex(r'^(?:删除老婆|老婆删除)(?!图片|确认|取消)(?P<role>.+)$', block=True)
 async def custom_wife_delete_role(bot: Bot, ev: Event):
     await _send_request_delete_custom_wife_role(bot, ev)
-
 

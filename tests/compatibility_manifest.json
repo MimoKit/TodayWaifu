@@ -35,6 +35,10 @@
         "expr": "GsStrConfig('官方机器人图库上传令牌', '图库 /upload 接口的 Bearer Token。仅保存在本地运行配置中，请勿提交到公开仓库', '', secret=True)"
       },
       {
+        "key": "DailyWifeImageUploadWhitelist",
+        "expr": "GsListStrConfig('图片上传白名单', '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单', [])"
+      },
+      {
         "key": "_DividerNteWife",
         "expr": "GsDivider('异环老婆', '')"
       },
@@ -251,7 +255,7 @@
     {
       "file": "twf/custom_role.py",
       "function": "custom_wife_upload",
-      "decorator": "custom_role_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)"
+      "decorator": "image_upload_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)"
     },
     {
       "file": "twf/custom_role.py",
@@ -421,7 +425,7 @@
     {
       "file": "twf/loli.py",
       "function": "upload_loli",
-      "decorator": "loli_manage_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)"
+      "decorator": "image_upload_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)"
     },
     {
       "file": "twf/loli.py",
@@ -437,6 +441,11 @@
       "file": "twf/pgr.py",
       "function": "daily_pgr_wife",
       "decorator": "pgr_wife_sv.on_fullmatch(('今日战双老婆', 'jrzslp'), block=True, to_ai='随机抽取当前用户今天的战双老婆。\\n    当用户说“今日战双老婆”“jrzslp”“我今天的战双老婆是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/pgr.py",
+      "function": "upload_pgr_wife",
+      "decorator": "image_upload_sv.on_command(('上传战双老婆图片', '战双老婆上传图片'), block=True)"
     },
     {
       "file": "twf/rob.py",

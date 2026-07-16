@@ -3,6 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def find_named_role_directory(root: Path, role_name: str) -> Path | None:
+    """在图库根目录中安全匹配已经存在的一级角色目录。"""
+    target = role_name.strip().casefold()
+    if not target or not root.is_dir():
+        return None
+    for path in root.iterdir():
+        if (
+            path.is_dir()
+            and not path.name.startswith('.')
+            and path.name.strip().casefold() == target
+        ):
+            return path
+    return None
+
+
 def scan_named_role_directories(
     root: Path,
     image_extensions: set[str],

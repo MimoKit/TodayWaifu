@@ -2,6 +2,85 @@
 from __future__ import annotations
 
 from .shared import *  # noqa: F403
+from .folder_gallery import find_named_role_directory
+from .image_input import collect_image_refs, image_hash_id, read_image_bytes
+
+
+def _unique_pgr_image_path(role_dir: Path, suffix: str, index: int) -> Path:
+    stamp = int(time.time() * 1000)
+    counter = 0
+    while True:
+        tail = f'_{counter}' if counter else ''
+        path = role_dir / f'pgr_{stamp}_{index}{tail}{suffix}'
+        if not path.exists():
+            return path
+        counter += 1
+
+
+def _save_pgr_image(role_dir: Path, source: str, index: int) -> Path | None:
+    image_data = read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES)
+    if image_data is None:
+        return None
+    data, suffix = image_data
+    path = _unique_pgr_image_path(role_dir, suffix, index)
+    path.write_bytes(data)
+    return path
+
+
+async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
+    if not _can_upload_images(ev):
+        return await _send_prefixed(bot, '你不在图片上传白名单中。', kind='pgr')
+
+    role_name = str(ev.text or '').strip().strip('"“”‘’')
+    if not role_name:
+        return await _send_prefixed(
+            bot,
+            '请输入已有角色文件夹名称，例如：上传战双老婆图片 露西亚，并附带图片。',
+            kind='pgr',
+        )
+
+    role_dir = find_named_role_directory(_pgr_wife_root(), role_name)
+    if role_dir is None:
+        return await _send_prefixed(
+            bot,
+            f'战双图库中不存在角色文件夹【{role_name}】，请先由主人创建对应文件夹。',
+            kind='pgr',
+        )
+
+    image_refs = collect_image_refs(ev)
+    if not image_refs:
+        return await _send_prefixed(
+            bot,
+            f'请同时发送图片和命令，例如：上传战双老婆图片 {role_dir.name}',
+            kind='pgr',
+        )
+
+    saved: list[Path] = []
+    failed = 0
+    for index, image_ref in enumerate(image_refs, 1):
+        path = await asyncio.to_thread(_save_pgr_image, role_dir, image_ref, index)
+        if path is None:
+            failed += 1
+        else:
+            saved.append(path)
+
+    if not saved:
+        return await _send_prefixed(
+            bot,
+            f'【{role_dir.name}】上传图片失败，请确认消息里附带的是图片。',
+            kind='pgr',
+        )
+
+    _invalidate_candidate_cache()
+    image_ids = [image_hash_id(path) for path in saved]
+    lines = [
+        f'【{role_dir.name}】上传战双老婆图片成功',
+        f'成功：{len(saved)} 张',
+        f'图片ID：{", ".join(image_ids)}',
+    ]
+    if failed:
+        lines.append(f'失败：{failed} 张')
+    await _send_prefixed(bot, '\n'.join(lines), kind='pgr')
 
 
 def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
@@ -111,3 +190,11 @@ async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
 )
 async def daily_pgr_wife(bot: Bot, ev: Event) -> None:
     await _send_daily_pgr_wife(bot, ev)
+
+
+@image_upload_sv.on_command(
+    ('上传战双老婆图片', '战双老婆上传图片'),
+    block=True,
+)
+async def upload_pgr_wife(bot: Bot, ev: Event) -> None:
+    await _send_upload_pgr_wife_images(bot, ev)

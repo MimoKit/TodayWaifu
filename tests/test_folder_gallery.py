@@ -45,6 +45,21 @@ class FolderGalleryTests(unittest.TestCase):
             self.assertEqual(gallery.scan_named_role_directories(root, {'.png'}), ())
             self.assertTrue(root.is_dir())
 
+    def test_finds_only_existing_direct_role_directory(self) -> None:
+        gallery = _load_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'pgr_wife'
+            role_dir = root / '露西亚'
+            role_dir.mkdir(parents=True)
+
+            self.assertEqual(
+                gallery.find_named_role_directory(root, ' 露西亚 '),
+                role_dir,
+            )
+            self.assertIsNone(gallery.find_named_role_directory(root, '不存在'))
+            self.assertIsNone(gallery.find_named_role_directory(root, '../露西亚'))
+            self.assertFalse((root / '不存在').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

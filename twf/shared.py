@@ -35,6 +35,7 @@ from ..daily_wife_config import DailyWifeConfig
 from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
 from .storage import atomic_write_json, read_json_dict
+from .upload_access import can_upload_images
 
 Plugins(
     name='TodayWaifu',
@@ -48,6 +49,7 @@ help_sv = SV('今日老婆-帮助', priority=1)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
 assign_wife_sv = SV('今日老婆-主人分配', pm=1, priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
+image_upload_sv = SV('今日老婆-图片上传', priority=2)
 wife_list_sv = SV('今日老婆-老婆列表', priority=3)
 husband_list_sv = SV('今日老婆-老公列表', priority=3)
 marry_member_sv = SV('今日老婆-娶群友', priority=3)
@@ -116,7 +118,7 @@ __all__ = [
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
-    '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
+    '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_pgr_wife_root',
@@ -138,7 +140,7 @@ __all__ = [
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
-    'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
+    'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'parse_qsl', 'urlencode', 'urlopen', 'urlparse', 'urlunparse',
@@ -1449,6 +1451,14 @@ def _is_master(ev: Event) -> bool:
     except Exception:
         masters = []
     return str(ev.user_id) in {str(master) for master in masters}
+
+
+def _can_upload_images(ev: Event) -> bool:
+    return _is_master(ev) or can_upload_images(
+        ev.user_id,
+        (),
+        _cfg('DailyWifeImageUploadWhitelist'),
+    )
 
 
 def _event_rng(ev: Event) -> random.Random:

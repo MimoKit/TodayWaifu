@@ -9,6 +9,7 @@ from gsuid_core.utils.plugins_config.models import (
     GsDivider,
     GsImageConfig,
     GsIntConfig,
+    GsListStrConfig,
     GsStrConfig,
 )
 
@@ -52,6 +53,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '图库 /upload 接口的 Bearer Token。仅保存在本地运行配置中，请勿提交到公开仓库',
         '',
         secret=True,
+    ),
+    'DailyWifeImageUploadWhitelist': GsListStrConfig(
+        '图片上传白名单',
+        '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',
+        [],
     ),
 
     '_DividerNteWife': GsDivider('异环老婆', ''),
