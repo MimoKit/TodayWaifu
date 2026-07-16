@@ -19,6 +19,14 @@
         "need_admin": false
       },
       {
+        "name": "今日异环老婆",
+        "desc": "抽取异环老婆（控制台开启后生效）",
+        "eg": "今日异环老婆",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
         "name": "老婆列表",
         "desc": "查看本群今日老婆汇总",
         "eg": "老婆列表",

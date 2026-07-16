@@ -1,5 +1,5 @@
 {
-  "base_commit": "0d0aaf7",
+  "base_commit": "efde3ae",
   "configs": {
     "CONFIG_DEFAULT": [
       {
@@ -33,6 +33,34 @@
       {
         "key": "DailyWifeOfficialImageGalleryToken",
         "expr": "GsStrConfig('官方机器人图库上传令牌', '图库 /upload 接口的 Bearer Token。仅保存在本地运行配置中，请勿提交到公开仓库', '', secret=True)"
+      },
+      {
+        "key": "_DividerNteWife",
+        "expr": "GsDivider('异环老婆', '')"
+      },
+      {
+        "key": "DailyWifeNteEnabled",
+        "expr": "GsBoolConfig('启用今日异环老婆', '开启后可使用“今日异环老婆”；优先读取 NTEUID 自定义面板图，没有时使用默认角色立绘', False)"
+      },
+      {
+        "key": "DailyWifeNteMixedEnabled",
+        "expr": "GsBoolConfig('启用鸣潮异环混合抽取', '开启后“今日老婆”会同时从鸣潮和异环角色中随机抽取', False)"
+      },
+      {
+        "key": "DailyWifeNteRoleMapPath",
+        "expr": "GsStrConfig('异环角色 ID 对照表路径', '留空时使用插件内置 nte_role_id_map.txt', '')"
+      },
+      {
+        "key": "DailyWifeNteCustomPanelPath",
+        "expr": "GsStrConfig('异环自定义面板图目录', '留空时自动查找 gsuid_core/data/NTEUID/custom/panel；目录下按角色 ID 分文件夹', '')"
+      },
+      {
+        "key": "DailyWifeNteDefaultPanelPath",
+        "expr": "GsStrConfig('异环默认角色立绘目录', '留空时自动查找 gsuid_core/data/NTEUID/role/detail；本地没有图片时使用 NTEUID 官方资源地址', '')"
+      },
+      {
+        "key": "DailyWifeNteTextTemplate",
+        "expr": "GsStrConfig('今日异环老婆文字模板', '可用变量：{name} 角色名，{role_id} 角色 ID', '你今天的异环老婆是{name}。')"
       },
       {
         "key": "_DividerNsfwCheck",
@@ -243,6 +271,16 @@
       "file": "twf/daily.py",
       "function": "daily_wife_full",
       "decorator": "daily_wife_sv.on_fullmatch(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='随机抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“我今天老婆是谁”“帮我娶个老婆”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_nte_wife_prefix",
+      "decorator": "daily_nte_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。可在主人 Debug 模式下把角色名放入 text。\\n    Args:\\n        text: 可选，主人 Debug 模式下指定异环角色名；普通用户留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_nte_wife_full",
+      "decorator": "daily_nte_wife_sv.on_fullmatch('今日异环老婆', block=True, to_ai='随机抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/daily.py",

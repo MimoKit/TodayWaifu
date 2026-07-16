@@ -21,10 +21,12 @@ def _load_module():
 class DailyKindMetadataTests(unittest.TestCase):
     def test_known_kinds_have_centralized_metadata(self) -> None:
         kinds = _load_module()
-        self.assertEqual(set(kinds.DAILY_KIND_METADATA), {"wife", "husband", "loli"})
+        self.assertEqual(set(kinds.DAILY_KIND_METADATA), {"wife", "husband", "loli", "nte"})
         self.assertEqual(kinds.daily_kind_metadata("wife").bucket, "wives")
         self.assertEqual(kinds.daily_kind_metadata("husband").title, "老公")
         self.assertEqual(kinds.daily_kind_metadata("loli").rob_enabled_key, "DailyLoliRobEnabled")
+        self.assertEqual(kinds.daily_kind_metadata("nte").bucket, "nte_wives")
+        self.assertEqual(kinds.daily_kind_metadata("nte").role_mode, "nte")
         self.assertEqual(
             kinds.daily_kind_metadata("husband").gift_success_default,
             "你把今天的老公{name}送给了对方！",

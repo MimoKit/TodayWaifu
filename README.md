@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center">TodayWaifu</h1>
-<h4 align="center">GSCore / GsUID 用的鸣潮「今日老婆」插件</h4>
+<h4 align="center">GSCore / GsUID 用的鸣潮、异环「今日老婆」插件</h4>
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License"></a>
@@ -49,6 +49,20 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 
 如不在默认位置，可用「本地角色图片目录」手动指定 `custom_role_pile` 路径。
 
+控制台开启「今日异环老婆」后，可发送：
+
+```text
+今日异环老婆
+```
+
+异环图片优先读取：
+
+```text
+gsuid_core/data/NTEUID/custom/panel/<角色ID>/
+```
+
+没有自定义图片时依次使用 NTEUID 自带角色图、本地缓存和官方角色立绘。开启「鸣潮异环混合抽取」后，原有「今日老婆」会从两个游戏的候选角色中一起抽取。
+
 注意：图库模式会从远程图库获取并发送图片，可能存在部分图片内容风险。是否启用请自行判断；因使用图库产生的任何风险由使用者自行承担，插件作者不承担责任。
 
 ## 常用配置
@@ -71,6 +85,11 @@ gsuid_core/data/XutheringWavesUID/resource/role_pile
 | 今日老婆概率抽群友 / 概率 | 关闭 / `0.1` | 按概率从群成员里抽老婆 |
 | 启用娶群友 | 关闭 | 开启后可使用「娶群友」命令 |
 | 启用今日老公 | 关闭 | 开启后可使用「今日老公」命令，只抽男角色 |
+| 启用今日异环老婆 | 关闭 | 开启后可使用「今日异环老婆」命令 |
+| 启用鸣潮异环混合抽取 | 关闭 | 开启后「今日老婆」同时使用鸣潮和异环候选池 |
+| 异环角色 ID 对照表路径 | 空 | 留空使用内置 `nte_role_id_map.txt` |
+| 异环自定义面板图目录 | 空 | 留空自动查找 `data/NTEUID/custom/panel` |
+| 异环默认角色立绘目录 | 空 | 留空自动查找 `data/NTEUID/role/detail` |
 | 启用抢老婆 | 开启 | 开启后可使用抢老婆命令 |
 | 抢老婆成功率 | `0.5` | 0 到 1 之间的小数 |
 | 抢老婆成功文案 | `抢老婆成功！你把对方今天的老婆{name}抢过来了！` | 支持 `{name}`、`{role_id}`、`{target}` |

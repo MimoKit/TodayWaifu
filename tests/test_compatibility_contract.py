@@ -39,7 +39,7 @@ def _trigger_manifest() -> list[dict[str, str]]:
                 if decorator.func.attr.startswith("on_"):
                     rows.append(
                         {
-                            "file": str(path.relative_to(ROOT)),
+                            "file": path.relative_to(ROOT).as_posix(),
                             "function": node.name,
                             "decorator": ast.unparse(decorator),
                         }

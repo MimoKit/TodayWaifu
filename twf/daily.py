@@ -66,8 +66,8 @@ def _record_text(record: WifeRecord, mode: str = 'wife') -> str:
 async def _ensure_daily_wife_record(
     ev: Event, user_id: str | int | None = None, mode: str = 'wife'
 ) -> WifeRecord | None:
-    bucket = 'husbands' if mode == 'husband' else 'wives'
-    salt = 'husband' if mode == 'husband' else ''
+    bucket = _daily_bucket_name(mode)
+    salt = mode if mode != 'wife' else ''
     key = _user_key(ev, user_id)
 
     # 快速路径：当天已有记录直接返回
@@ -261,8 +261,11 @@ async def _send_record_image(
 
 
 async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''):
-    title = '老公' if mode == 'husband' else '老婆'
-    logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 请求 {title} (指定: {specified_name or "无"})')
+    title = _daily_item_title(mode)
+    logger.debug(
+        f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} '
+        f'请求 {title} (指定: {specified_name or "无"})'
+    )
     
     is_master = _is_master(ev)
     is_debug = _cfg_bool('DailyWifeDebugMode', False)
@@ -544,6 +547,36 @@ async def daily_wife_prefix(bot: Bot, ev: Event):
 )
 async def daily_wife_full(bot: Bot, ev: Event):
     await _send_daily_wife(bot, ev, mode='wife', specified_name='')
+
+
+@daily_nte_wife_sv.on_prefix(
+    '今日异环老婆',
+    block=True,
+    to_ai="""抽取当前用户今天的异环老婆。
+    该功能需要先在控制台开启。可在主人 Debug 模式下把角色名放入 text。
+    Args:
+        text: 可选，主人 Debug 模式下指定异环角色名；普通用户留空。
+    """,
+)
+async def daily_nte_wife_prefix(bot: Bot, ev: Event):
+    if not _cfg_bool('DailyWifeNteEnabled', False):
+        return await _send_prefixed(bot, '今日异环老婆功能当前已关闭。')
+    await _send_daily_wife(bot, ev, mode='nte', specified_name=str(ev.text or '').strip())
+
+
+@daily_nte_wife_sv.on_fullmatch(
+    '今日异环老婆',
+    block=True,
+    to_ai="""随机抽取当前用户今天的异环老婆。
+    该功能需要先在控制台开启。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def daily_nte_wife_full(bot: Bot, ev: Event):
+    if not _cfg_bool('DailyWifeNteEnabled', False):
+        return await _send_prefixed(bot, '今日异环老婆功能当前已关闭。')
+    await _send_daily_wife(bot, ev, mode='nte', specified_name='')
 
 
 @wife_list_sv.on_fullmatch(

@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass
 from datetime import date
 from io import BytesIO
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -55,12 +56,15 @@ divorce_sv = SV('今日老婆-离婚', priority=3)
 loli_sv = SV('今日老婆-今日萝莉', priority=3)
 daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
+daily_nte_wife_sv = SV('今日老婆-异环老婆', priority=10)
 BASE_DIR = Path(__file__).parent.parent
 WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
 HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
+NTE_ROLE_MAP_PATH = BASE_DIR / 'nte_role_id_map.txt'
 LEGACY_ROLE_MAP_PATH = BASE_DIR / 'role_id_map.txt'
 HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 DEFAULT_GALLERY_API_URL = 'https://img.xlinxc.cn/api/xwuid/roles'
+NTE_DETAIL_CDN_BASE = 'https://webstatic.tajiduo.com/bbs/yh-game-records-web-source/character/detail'
 CACHE_TTL_SECONDS = 300
 MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
 LIST_FORWARD_THRESHOLD = 10
@@ -95,7 +99,7 @@ __all__ = [
     'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins', 'REPLY_PREFIX',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
-    'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
+    'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
     '_collect_role_candidates', '_configured_path', '_context_key',
     '_custom_upload_data_root', '_custom_upload_role_map_path',
@@ -118,6 +122,7 @@ __all__ = [
     '_get_reply_prefix', '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
+    '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text',
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image',
@@ -126,7 +131,7 @@ __all__ = [
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
-    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_wife_sv',
+    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'loli_manage_sv', 'loli_sv',
     'marry_member_sv', 'rob_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
@@ -756,10 +761,18 @@ def _role_map_title(mode: str) -> str:
 
 def _resolve_role_map_path(mode: str = 'wife') -> Path | None:
     role_mode = _role_mode(mode)
+    if role_mode == 'nte':
+        configured = _configured_path('DailyWifeNteRoleMapPath')
+        candidates = [configured, NTE_ROLE_MAP_PATH]
+        for path in candidates:
+            if path and path.is_file():
+                logger.debug(f'{LOG_PREFIX} 成功定位异环角色对照表文件: {path}')
+                return path
+        logger.warning(f'{LOG_PREFIX} 未能找到异环角色对照表文件')
+        return None
+
     configured = _configured_path(
-        'DailyWifeHusbandRoleMapPath'
-        if role_mode == 'husband'
-        else 'DailyWifeWifeRoleMapPath'
+        'DailyWifeHusbandRoleMapPath' if role_mode == 'husband' else 'DailyWifeWifeRoleMapPath'
     )
     legacy_configured = _configured_path('DailyWifeRoleMapPath') if role_mode == 'wife' else None
     primary_builtin = HUSBAND_ROLE_MAP_PATH if role_mode == 'husband' else WIFE_ROLE_MAP_PATH
@@ -854,6 +867,71 @@ def _resolve_default_role_pile_root() -> Path | None:
     logger.info(f'{LOG_PREFIX} 未能找到默认角色图片目录 role_pile')
     return None
 
+
+def _resolve_nte_data_dir(config_key: str, relative: Path) -> Path | None:
+    configured = _configured_path(config_key)
+    candidates = [configured] if configured else []
+    candidates.extend(
+        [
+            get_res_path('NTEUID') / relative,
+            Path.cwd() / 'gsuid_core' / 'data' / 'NTEUID' / relative,
+            Path.cwd() / 'data' / 'NTEUID' / relative,
+            BASE_DIR.parent / 'gsuid_core' / 'data' / 'NTEUID' / relative,
+            BASE_DIR.parent / 'data' / 'NTEUID' / relative,
+        ]
+    )
+    for path in candidates:
+        if path and path.is_dir():
+            return path
+    return None
+
+
+def _resolve_nte_custom_panel_root() -> Path | None:
+    path = _resolve_nte_data_dir('DailyWifeNteCustomPanelPath', Path('custom') / 'panel')
+    if path is None:
+        logger.info(f'{LOG_PREFIX} 未能找到 NTEUID 自定义面板图目录')
+    else:
+        logger.debug(f'{LOG_PREFIX} 成功定位 NTEUID 自定义面板图目录: {path}')
+    return path
+
+
+def _resolve_nte_default_panel_root() -> Path | None:
+    path = _resolve_nte_data_dir('DailyWifeNteDefaultPanelPath', Path('role') / 'detail')
+    if path is None:
+        logger.info(f'{LOG_PREFIX} 未能找到 NTEUID 默认角色立绘目录，将使用官方资源地址')
+    else:
+        logger.debug(f'{LOG_PREFIX} 成功定位 NTEUID 默认角色立绘目录: {path}')
+    return path
+
+
+def _nte_static_resource_roots() -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    for module_name in ('NTEUID', 'gsuid_core.plugins.NTEUID', 'gsuid_core.plugins.NTEUID.NTEUID'):
+        try:
+            spec = find_spec(module_name)
+        except (ImportError, ModuleNotFoundError, ValueError):
+            spec = None
+        if spec is None:
+            continue
+        locations = list(spec.submodule_search_locations or ())
+        if spec.origin:
+            locations.append(str(Path(spec.origin).parent))
+        for location in locations:
+            module_root = Path(location)
+            candidates.extend((module_root / 'resource', module_root / 'NTEUID' / 'resource'))
+
+    candidates.extend(
+        [
+            BASE_DIR.parent / 'NTEUID' / 'NTEUID' / 'resource',
+            BASE_DIR.parent / 'NTEUID' / 'resource',
+        ]
+    )
+    existing: list[Path] = []
+    for path in candidates:
+        if path.is_dir() and path not in existing:
+            existing.append(path)
+    return tuple(existing)
+
 def _load_role_map(path: Path) -> dict[str, str]:
     result: dict[str, str] = {}
     for line in path.read_text(encoding='utf-8').splitlines():
@@ -892,6 +970,7 @@ def _collect_role_candidates(
     pile_root: Path,
     default_pile_root: Path | None,
     upload_pile_root: Path | None = None,
+    default_name_patterns: tuple[str, ...] = ('role_pile_{role_id}{ext}',),
 ) -> tuple[RoleCandidate, ...]:
     grouped: dict[str, dict[str, list[Any]]] = {}
     for role_id in sorted(role_map.keys(), key=lambda item: int(item) if item.isdigit() else item):
@@ -914,10 +993,13 @@ def _collect_role_candidates(
 
         # 3. 如果没有自定义图片，且存在默认面板目录，尝试获取默认图片
         if not images and default_pile_root and default_pile_root.is_dir():
-            for ext in IMAGE_EXTENSIONS:
-                fallback_img = default_pile_root / f'role_pile_{role_id}{ext}'
-                if fallback_img.is_file():
-                    images.append(str(fallback_img))
+            for pattern in default_name_patterns:
+                for ext in IMAGE_EXTENSIONS:
+                    fallback_img = default_pile_root / pattern.format(role_id=role_id, ext=ext)
+                    if fallback_img.is_file():
+                        images.append(str(fallback_img))
+                        break
+                if images:
                     break
 
         if not images:
@@ -1037,6 +1119,67 @@ def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
     return candidates, None
 
 
+def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    role_map_path = _resolve_role_map_path('nte')
+    if role_map_path is None:
+        return None, '没有找到异环角色 ID 对照表。'
+
+    try:
+        role_map = _load_role_map(role_map_path)
+    except Exception as exc:
+        logger.exception(f'{LOG_PREFIX} 读取异环角色对照表失败: {exc}')
+        return None, '读取异环角色 ID 对照表失败。'
+    if not role_map:
+        return None, '异环角色 ID 对照表为空。'
+
+    custom_root = _resolve_nte_custom_panel_root()
+    default_root = _resolve_nte_default_panel_root()
+    static_roots = _nte_static_resource_roots()
+    custom_candidates = _collect_role_candidates(
+        role_map,
+        custom_root or Path('dummy_non_existent_nte_custom_path'),
+        None,
+    )
+    custom_by_id = {
+        role_id: candidate
+        for candidate in custom_candidates
+        for role_id in candidate.role_ids
+    }
+
+    candidates: list[RoleCandidate] = []
+    for role_id in sorted(role_map, key=lambda item: int(item) if item.isdigit() else item):
+        role_name = role_map[role_id]
+        custom = custom_by_id.get(role_id)
+        if custom is not None:
+            candidates.append(custom)
+            continue
+
+        images: tuple[str, ...] = ()
+        for resource_root in static_roots:
+            for subdir in (Path('char') / 'fashion', Path('char') / 'lihui'):
+                role_dir = resource_root / subdir / role_id
+                if role_dir.is_dir():
+                    images = _role_images(role_dir)
+                if images:
+                    break
+            if images:
+                break
+
+        if not images and default_root is not None:
+            for ext in IMAGE_EXTENSIONS:
+                default_image = default_root / f'{role_id}{ext}'
+                if default_image.is_file():
+                    images = (str(default_image),)
+                    break
+
+        if not images:
+            images = (f'{NTE_DETAIL_CDN_BASE}/{role_id}.png',)
+        candidates.append(RoleCandidate(role_name, (role_id,), images))
+
+    logger.debug(f'{LOG_PREFIX} 成功加载异环老婆候选 {len(candidates)} 名')
+    return tuple(candidates), None
+
+
 def _normalize_role_name(name: str) -> str:
     return name.replace('・', '·').replace('•', '·').strip()
 
@@ -1070,8 +1213,11 @@ def _husband_available() -> bool:
 
 def _filter_by_mode(candidates: tuple['RoleCandidate', ...], mode: str) -> tuple['RoleCandidate', ...]:
     role_map = _load_mode_role_map(mode)
-    if _role_mode(mode) == 'wife':
+    role_mode = _role_mode(mode)
+    if role_mode == 'wife':
         role_map.update(_load_custom_upload_role_map())
+        if _cfg_bool('DailyWifeNteMixedEnabled', False):
+            role_map.update(_load_mode_role_map('nte'))
     allowed_ids = set(role_map)
     allowed_names = {_normalize_role_name(name) for name in role_map.values()}
     return tuple(
@@ -1178,7 +1324,7 @@ async def _download_image(url: str) -> bytes:
 
 
 
-async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     source = _image_source()
     role_mode = _role_mode(mode)
     now = time.time()
@@ -1223,6 +1369,37 @@ async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
 
     CANDIDATE_CACHE[cache_key] = (now, candidates)
     return candidates, None
+
+
+async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    cache_key = 'local:nte'
+    now = time.time()
+    cached = CANDIDATE_CACHE.get(cache_key)
+    if cached and now - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1], None
+    candidates, error = await asyncio.to_thread(_load_nte_local_candidates)
+    if error or not candidates:
+        return None, error
+    CANDIDATE_CACHE[cache_key] = (now, candidates)
+    return candidates, None
+
+
+async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    role_mode = _role_mode(mode)
+    if role_mode == 'nte':
+        return await _load_nte_candidates()
+
+    candidates, error = await _load_wuwa_candidates(role_mode)
+    if error or not candidates:
+        return None, error
+    if role_mode != 'wife' or not _cfg_bool('DailyWifeNteMixedEnabled', False):
+        return candidates, None
+
+    nte_candidates, nte_error = await _load_nte_candidates()
+    if nte_error or not nte_candidates:
+        logger.warning(f'{LOG_PREFIX} 鸣潮异环混合抽取未加载到异环候选: {nte_error}')
+        return candidates, None
+    return _merge_role_candidates(candidates, nte_candidates), None
 
 
 def _daily_rng(ev: Event, user_id: str | int | None = None, salt: str = '') -> random.Random:
@@ -1531,6 +1708,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context = day.setdefault(_context_key(ev), {})
     context.setdefault('wives', {})
     context.setdefault('husbands', {})
+    context.setdefault('nte_wives', {})
     context.setdefault('lolis', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})

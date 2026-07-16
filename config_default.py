@@ -53,6 +53,38 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '',
         secret=True,
     ),
+
+    '_DividerNteWife': GsDivider('异环老婆', ''),
+    'DailyWifeNteEnabled': GsBoolConfig(
+        '启用今日异环老婆',
+        '开启后可使用“今日异环老婆”；优先读取 NTEUID 自定义面板图，没有时使用默认角色立绘',
+        False,
+    ),
+    'DailyWifeNteMixedEnabled': GsBoolConfig(
+        '启用鸣潮异环混合抽取',
+        '开启后“今日老婆”会同时从鸣潮和异环角色中随机抽取',
+        False,
+    ),
+    'DailyWifeNteRoleMapPath': GsStrConfig(
+        '异环角色 ID 对照表路径',
+        '留空时使用插件内置 nte_role_id_map.txt',
+        '',
+    ),
+    'DailyWifeNteCustomPanelPath': GsStrConfig(
+        '异环自定义面板图目录',
+        '留空时自动查找 gsuid_core/data/NTEUID/custom/panel；目录下按角色 ID 分文件夹',
+        '',
+    ),
+    'DailyWifeNteDefaultPanelPath': GsStrConfig(
+        '异环默认角色立绘目录',
+        '留空时自动查找 gsuid_core/data/NTEUID/role/detail；本地没有图片时使用 NTEUID 官方资源地址',
+        '',
+    ),
+    'DailyWifeNteTextTemplate': GsStrConfig(
+        '今日异环老婆文字模板',
+        '可用变量：{name} 角色名，{role_id} 角色 ID',
+        '你今天的异环老婆是{name}。',
+    ),
     '_DividerNsfwCheck': GsDivider('NSFW 检测', ''),
     'DailyWifeNsfwCheckEnabled': GsBoolConfig(
         '启用 NSFW 检测',
