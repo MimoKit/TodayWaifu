@@ -64,15 +64,22 @@ async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
     if not _cfg_bool('DailyWifePgrEnabled', True):
         return await _send_prefixed(bot, '今日战双老婆功能当前已关闭。', kind='pgr')
 
-    other_wife_name = _get_other_daily_wife_name(ev, 'pgr')
-    if other_wife_name:
-        return await _send_prefixed(
-            bot,
-            f'你今天已经有{other_wife_name}了，不要贪心！',
-            kind='pgr',
-        )
+    is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and _is_master(ev)
 
-    record = await _ensure_daily_pgr_wife_record(ev)
+    if not is_debug_active:
+        other_wife_name = _get_other_daily_wife_name(ev, 'pgr')
+        if other_wife_name:
+            return await _send_prefixed(
+                bot,
+                f'你今天已经有{other_wife_name}了，不要贪心！',
+                kind='pgr',
+            )
+
+    if is_debug_active:
+        candidates = _load_pgr_wife_candidates()
+        record = await _pick_nsfw_checked_role_record(candidates, random, 'pgr')
+    else:
+        record = await _ensure_daily_pgr_wife_record(ev)
     if record is None:
         root = _pgr_wife_root()
         return await _send_prefixed(
