@@ -439,6 +439,11 @@
     },
     {
       "file": "twf/pgr.py",
+      "function": "daily_pgr_wife_prefix",
+      "decorator": "pgr_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    主人 Debug 模式下可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅主人 Debug 模式可用。\\n    ')"
+    },
+    {
+      "file": "twf/pgr.py",
       "function": "daily_pgr_wife",
       "decorator": "pgr_wife_sv.on_fullmatch(('今日战双老婆', 'jrzslp'), block=True, to_ai='随机抽取当前用户今天的战双老婆。\\n    当用户说“今日战双老婆”“jrzslp”“我今天的战双老婆是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },

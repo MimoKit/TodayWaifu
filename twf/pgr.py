@@ -87,6 +87,18 @@ def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
     return _load_pgr_local_candidates()
 
 
+def _pgr_candidates_by_name(
+    candidates: tuple[RoleCandidate, ...],
+    specified_name: str,
+) -> tuple[RoleCandidate, ...]:
+    target = _normalize_role_name(specified_name).casefold()
+    return tuple(
+        candidate
+        for candidate in candidates
+        if _normalize_role_name(candidate.name).casefold() == target
+    )
+
+
 def _stored_pgr_record(raw: Any) -> WifeRecord | None:
     if not isinstance(raw, dict):
         return None
@@ -139,11 +151,23 @@ def _pgr_result_text(record: WifeRecord) -> str | None:
     return template.format(name=record.name, role_id='/'.join(record.role_ids))
 
 
-async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
+async def _send_daily_pgr_wife(
+    bot: Bot,
+    ev: Event,
+    specified_name: str = '',
+) -> None:
     if not _cfg_bool('DailyWifePgrEnabled', True):
         return await _send_prefixed(bot, '今日战双老婆功能当前已关闭。', kind='pgr')
 
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and _is_master(ev)
+    specified_name = _normalize_role_name(specified_name)
+
+    if specified_name and not is_debug_active:
+        return await _send_prefixed(
+            bot,
+            '只有开启主人 Debug 模式后，机器人主人才可以指定战双老婆。',
+            kind='pgr',
+        )
 
     if not is_debug_active:
         other_wife_name = _get_other_daily_wife_name(ev, 'pgr')
@@ -156,6 +180,14 @@ async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
 
     if is_debug_active:
         candidates = _load_pgr_wife_candidates()
+        if specified_name:
+            candidates = _pgr_candidates_by_name(candidates, specified_name)
+            if not candidates:
+                return await _send_prefixed(
+                    bot,
+                    f'战双老婆图库中没有角色【{specified_name}】。',
+                    kind='pgr',
+                )
         record = await _pick_nsfw_checked_role_record(candidates, random, 'pgr')
     else:
         record = await _ensure_daily_pgr_wife_record(ev)
@@ -179,6 +211,19 @@ async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
     )
 
 
+@pgr_wife_sv.on_prefix(
+    ('今日战双老婆', 'jrzslp'),
+    block=True,
+    to_ai="""抽取当前用户今天的战双老婆。
+    主人 Debug 模式下可以指定战双角色名。
+    Args:
+        text: 战双角色名，例如“露西亚”；仅主人 Debug 模式可用。
+    """,
+)
+async def daily_pgr_wife_prefix(bot: Bot, ev: Event) -> None:
+    await _send_daily_pgr_wife(bot, ev, str(ev.text or '').strip())
+
+
 @pgr_wife_sv.on_fullmatch(
     ('今日战双老婆', 'jrzslp'),
     block=True,
@@ -189,7 +234,7 @@ async def _send_daily_pgr_wife(bot: Bot, ev: Event) -> None:
     """,
 )
 async def daily_pgr_wife(bot: Bot, ev: Event) -> None:
-    await _send_daily_pgr_wife(bot, ev)
+    await _send_daily_pgr_wife(bot, ev, '')
 
 
 @image_upload_sv.on_command(

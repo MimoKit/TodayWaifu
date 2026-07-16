@@ -23,6 +23,13 @@ class PgrFeatureSourceTests(unittest.TestCase):
                 for node in tree.body
             )
         )
+        self.assertTrue(
+            any(
+                isinstance(node, ast.AsyncFunctionDef)
+                and node.name == 'daily_pgr_wife_prefix'
+                for node in tree.body
+            )
+        )
         self.assertIn("('今日战双老婆', 'jrzslp')", source)
         self.assertIn("('上传战双老婆图片', '战双老婆上传图片')", source)
 
@@ -115,8 +122,40 @@ class PgrFeatureSourceTests(unittest.TestCase):
 
         self.assertIn('if is_debug_active:', function)
         self.assertIn('_load_pgr_wife_candidates()', function)
+        self.assertIn('_pgr_candidates_by_name(candidates, specified_name)', function)
+        self.assertIn('只有开启主人 Debug 模式后', function)
+        self.assertIn('战双老婆图库中没有角色', function)
         self.assertIn("_pick_nsfw_checked_role_record(candidates, random, 'pgr')", function)
         self.assertIn('else:\n        record = await _ensure_daily_pgr_wife_record(ev)', function)
+
+    def test_pgr_prefix_passes_specified_name(self) -> None:
+        source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+        function = ast.get_source_segment(
+            source,
+            next(
+                node
+                for node in ast.parse(source).body
+                if isinstance(node, ast.AsyncFunctionDef)
+                and node.name == 'daily_pgr_wife_prefix'
+            ),
+        ) or ''
+
+        self.assertIn("str(ev.text or '').strip()", function)
+
+    def test_pgr_specified_name_uses_normalized_exact_match(self) -> None:
+        source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+        function = ast.get_source_segment(
+            source,
+            next(
+                node
+                for node in ast.parse(source).body
+                if isinstance(node, ast.FunctionDef)
+                and node.name == '_pgr_candidates_by_name'
+            ),
+        ) or ''
+
+        self.assertIn('_normalize_role_name(specified_name).casefold()', function)
+        self.assertIn('_normalize_role_name(candidate.name).casefold() == target', function)
 
 
 if __name__ == '__main__':
