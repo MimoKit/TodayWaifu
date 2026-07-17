@@ -246,6 +246,16 @@ class UnifiedDivorceTests(unittest.TestCase):
             'divorced',
         )
 
+    def test_loli_divorce_result_hides_internal_image_id(self) -> None:
+        result_name = _extract_function(
+            ROOT / 'twf' / 'divorce.py',
+            '_divorce_result_name',
+            {},
+        )
+
+        self.assertEqual(result_name('loli', '萝莉图b1b06da1'), '今日萝莉')
+        self.assertEqual(result_name('pgr', '露西亚'), '露西亚')
+
 
 if __name__ == '__main__':
     unittest.main()

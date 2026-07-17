@@ -39,6 +39,13 @@ DIVORCE_COMMANDS = (
 )
 
 
+def _divorce_result_name(kind: str, name: str) -> str:
+    """把内部记录名称转换为适合用户阅读的离婚结果。"""
+    if kind == 'loli':
+        return '今日萝莉'
+    return name
+
+
 async def _send_divorce_all(bot: Bot, ev: Event) -> None:
     user_key = _user_key(ev)
     logger.info(
@@ -57,7 +64,9 @@ async def _send_divorce_all(bot: Bot, ev: Event) -> None:
         return await _send_prefixed(bot, '你今天没有可以离婚的对象。')
 
     _save_wife_data(data)
-    names = '、'.join(dict.fromkeys(name for _, name in divorced))
+    names = '、'.join(
+        dict.fromkeys(_divorce_result_name(kind, name) for kind, name in divorced)
+    )
     await _send_prefixed(bot, f'已经全部离婚：{names}。')
 
 
