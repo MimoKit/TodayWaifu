@@ -339,18 +339,8 @@
     },
     {
       "file": "twf/divorce.py",
-      "function": "divorce_wife",
-      "decorator": "divorce_sv.on_fullmatch(('老婆离婚', '离婚', '离婚老婆', '今日老婆离婚', '和老婆离婚'), block=True, to_ai='和当前用户今天的老婆离婚。\\n    当用户说“我要和老婆离婚”“离婚老婆”“今日老婆离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/divorce.py",
-      "function": "divorce_husband",
-      "decorator": "divorce_sv.on_fullmatch(('老公离婚', '离婚老公', '今日老公离婚', '和老公离婚'), block=True, to_ai='和当前用户今天的老公离婚。\\n    当用户说“我要和老公离婚”“老公离婚”“今日老公离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/divorce.py",
-      "function": "divorce_loli",
-      "decorator": "divorce_sv.on_fullmatch(('萝莉离婚', '离婚萝莉', '今日萝莉离婚', '和萝莉离婚'), block=True, to_ai='和当前用户今天的萝莉离婚。\\n    当用户说“我要和萝莉离婚”“萝莉离婚”“今日萝莉离婚”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+      "function": "divorce_all",
+      "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='一次性结束当前用户今天的全部婚姻关系。\\n    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。\\n    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/gift.py",

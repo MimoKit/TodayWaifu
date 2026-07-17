@@ -97,16 +97,23 @@ async def _ensure_daily_wife_record(
             chosen = None
 
     if chosen is None:
-        candidates, error = await _load_candidates(mode)
-        if error or not candidates:
-            logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
-            return None
-        candidates = _filter_by_mode(candidates, mode)
-        if not candidates:
-            logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
-            return None
         rng = _daily_rng(ev, key, salt)
-        chosen = await _pick_nsfw_checked_role_record(candidates, rng, mode)
+        if mode == 'wife' and _cfg_bool('DailyWifeNteMixedEnabled', False):
+            pools, error = await _load_wife_candidate_pools()
+            if error or not pools:
+                logger.error(f'{LOG_PREFIX} 获取融合候选池失败: {error}')
+                return None
+            chosen = await _pick_mixed_wife_record(pools, rng, key)
+        else:
+            candidates, error = await _load_candidates(mode)
+            if error or not candidates:
+                logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
+                return None
+            candidates = _filter_by_mode(candidates, mode)
+            if not candidates:
+                logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
+                return None
+            chosen = await _pick_nsfw_checked_role_record(candidates, rng, mode)
         if chosen is None:
             logger.warning(f'{LOG_PREFIX} 没有通过 NSFW 检测的 {mode} 角色图片')
             return None
@@ -128,6 +135,25 @@ async def _ensure_daily_wife_record(
     context[bucket][key] = _record_to_dict(chosen, ev, key)
     _save_wife_data(data)
     return chosen
+
+
+async def _pick_mixed_wife_record(
+    pools: tuple[tuple[str, tuple[RoleCandidate, ...]], ...],
+    rng: random.Random,
+    user_key: str,
+) -> WifeRecord | None:
+    """先等概率打乱游戏池，再在池内抽取角色。"""
+    pool_order = list(pools)
+    rng.shuffle(pool_order)
+    for source, candidates in pool_order:
+        chosen = await _pick_nsfw_checked_role_record(candidates, rng, 'wife')
+        if chosen is not None:
+            logger.info(
+                f'{LOG_PREFIX} 融合模式为用户 {user_key} 选中游戏池 {source}: '
+                f'{chosen.name}'
+            )
+            return chosen
+    return None
 
 
 

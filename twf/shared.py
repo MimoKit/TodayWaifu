@@ -114,7 +114,7 @@ __all__ = [
     '_gallery_api_url', '_gallery_mode_enabled',
     '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
-    '_get_other_daily_wife_name',
+    '_get_other_daily_wife_name', '_load_wife_candidate_pools',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
@@ -123,7 +123,8 @@ __all__ = [
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
-    '_member_avatar_cache_path', '_member_feature_enabled', '_member_probability',
+    '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
+    '_member_feature_enabled', '_member_probability',
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_nsfw_checked_role_record',
@@ -485,6 +486,19 @@ EXCLUDED_ROLE_NAMES = {
     '陆·赫斯',
 }
 EXCLUDED_ROLE_KEYWORDS = ('漂泊者',)
+NTE_EXCLUDED_ROLE_NAMES = {
+    '翳',
+    '埃德嘉',
+    '白藏',
+    '阿德勒',
+    '卡厄斯',
+}
+NTE_EXCLUDED_ROLE_KEYWORDS = (
+    '异能者·零',
+    '异能者零',
+    '男主',
+    '女主',
+)
 # 按数据源分别缓存候选，避免切换数据源后误用旧缓存
 CANDIDATE_CACHE: dict[str, tuple[float, tuple['RoleCandidate', ...]]] = {}
 CUSTOM_ROLE_DELETE_PENDING: dict[str, dict[str, Any]] = {}
@@ -1139,6 +1153,11 @@ def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
     except Exception as exc:
         logger.exception(f'{LOG_PREFIX} 读取异环角色对照表失败: {exc}')
         return None, '读取异环角色 ID 对照表失败。'
+    role_map = {
+        role_id: role_name
+        for role_id, role_name in role_map.items()
+        if not _is_excluded_nte_role(role_name)
+    }
     if not role_map:
         return None, '异环角色 ID 对照表为空。'
 
@@ -1220,6 +1239,13 @@ def _is_male_role(name: str) -> bool:
 def _is_excluded_role(name: str) -> bool:
     return any(keyword in name for keyword in EXCLUDED_ROLE_KEYWORDS)
 
+
+def _is_excluded_nte_role(name: str) -> bool:
+    normalized = _normalize_role_name(name)
+    if normalized in NTE_EXCLUDED_ROLE_NAMES:
+        return True
+    return any(keyword in normalized for keyword in NTE_EXCLUDED_ROLE_KEYWORDS)
+
 def _husband_enabled() -> bool:
     return _cfg_bool('DailyWifeHusbandEnabled', False)
 
@@ -1236,15 +1262,28 @@ def _husband_available() -> bool:
     return _husband_enabled()
 
 
-def _filter_by_mode(candidates: tuple['RoleCandidate', ...], mode: str) -> tuple['RoleCandidate', ...]:
+def _filter_by_mode(
+    candidates: tuple['RoleCandidate', ...],
+    mode: str,
+    include_mixed_sources: bool = True,
+) -> tuple['RoleCandidate', ...]:
     role_map = _load_mode_role_map(mode)
     role_mode = _role_mode(mode)
     if role_mode == 'wife':
         role_map.update(_load_custom_upload_role_map())
-        if _cfg_bool('DailyWifeNteMixedEnabled', False):
+        if include_mixed_sources and _cfg_bool('DailyWifeNteMixedEnabled', False):
             role_map.update(_load_mode_role_map('nte'))
     allowed_ids = set(role_map)
     allowed_names = {_normalize_role_name(name) for name in role_map.values()}
+    if (
+        role_mode == 'wife'
+        and include_mixed_sources
+        and _cfg_bool('DailyWifeNteMixedEnabled', False)
+    ):
+        allowed_names.update(
+            _normalize_role_name(candidate.name)
+            for candidate in _load_pgr_local_candidates()
+        )
     return tuple(
         role
         for role in candidates
@@ -1409,29 +1448,66 @@ async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
     return candidates, None
 
 
+async def _load_wife_candidate_pools() -> tuple[
+    tuple[tuple[str, tuple[RoleCandidate, ...]], ...],
+    str | None,
+]:
+    """加载今日老婆可用游戏池；融合模式下各游戏池独立降级。"""
+    pools: list[tuple[str, tuple[RoleCandidate, ...]]] = []
+    errors: list[str] = []
+
+    wuwa_candidates, wuwa_error = await _load_wuwa_candidates('wife')
+    if wuwa_candidates:
+        filtered_wuwa = _filter_by_mode(
+            wuwa_candidates,
+            'wife',
+            include_mixed_sources=False,
+        )
+        if filtered_wuwa:
+            pools.append(('wuwa', filtered_wuwa))
+    elif wuwa_error:
+        errors.append(f'鸣潮：{wuwa_error}')
+
+    if not _cfg_bool('DailyWifeNteMixedEnabled', False):
+        if pools:
+            return tuple(pools), None
+        return (), errors[0] if errors else '没有找到可用的老婆角色。'
+
+    nte_candidates, nte_error = await _load_nte_candidates()
+    if nte_candidates:
+        pools.append(('nte', nte_candidates))
+    elif nte_error:
+        errors.append(f'异环：{nte_error}')
+
+    if _cfg_bool('DailyWifePgrEnabled', True):
+        pgr_candidates = await asyncio.to_thread(_load_pgr_local_candidates)
+        if pgr_candidates:
+            pools.append(('pgr', pgr_candidates))
+        else:
+            errors.append('战双：图库中没有可用图片。')
+
+    if pools:
+        return tuple(pools), None
+    return (), '；'.join(errors) or '没有找到可用的老婆角色。'
+
+
 async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
     if role_mode == 'nte':
         return await _load_nte_candidates()
 
+    if role_mode == 'wife':
+        pools, error = await _load_wife_candidate_pools()
+        if error or not pools:
+            return None, error
+        candidates: tuple[RoleCandidate, ...] = ()
+        for _, pool_candidates in pools:
+            candidates = _merge_role_candidates(candidates, pool_candidates)
+        return candidates, None
+
     candidates, error = await _load_wuwa_candidates(role_mode)
     if error or not candidates:
         return None, error
-    if role_mode != 'wife' or not _cfg_bool('DailyWifeNteMixedEnabled', False):
-        return candidates, None
-
-    nte_candidates, nte_error = await _load_nte_candidates()
-    if nte_error or not nte_candidates:
-        logger.warning(f'{LOG_PREFIX} 混合抽取未加载到异环候选: {nte_error}')
-    else:
-        candidates = _merge_role_candidates(candidates, nte_candidates)
-
-    if _cfg_bool('DailyWifePgrEnabled', True):
-        pgr_candidates = _load_pgr_local_candidates()
-        if not pgr_candidates:
-            logger.warning(f'{LOG_PREFIX} 混合抽取未加载到战双候选，继续使用其他图库')
-        else:
-            candidates = _merge_role_candidates(candidates, pgr_candidates)
     return candidates, None
 
 
@@ -1771,6 +1847,7 @@ def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
 
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
 
 
 def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
@@ -1784,7 +1861,7 @@ def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
         if kind == requested_kind:
             continue
         raw = context[_daily_bucket_name(kind)].get(user_key)
-        if not isinstance(raw, dict):
+        if not _has_active_wife(raw):
             continue
         name = str(raw.get('name') or '').strip()
         if name:
@@ -1861,12 +1938,12 @@ def _wife_state(raw: Any) -> str:
     """返回记录持有状态：owned 正常持有 / lost_stolen 被抢走 / lost_gifted 送出去 / divorced 主动离婚。"""
     if not isinstance(raw, dict):
         return 'owned'
+    if raw.get('divorced'):
+        return 'divorced'
     if raw.get('stolen_by'):
         return 'lost_stolen'
     if raw.get('gifted_to'):
         return 'lost_gifted'
-    if raw.get('divorced'):
-        return 'divorced'
     return 'owned'
 
 
@@ -1891,6 +1968,36 @@ def _is_secondhand_wife(raw: Any) -> bool:
 def _has_active_wife(raw: Any) -> bool:
     """是否仍持有一个有效（未离手）的老婆。"""
     return isinstance(raw, dict) and bool(raw.get('name')) and _wife_state(raw) == 'owned'
+
+
+def _mark_all_daily_records_divorced(
+    context: dict[str, Any],
+    user_key: str,
+    divorced_at: int,
+) -> list[tuple[str, str]]:
+    """一次性终止用户今天在全部模式中的婚姻记录。"""
+    divorced: list[tuple[str, str]] = []
+    for kind in ALL_DAILY_RECORD_KINDS:
+        bucket = context[_daily_bucket_name(kind)]
+        raw = bucket.get(user_key)
+        if not isinstance(raw, dict) or not str(raw.get('name') or '').strip():
+            continue
+        if raw.get('divorced'):
+            continue
+        raw['divorced'] = True
+        raw['divorced_at'] = divorced_at
+        divorced.append((kind, str(raw['name'])))
+
+    safe_record = context['safe_wives'].get(user_key)
+    if (
+        isinstance(safe_record, dict)
+        and str(safe_record.get('name') or '').strip()
+        and not safe_record.get('divorced')
+    ):
+        safe_record['divorced'] = True
+        safe_record['divorced_at'] = divorced_at
+        divorced.append(('safe_wife', str(safe_record['name'])))
+    return divorced
 
 
 def _normalise_target_user_id(value: Any) -> str:

@@ -100,7 +100,7 @@ def _pgr_candidates_by_name(
 
 
 def _stored_pgr_record(raw: Any) -> WifeRecord | None:
-    if not isinstance(raw, dict):
+    if not isinstance(raw, dict) or _wife_state(raw) != 'owned':
         return None
     record = _record_from_dict(raw)
     if record is None or not Path(record.image).is_file():
@@ -113,7 +113,10 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     bucket = _daily_bucket_name('pgr')
     data = _load_wife_data()
     context = _get_today_context(data, ev)
-    current = _stored_pgr_record(context[bucket].get(key))
+    current_raw = context[bucket].get(key)
+    if isinstance(current_raw, dict) and _wife_state(current_raw) != 'owned':
+        return None
+    current = _stored_pgr_record(current_raw)
     if current is not None:
         if await _nsfw_record_passes(current):
             return current
@@ -134,7 +137,11 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     # await 后重新读取，避免并发命令覆盖已经生成的结果。
     data = _load_wife_data()
     context = _get_today_context(data, ev)
-    existing = _stored_pgr_record(context[bucket].get(key))
+    existing_raw = context[bucket].get(key)
+    if isinstance(existing_raw, dict) and _wife_state(existing_raw) != 'owned':
+        logger.debug(f'{LOG_PREFIX} 写入前发现已离手的战双老婆记录，拒绝覆盖')
+        return None
+    existing = _stored_pgr_record(existing_raw)
     if existing is not None:
         return existing
     context[bucket][key] = _record_to_dict(chosen, ev, key)
@@ -170,6 +177,21 @@ async def _send_daily_pgr_wife(
         )
 
     if not is_debug_active:
+        data = _load_wife_data()
+        context = _get_today_context(data, ev)
+        current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
+        state = _wife_state(current)
+        if state == 'divorced':
+            return await _send_prefixed(
+                bot,
+                '你今天已经和战双老婆离婚了，明天再来吧~',
+                kind='pgr',
+            )
+        if state == 'lost_stolen':
+            return await _send_prefixed(bot, '你的战双老婆已经被抢走了。', kind='pgr')
+        if state == 'lost_gifted':
+            return await _send_prefixed(bot, '你的战双老婆已经送出去了。', kind='pgr')
+
         other_wife_name = _get_other_daily_wife_name(ev, 'pgr')
         if other_wife_name:
             return await _send_prefixed(

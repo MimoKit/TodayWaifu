@@ -1,15 +1,13 @@
-"""TodayWaifu divorce command."""
+"""TodayWaifu unified divorce command."""
 from __future__ import annotations
 
 from .shared import (
     Bot,
     Event,
     LOG_PREFIX,
-    _daily_bucket_name,
-    _daily_item_title,
     _get_today_context,
-    _has_active_wife,
     _load_wife_data,
+    _mark_all_daily_records_divorced,
     _save_wife_data,
     _send_prefixed,
     _user_key,
@@ -19,65 +17,59 @@ from .shared import (
 )
 
 
-async def _send_divorce(bot: Bot, ev: Event, kind: str = 'wife') -> None:
-    title = _daily_item_title(kind)
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起离婚: {title}')
+DIVORCE_COMMANDS = (
+    '离婚',
+    '全部离婚',
+    '老婆离婚',
+    '离婚老婆',
+    '今日老婆离婚',
+    '和老婆离婚',
+    '老公离婚',
+    '离婚老公',
+    '今日老公离婚',
+    '和老公离婚',
+    '萝莉离婚',
+    '离婚萝莉',
+    '今日萝莉离婚',
+    '和萝莉离婚',
+    '异环老婆离婚',
+    '离婚异环老婆',
+    '战双老婆离婚',
+    '离婚战双老婆',
+)
+
+
+async def _send_divorce_all(bot: Bot, ev: Event) -> None:
+    user_key = _user_key(ev)
+    logger.info(
+        f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} '
+        '发起统一离婚'
+    )
 
     data = _load_wife_data()
     context = _get_today_context(data, ev)
-    bucket = _daily_bucket_name(kind)
-    user_key = _user_key(ev)
-    current = context[bucket].get(user_key)
-    if not _has_active_wife(current):
-        return await _send_prefixed(bot, f'你今天没有可以离婚的{title}。', kind=kind)
+    divorced = _mark_all_daily_records_divorced(context, user_key, int(time.time()))
 
-    if not isinstance(current, dict):
-        return await _send_prefixed(bot, f'你今天没有可以离婚的{title}。', kind=kind)
+    from .gift import clear_pending_gifts_for_user
 
-    item_name = str(current.get('name') or title)
-    current['divorced'] = True
-    current['divorced_at'] = int(time.time())
+    clear_pending_gifts_for_user(ev, user_key)
+    if not divorced:
+        return await _send_prefixed(bot, '你今天没有可以离婚的对象。')
+
     _save_wife_data(data)
-
-    if kind == 'loli':
-        return await _send_prefixed(bot, '你已经和今天的萝莉离婚了。', kind=kind)
-    await _send_prefixed(bot, f'你已经和今天的{title}{item_name}离婚了。', kind=kind)
+    names = '、'.join(dict.fromkeys(name for _, name in divorced))
+    await _send_prefixed(bot, f'已经全部离婚：{names}。')
 
 
 @divorce_sv.on_fullmatch(
-    ('老婆离婚', '离婚', '离婚老婆', '今日老婆离婚', '和老婆离婚'),
+    DIVORCE_COMMANDS,
     block=True,
-    to_ai="""和当前用户今天的老婆离婚。
-    当用户说“我要和老婆离婚”“离婚老婆”“今日老婆离婚”时调用。
+    to_ai="""一次性结束当前用户今天的全部婚姻关系。
+    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。
+    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。
     Args:
         text: 无需参数，留空。
     """,
 )
-async def divorce_wife(bot: Bot, ev: Event):
-    await _send_divorce(bot, ev, 'wife')
-
-
-@divorce_sv.on_fullmatch(
-    ('老公离婚', '离婚老公', '今日老公离婚', '和老公离婚'),
-    block=True,
-    to_ai="""和当前用户今天的老公离婚。
-    当用户说“我要和老公离婚”“老公离婚”“今日老公离婚”时调用。
-    Args:
-        text: 无需参数，留空。
-    """,
-)
-async def divorce_husband(bot: Bot, ev: Event):
-    await _send_divorce(bot, ev, 'husband')
-
-
-@divorce_sv.on_fullmatch(
-    ('萝莉离婚', '离婚萝莉', '今日萝莉离婚', '和萝莉离婚'),
-    block=True,
-    to_ai="""和当前用户今天的萝莉离婚。
-    当用户说“我要和萝莉离婚”“萝莉离婚”“今日萝莉离婚”时调用。
-    Args:
-        text: 无需参数，留空。
-    """,
-)
-async def divorce_loli(bot: Bot, ev: Event):
-    await _send_divorce(bot, ev, 'loli')
+async def divorce_all(bot: Bot, ev: Event) -> None:
+    await _send_divorce_all(bot, ev)

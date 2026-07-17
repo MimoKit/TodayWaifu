@@ -62,7 +62,7 @@ class InteractionSourceTests(unittest.TestCase):
             self.assertIn(declaration, shared_source)
 
     def test_mode_aware_modules_forward_reply_kind(self) -> None:
-        for module_name in ('daily.py', 'rob.py', 'gift.py', 'divorce.py'):
+        for module_name in ('daily.py', 'rob.py', 'gift.py'):
             source = (ROOT / 'twf' / module_name).read_text(encoding='utf-8')
             self.assertRegex(source, r'_send_prefixed\([\s\S]*?kind=(?:mode|kind)')
 
@@ -91,16 +91,26 @@ class InteractionSourceTests(unittest.TestCase):
         gift_source = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
         self.assertIn("item_text = title if kind == 'loli' else f'{title}{role.name}'", gift_source)
 
-    def test_divorce_module_registers_independent_commands(self) -> None:
+    def test_divorce_module_registers_one_unified_command(self) -> None:
         init_source = (ROOT / '__init__.py').read_text(encoding='utf-8')
         shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
         divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8')
         self.assertIn('from .twf import divorce', init_source)
         self.assertIn("divorce_sv = SV('今日老婆-离婚'", shared_source)
-        for word in ('离婚', '离婚老公', '离婚萝莉'):
+        for word in (
+            '离婚',
+            '全部离婚',
+            '老婆离婚',
+            '离婚老公',
+            '离婚萝莉',
+            '异环老婆离婚',
+            '战双老婆离婚',
+        ):
             self.assertIn(word, divorce_source)
-        for word in ('老婆离婚', '老公离婚', '萝莉离婚'):
-            self.assertIn(word, divorce_source)
+        self.assertIn('async def divorce_all(', divorce_source)
+        self.assertNotIn('async def divorce_wife(', divorce_source)
+        self.assertNotIn('async def divorce_husband(', divorce_source)
+        self.assertNotIn('async def divorce_loli(', divorce_source)
 
     def test_natural_command_aliases_are_registered(self) -> None:
         custom_source = (ROOT / 'twf' / 'custom_role.py').read_text(encoding='utf-8')
@@ -112,14 +122,15 @@ class InteractionSourceTests(unittest.TestCase):
             self.assertIn(word, loli_source)
         self.assertIn('老婆帮助', help_source)
 
-    def test_divorce_uses_separate_state_not_stolen_or_gifted(self) -> None:
+    def test_divorce_marks_all_daily_records_with_divorced_state(self) -> None:
         shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
         divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8')
         self.assertIn("raw.get('divorced')", shared_source)
         self.assertIn("return 'divorced'", shared_source)
-        self.assertIn("current['divorced'] = True", divorce_source)
-        self.assertNotIn("current['stolen_by']", divorce_source)
-        self.assertNotIn("current['gifted_to']", divorce_source)
+        self.assertIn('ALL_DAILY_RECORD_KINDS', shared_source)
+        self.assertIn("context['safe_wives']", shared_source)
+        self.assertIn('_mark_all_daily_records_divorced(', divorce_source)
+        self.assertIn('clear_pending_gifts_for_user(', divorce_source)
 
 
 if __name__ == '__main__':

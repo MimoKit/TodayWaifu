@@ -101,6 +101,18 @@ def _clear_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> N
     _GIFT_PENDING.pop(_gift_pending_key(ev, target_user_id, kind), None)
 
 
+def clear_pending_gifts_for_user(ev: Event, user_id: str) -> None:
+    """取消当前会话中该用户作为赠送方或接收方的全部待确认请求。"""
+    context_prefix = f'{_context_key(ev)}:'
+    for key, pending in tuple(_GIFT_PENDING.items()):
+        if not key.startswith(context_prefix):
+            continue
+        is_recipient = key.rsplit(':', 1)[-1] == user_id
+        is_giver = isinstance(pending, dict) and str(pending.get('giver_id') or '') == user_id
+        if is_recipient or is_giver:
+            _GIFT_PENDING.pop(key, None)
+
+
 async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起送{title}')

@@ -62,15 +62,20 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn("_cfg('DailyWifePgrGalleryPath')", shared)
         self.assertIn("_daily_rng(ev, key, 'pgr_wife')", source)
         self.assertIn("Path(record.image).is_file()", source)
+        self.assertIn("_wife_state(existing_raw) != 'owned'", source)
+        self.assertIn('写入前发现已离手的战双老婆记录，拒绝覆盖', source)
         self.assertIn("_get_other_daily_wife_name(ev, 'pgr')", source)
         self.assertIn('不要贪心！', source)
 
     def test_pgr_gallery_is_wired_into_mixed_mode(self) -> None:
         shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
 
         self.assertIn("_cfg_bool('DailyWifeNteMixedEnabled', False)", shared)
         self.assertIn('_load_pgr_local_candidates()', shared)
-        self.assertIn("_merge_role_candidates(candidates, pgr_candidates)", shared)
+        self.assertIn("pools.append(('pgr', pgr_candidates))", shared)
+        self.assertIn('rng.shuffle(pool_order)', daily)
+        self.assertIn('_pick_mixed_wife_record(pools, rng, key)', daily)
 
     def test_daily_wife_variants_share_an_exclusive_daily_choice(self) -> None:
         shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
