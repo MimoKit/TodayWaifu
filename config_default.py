@@ -60,15 +60,32 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         [],
     ),
 
+    '_DividerMixedWife': GsDivider('融合老婆', ''),
+    'DailyWifeNteMixedEnabled': GsBoolConfig(
+        '启用融合老婆',
+        '开启后“今日老婆”会先从已启用的游戏池中等概率选择一个游戏，再抽取该游戏角色',
+        False,
+    ),
+    'DailyWifeMixedWuwaEnabled': GsBoolConfig(
+        '融合鸣潮',
+        '控制鸣潮角色是否参与“今日老婆”融合抽取',
+        True,
+    ),
+    'DailyWifeMixedNteEnabled': GsBoolConfig(
+        '融合异环',
+        '控制异环角色是否参与“今日老婆”融合抽取；不影响独立的“今日异环老婆”功能',
+        True,
+    ),
+    'DailyWifeMixedPgrEnabled': GsBoolConfig(
+        '融合战双',
+        '控制战双角色是否参与“今日老婆”融合抽取；不影响独立的“今日战双老婆”功能',
+        True,
+    ),
+
     '_DividerNteWife': GsDivider('异环老婆', ''),
     'DailyWifeNteEnabled': GsBoolConfig(
         '启用今日异环老婆',
         '开启后可使用“今日异环老婆”；优先读取 NTEUID 自定义面板图，没有时使用默认角色立绘',
-        False,
-    ),
-    'DailyWifeNteMixedEnabled': GsBoolConfig(
-        '启用多游戏混合抽取',
-        '开启后“今日老婆”会同时从鸣潮、异环和本地战双图库中随机抽取；图库为空时自动跳过',
         False,
     ),
     'DailyWifeNteRoleMapPath': GsStrConfig(

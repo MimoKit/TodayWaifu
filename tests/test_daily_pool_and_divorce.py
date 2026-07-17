@@ -138,6 +138,79 @@ class MixedPoolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(error)
         self.assertEqual([source for source, _ in pools], ['nte', 'pgr'])
 
+    async def test_each_game_can_be_excluded_from_mixed_mode_independently(self) -> None:
+        wuwa = (_RoleCandidate('今汐', ('1304',), ('wuwa.png',)),)
+        pgr = (_RoleCandidate('露西亚', ('露西亚',), ('pgr.png',)),)
+
+        async def load_wuwa(_mode: str):
+            return wuwa, None
+
+        async def load_nte():
+            self.fail('融合异环关闭后不应加载异环候选')
+
+        async def to_thread(function, *args):
+            return function(*args)
+
+        config = {
+            'DailyWifeNteMixedEnabled': True,
+            'DailyWifeMixedWuwaEnabled': True,
+            'DailyWifeMixedNteEnabled': False,
+            'DailyWifeMixedPgrEnabled': True,
+        }
+        load_pools = _extract_function(
+            ROOT / 'twf' / 'shared.py',
+            '_load_wife_candidate_pools',
+            {
+                '_load_wuwa_candidates': load_wuwa,
+                '_load_nte_candidates': load_nte,
+                '_load_pgr_local_candidates': lambda: pgr,
+                '_filter_by_mode': lambda candidates, _mode, **_kwargs: candidates,
+                '_cfg_bool': lambda key, default: config.get(key, default),
+                'asyncio': SimpleNamespace(to_thread=to_thread),
+            },
+        )
+
+        pools, error = await load_pools()
+
+        self.assertIsNone(error)
+        self.assertEqual([source for source, _ in pools], ['wuwa', 'pgr'])
+
+    async def test_mixed_mode_reports_when_all_game_switches_are_off(self) -> None:
+        async def unexpected_wuwa(_mode: str):
+            self.fail('融合鸣潮关闭后不应加载鸣潮候选')
+
+        async def unexpected_nte():
+            self.fail('融合异环关闭后不应加载异环候选')
+
+        async def to_thread(function, *args):
+            return function(*args)
+
+        config = {
+            'DailyWifeNteMixedEnabled': True,
+            'DailyWifeMixedWuwaEnabled': False,
+            'DailyWifeMixedNteEnabled': False,
+            'DailyWifeMixedPgrEnabled': False,
+        }
+        load_pools = _extract_function(
+            ROOT / 'twf' / 'shared.py',
+            '_load_wife_candidate_pools',
+            {
+                '_load_wuwa_candidates': unexpected_wuwa,
+                '_load_nte_candidates': unexpected_nte,
+                '_load_pgr_local_candidates': lambda: self.fail(
+                    '融合战双关闭后不应扫描战双图库'
+                ),
+                '_filter_by_mode': lambda candidates, _mode, **_kwargs: candidates,
+                '_cfg_bool': lambda key, default: config.get(key, default),
+                'asyncio': SimpleNamespace(to_thread=to_thread),
+            },
+        )
+
+        pools, error = await load_pools()
+
+        self.assertEqual(pools, ())
+        self.assertEqual(error, '融合模式未启用任何游戏池。')
+
     async def test_mixed_draw_selects_a_game_pool_before_a_character(self) -> None:
         calls: list[str] = []
 

@@ -74,10 +74,7 @@ class NteConfigAndCommandTests(unittest.TestCase):
         matches = [
             entry
             for entry in _config_entries()
-            if '异环' in f'{entry[0]} {entry[1]} {entry[2]}'
-            and '老婆' in f'{entry[0]} {entry[1]} {entry[2]}'
-            and '混合' not in f'{entry[0]} {entry[1]} {entry[2]}'
-            and _bool_default(entry[3]) is not None
+            if entry[0] == 'DailyWifeNteEnabled'
         ]
         self.assertEqual(len(matches), 1, '应有且仅有一个“今日异环老婆”布尔开关')
         self.assertFalse(_bool_default(matches[0][3]))
@@ -179,12 +176,29 @@ class NteCandidateBehaviorTests(unittest.TestCase):
         mixed = [
             entry
             for entry in entries
-            if '混合' in f'{entry[0]} {entry[1]} {entry[2]}'
-            and '抽取' in f'{entry[0]} {entry[1]} {entry[2]}'
-            and _bool_default(entry[3]) is not None
+            if entry[0] == 'DailyWifeNteMixedEnabled'
         ]
-        self.assertEqual(len(mixed), 1, '应有且仅有一个多游戏混合模式布尔开关')
+        self.assertEqual(len(mixed), 1, '应保留兼容旧配置的融合模式总开关')
         self.assertFalse(_bool_default(mixed[0][3]))
+
+        game_switches = {
+            key: _bool_default(call)
+            for key, _title, _description, call in entries
+            if key
+            in {
+                'DailyWifeMixedWuwaEnabled',
+                'DailyWifeMixedNteEnabled',
+                'DailyWifeMixedPgrEnabled',
+            }
+        }
+        self.assertEqual(
+            game_switches,
+            {
+                'DailyWifeMixedWuwaEnabled': True,
+                'DailyWifeMixedNteEnabled': True,
+                'DailyWifeMixedPgrEnabled': True,
+            },
+        )
 
         config_key = mixed[0][0]
         runtime_source = '\n'.join(
@@ -192,6 +206,8 @@ class NteCandidateBehaviorTests(unittest.TestCase):
             for name in ('shared.py', 'daily.py')
         )
         self.assertIn(config_key, runtime_source, '混合模式配置必须接入候选加载流程')
+        for key in game_switches:
+            self.assertIn(key, runtime_source)
 
         merge = _extract_function(
             '_merge_role_candidates',

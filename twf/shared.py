@@ -1271,7 +1271,11 @@ def _filter_by_mode(
     role_mode = _role_mode(mode)
     if role_mode == 'wife':
         role_map.update(_load_custom_upload_role_map())
-        if include_mixed_sources and _cfg_bool('DailyWifeNteMixedEnabled', False):
+        if (
+            include_mixed_sources
+            and _cfg_bool('DailyWifeNteMixedEnabled', False)
+            and _cfg_bool('DailyWifeMixedNteEnabled', True)
+        ):
             role_map.update(_load_mode_role_map('nte'))
     allowed_ids = set(role_map)
     allowed_names = {_normalize_role_name(name) for name in role_map.values()}
@@ -1279,6 +1283,7 @@ def _filter_by_mode(
         role_mode == 'wife'
         and include_mixed_sources
         and _cfg_bool('DailyWifeNteMixedEnabled', False)
+        and _cfg_bool('DailyWifeMixedPgrEnabled', True)
     ):
         allowed_names.update(
             _normalize_role_name(candidate.name)
@@ -1455,31 +1460,40 @@ async def _load_wife_candidate_pools() -> tuple[
     """加载今日老婆可用游戏池；融合模式下各游戏池独立降级。"""
     pools: list[tuple[str, tuple[RoleCandidate, ...]]] = []
     errors: list[str] = []
+    mixed_enabled = _cfg_bool('DailyWifeNteMixedEnabled', False)
+    wuwa_enabled = not mixed_enabled or _cfg_bool('DailyWifeMixedWuwaEnabled', True)
+    nte_enabled = mixed_enabled and _cfg_bool('DailyWifeMixedNteEnabled', True)
+    pgr_enabled = mixed_enabled and _cfg_bool('DailyWifeMixedPgrEnabled', True)
 
-    wuwa_candidates, wuwa_error = await _load_wuwa_candidates('wife')
-    if wuwa_candidates:
-        filtered_wuwa = _filter_by_mode(
-            wuwa_candidates,
-            'wife',
-            include_mixed_sources=False,
-        )
-        if filtered_wuwa:
-            pools.append(('wuwa', filtered_wuwa))
-    elif wuwa_error:
-        errors.append(f'鸣潮：{wuwa_error}')
+    if mixed_enabled and not any((wuwa_enabled, nte_enabled, pgr_enabled)):
+        return (), '融合模式未启用任何游戏池。'
 
-    if not _cfg_bool('DailyWifeNteMixedEnabled', False):
+    if wuwa_enabled:
+        wuwa_candidates, wuwa_error = await _load_wuwa_candidates('wife')
+        if wuwa_candidates:
+            filtered_wuwa = _filter_by_mode(
+                wuwa_candidates,
+                'wife',
+                include_mixed_sources=False,
+            )
+            if filtered_wuwa:
+                pools.append(('wuwa', filtered_wuwa))
+        elif wuwa_error:
+            errors.append(f'鸣潮：{wuwa_error}')
+
+    if not mixed_enabled:
         if pools:
             return tuple(pools), None
         return (), errors[0] if errors else '没有找到可用的老婆角色。'
 
-    nte_candidates, nte_error = await _load_nte_candidates()
-    if nte_candidates:
-        pools.append(('nte', nte_candidates))
-    elif nte_error:
-        errors.append(f'异环：{nte_error}')
+    if nte_enabled:
+        nte_candidates, nte_error = await _load_nte_candidates()
+        if nte_candidates:
+            pools.append(('nte', nte_candidates))
+        elif nte_error:
+            errors.append(f'异环：{nte_error}')
 
-    if _cfg_bool('DailyWifePgrEnabled', True):
+    if pgr_enabled:
         pgr_candidates = await asyncio.to_thread(_load_pgr_local_candidates)
         if pgr_candidates:
             pools.append(('pgr', pgr_candidates))
