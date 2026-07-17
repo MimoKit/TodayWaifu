@@ -381,11 +381,36 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
     if is_debug_active:
         logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
-        candidates, error = await _load_candidates(mode)
-        if error or not candidates:
-            return await _send_prefixed(bot, error or '没有找到可用角色。', kind=mode)
-        if not candidates:
-            return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
+        if mode == 'wife' and not specified_name and _cfg_bool(
+            'DailyWifeNteMixedEnabled',
+            False,
+        ):
+            pools, error = await _load_wife_candidate_pools()
+            if error or not pools:
+                return await _send_prefixed(
+                    bot,
+                    error or '没有找到可用角色。',
+                    kind=mode,
+                )
+            record = await _pick_mixed_wife_record(
+                pools,
+                random,
+                _user_key(ev),
+            )
+        else:
+            candidates, error = await _load_candidates(mode)
+            if error or not candidates:
+                return await _send_prefixed(
+                    bot,
+                    error or '没有找到可用角色。',
+                    kind=mode,
+                )
+            if not candidates:
+                return await _send_prefixed(
+                    bot,
+                    f'没有找到可用的{title}角色。',
+                    kind=mode,
+                )
         if specified_name:
             target_candidates = [c for c in candidates if c.name == specified_name]
             if not target_candidates:
@@ -395,10 +420,12 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                     kind=mode,
                 )
             candidates = tuple(target_candidates)
-        else:
+            record = await _pick_nsfw_checked_role_record(candidates, random, mode)
+        elif record is None and not (
+            mode == 'wife' and _cfg_bool('DailyWifeNteMixedEnabled', False)
+        ):
             candidates = _filter_by_mode(candidates, mode)
-
-        record = await _pick_nsfw_checked_role_record(candidates, random, mode)
+            record = await _pick_nsfw_checked_role_record(candidates, random, mode)
         if record is None:
             logger.warning(f'{LOG_PREFIX} Debug 抽取没有通过 NSFW 检测的图片')
             return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)

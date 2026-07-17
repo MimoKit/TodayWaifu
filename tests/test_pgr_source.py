@@ -77,6 +77,25 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('rng.shuffle(pool_order)', daily)
         self.assertIn('_pick_mixed_wife_record(pools, rng, key)', daily)
 
+    def test_owner_debug_random_draw_uses_the_same_game_pool_logic(self) -> None:
+        source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
+        function = ast.get_source_segment(
+            source,
+            next(
+                node
+                for node in ast.parse(source).body
+                if isinstance(node, ast.AsyncFunctionDef)
+                and node.name == '_send_daily_wife'
+            ),
+        ) or ''
+
+        self.assertIn("if mode == 'wife' and not specified_name", function)
+        self.assertIn('_load_wife_candidate_pools()', function)
+        self.assertIn(
+            "record = await _pick_mixed_wife_record(\n                pools,\n                random,",
+            function,
+        )
+
     def test_daily_wife_variants_share_an_exclusive_daily_choice(self) -> None:
         shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
         daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
