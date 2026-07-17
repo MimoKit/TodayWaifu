@@ -160,7 +160,14 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeDebugMode': GsBoolConfig(
         '主人 Debug 模式',
-        '开启后机器人主人可以用"今日老婆 角色名"指定抽取的角色，便于调试',
+        '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试',
+        False,
+    ),
+
+    '_DividerAssignWife': GsDivider('分配老婆', ''),
+    'DailyWifeOwnerSpecifyEnabled': GsBoolConfig(
+        '启用主人指定老婆',
+        '开启后机器人主人可以用“今日老婆 角色名”“今日异环老婆 角色名”“今日战双老婆 角色名”指定抽取角色',
         False,
     ),
 

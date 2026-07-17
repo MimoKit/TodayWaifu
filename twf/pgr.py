@@ -166,17 +166,22 @@ async def _send_daily_pgr_wife(
     if not _cfg_bool('DailyWifePgrEnabled', True):
         return await _send_prefixed(bot, '今日战双老婆功能当前已关闭。', kind='pgr')
 
-    is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and _is_master(ev)
+    is_master = _is_master(ev)
+    is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
+    can_specify_role = (
+        _cfg_bool('DailyWifeOwnerSpecifyEnabled', False) and is_master
+    )
     specified_name = _normalize_role_name(specified_name)
+    is_transient_draw = is_debug_active or bool(specified_name)
 
-    if specified_name and not is_debug_active:
+    if specified_name and not can_specify_role:
         return await _send_prefixed(
             bot,
-            '只有开启主人 Debug 模式后，机器人主人才可以指定战双老婆。',
+            '只有开启“主人指定老婆”后，机器人主人才可以指定战双老婆。',
             kind='pgr',
         )
 
-    if not is_debug_active:
+    if not is_transient_draw:
         data = _load_wife_data()
         context = _get_today_context(data, ev)
         current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
@@ -200,7 +205,7 @@ async def _send_daily_pgr_wife(
                 kind='pgr',
             )
 
-    if is_debug_active:
+    if is_transient_draw:
         candidates = _load_pgr_wife_candidates()
         if specified_name:
             candidates = _pgr_candidates_by_name(candidates, specified_name)
@@ -237,9 +242,9 @@ async def _send_daily_pgr_wife(
     ('今日战双老婆', 'jrzslp'),
     block=True,
     to_ai="""抽取当前用户今天的战双老婆。
-    主人 Debug 模式下可以指定战双角色名。
+    开启“主人指定老婆”后，机器人主人可以指定战双角色名。
     Args:
-        text: 战双角色名，例如“露西亚”；仅主人 Debug 模式可用。
+        text: 战双角色名，例如“露西亚”；仅开启主人指定老婆后可用。
     """,
 )
 async def daily_pgr_wife_prefix(bot: Bot, ev: Event) -> None:

@@ -132,7 +132,15 @@
       },
       {
         "key": "DailyWifeDebugMode",
-        "expr": "GsBoolConfig('主人 Debug 模式', '开启后机器人主人可以用\"今日老婆 角色名\"指定抽取的角色，便于调试', False)"
+        "expr": "GsBoolConfig('主人 Debug 模式', '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试', False)"
+      },
+      {
+        "key": "_DividerAssignWife",
+        "expr": "GsDivider('分配老婆', '')"
+      },
+      {
+        "key": "DailyWifeOwnerSpecifyEnabled",
+        "expr": "GsBoolConfig('启用主人指定老婆', '开启后机器人主人可以用“今日老婆 角色名”“今日异环老婆 角色名”“今日战双老婆 角色名”指定抽取角色', False)"
       },
       {
         "key": "_DividerDailyWife",
@@ -311,7 +319,7 @@
     {
       "file": "twf/daily.py",
       "function": "daily_nte_wife_prefix",
-      "decorator": "daily_nte_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。可在主人 Debug 模式下把角色名放入 text。\\n    Args:\\n        text: 可选，主人 Debug 模式下指定异环角色名；普通用户留空。\\n    ')"
+      "decorator": "daily_nte_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。开启“主人指定老婆”后，主人可把角色名放入 text。\\n    Args:\\n        text: 可选，主人启用指定老婆后可填写异环角色名；普通用户留空。\\n    ')"
     },
     {
       "file": "twf/daily.py",
@@ -446,7 +454,7 @@
     {
       "file": "twf/pgr.py",
       "function": "daily_pgr_wife_prefix",
-      "decorator": "pgr_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    主人 Debug 模式下可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅主人 Debug 模式可用。\\n    ')"
+      "decorator": "pgr_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    开启“主人指定老婆”后，机器人主人可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅开启主人指定老婆后可用。\\n    ')"
     },
     {
       "file": "twf/pgr.py",

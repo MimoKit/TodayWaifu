@@ -129,9 +129,21 @@ class PgrFeatureSourceTests(unittest.TestCase):
         ) or ''
 
         for source in (daily_function, pgr_function):
-            self.assertIn("_cfg_bool('DailyWifeDebugMode', False) and _is_master(ev)", source)
+            self.assertIn("is_master = _is_master(ev)", source)
+            self.assertIn("_cfg_bool('DailyWifeDebugMode', False) and is_master", source)
             self.assertLess(source.index('is_debug_active ='), source.index('_get_other_daily_wife_name('))
-            self.assertIn('if not is_debug_active:', source)
+            self.assertIn('if not is_transient_draw:', source)
+
+    def test_owner_role_selection_is_independent_from_debug_mode(self) -> None:
+        config = (ROOT / 'config_default.py').read_text(encoding='utf-8-sig')
+        daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
+        pgr = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+
+        self.assertIn("'_DividerAssignWife': GsDivider('分配老婆', '')", config)
+        self.assertIn("'DailyWifeOwnerSpecifyEnabled'", config)
+        for source in (daily, pgr):
+            self.assertIn("_cfg_bool('DailyWifeOwnerSpecifyEnabled', False)", source)
+            self.assertIn('is_transient_draw = is_debug_active or bool(specified_name)', source)
 
     def test_pgr_owner_debug_draw_is_random_and_not_persisted(self) -> None:
         source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
@@ -145,10 +157,10 @@ class PgrFeatureSourceTests(unittest.TestCase):
             ),
         ) or ''
 
-        self.assertIn('if is_debug_active:', function)
+        self.assertIn('if is_transient_draw:', function)
         self.assertIn('_load_pgr_wife_candidates()', function)
         self.assertIn('_pgr_candidates_by_name(candidates, specified_name)', function)
-        self.assertIn('只有开启主人 Debug 模式后', function)
+        self.assertIn('只有开启“主人指定老婆”后', function)
         self.assertIn('战双老婆图库中没有角色', function)
         self.assertIn("_pick_nsfw_checked_role_record(candidates, random, 'pgr')", function)
         self.assertIn('else:\n        record = await _ensure_daily_pgr_wife_record(ev)', function)

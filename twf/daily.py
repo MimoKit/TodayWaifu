@@ -296,9 +296,25 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         f'请求 {title} (指定: {specified_name or "无"})'
     )
 
-    is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and _is_master(ev)
+    is_master = _is_master(ev)
+    is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
+    can_specify_role = (
+        _cfg_bool('DailyWifeOwnerSpecifyEnabled', False) and is_master
+    )
+    specified_name = _normalize_role_name(specified_name)
+    is_transient_draw = is_debug_active or bool(specified_name)
 
-    if not is_debug_active:
+    if specified_name and not can_specify_role:
+        logger.warning(
+            f'{LOG_PREFIX} 用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝'
+        )
+        return await _send_prefixed(
+            bot,
+            f'只有开启“主人指定老婆”后，机器人主人才可以指定{title}哦。',
+            kind=mode,
+        )
+
+    if not is_transient_draw:
         other_wife_name = _get_other_daily_wife_name(ev, mode)
         if other_wife_name:
             return await _send_prefixed(
@@ -307,7 +323,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                 kind=mode,
             )
 
-    if not is_debug_active:
+    if not is_transient_draw:
         data = _load_wife_data()
         context = _get_today_context(data, ev)
         user_key = _user_key(ev)
@@ -382,8 +398,11 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
     record: WifeRecord | None = None
 
-    if is_debug_active:
-        logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
+    if is_transient_draw:
+        if is_debug_active:
+            logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
+        if specified_name:
+            logger.debug(f'{LOG_PREFIX} 主人指定抽取 {title}: {specified_name}')
         if mode == 'wife' and not specified_name and _cfg_bool(
             'DailyWifeNteMixedEnabled',
             False,
@@ -433,14 +452,6 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.warning(f'{LOG_PREFIX} Debug 抽取没有通过 NSFW 检测的图片')
             return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
     else:
-        if specified_name:
-            logger.warning(f'{LOG_PREFIX} 普通用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝')
-            return await _send_prefixed(
-                bot,
-                f'只有在 Debug 模式下主人才能指定{title}哦。',
-                kind=mode,
-            )
-
         record = await _ensure_daily_wife_record(ev, mode=mode)
         if record is None:
             return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
@@ -616,9 +627,9 @@ async def daily_wife_full(bot: Bot, ev: Event):
     '今日异环老婆',
     block=True,
     to_ai="""抽取当前用户今天的异环老婆。
-    该功能需要先在控制台开启。可在主人 Debug 模式下把角色名放入 text。
+    该功能需要先在控制台开启。开启“主人指定老婆”后，主人可把角色名放入 text。
     Args:
-        text: 可选，主人 Debug 模式下指定异环角色名；普通用户留空。
+        text: 可选，主人启用指定老婆后可填写异环角色名；普通用户留空。
     """,
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event):
