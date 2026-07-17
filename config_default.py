@@ -165,10 +165,10 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
 
     '_DividerAssignWife': GsDivider('分配老婆', ''),
-    'DailyWifeOwnerSpecifyEnabled': GsBoolConfig(
-        '启用主人指定老婆',
-        '开启后机器人主人可以用“今日老婆 角色名”“今日异环老婆 角色名”“今日战双老婆 角色名”指定抽取角色',
-        False,
+    'DailyWifeSpecifyWhitelist': GsListStrConfig(
+        '指定老婆白名单',
+        '允许使用指定老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-指定老婆”服务中配置',
+        [],
     ),
 
     '_DividerDailyWife': GsDivider('今日老婆', ''),

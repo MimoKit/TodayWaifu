@@ -139,8 +139,8 @@
         "expr": "GsDivider('分配老婆', '')"
       },
       {
-        "key": "DailyWifeOwnerSpecifyEnabled",
-        "expr": "GsBoolConfig('启用主人指定老婆', '开启后机器人主人可以用“今日老婆 角色名”“今日异环老婆 角色名”“今日战双老婆 角色名”指定抽取角色', False)"
+        "key": "DailyWifeSpecifyWhitelist",
+        "expr": "GsListStrConfig('指定老婆白名单', '允许使用指定老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-指定老婆”服务中配置', [])"
       },
       {
         "key": "_DividerDailyWife",
@@ -309,7 +309,7 @@
     {
       "file": "twf/daily.py",
       "function": "daily_wife_prefix",
-      "decorator": "daily_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ')"
+      "decorator": "specify_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ')"
     },
     {
       "file": "twf/daily.py",
@@ -319,7 +319,7 @@
     {
       "file": "twf/daily.py",
       "function": "daily_nte_wife_prefix",
-      "decorator": "daily_nte_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。开启“主人指定老婆”后，主人可把角色名放入 text。\\n    Args:\\n        text: 可选，主人启用指定老婆后可填写异环角色名；普通用户留空。\\n    ')"
+      "decorator": "specify_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。机器人主人或指定老婆白名单用户可把角色名放入 text。\\n    Args:\\n        text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。\\n    ')"
     },
     {
       "file": "twf/daily.py",
@@ -344,7 +344,7 @@
     {
       "file": "twf/daily.py",
       "function": "daily_husband_prefix",
-      "decorator": "daily_husband_sv.on_prefix('今日老公', block=True, to_ai='抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天的老公是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。\\n    ')"
+      "decorator": "specify_wife_sv.on_prefix('今日老公', block=True, to_ai='抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天的老公是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。\\n    ')"
     },
     {
       "file": "twf/daily.py",
@@ -454,7 +454,7 @@
     {
       "file": "twf/pgr.py",
       "function": "daily_pgr_wife_prefix",
-      "decorator": "pgr_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    开启“主人指定老婆”后，机器人主人可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅开启主人指定老婆后可用。\\n    ')"
+      "decorator": "specify_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    机器人主人或指定老婆白名单用户可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅主人或白名单用户可用。\\n    ')"
     },
     {
       "file": "twf/pgr.py",

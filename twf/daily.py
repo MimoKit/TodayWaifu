@@ -298,9 +298,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
     is_master = _is_master(ev)
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
-    can_specify_role = (
-        _cfg_bool('DailyWifeOwnerSpecifyEnabled', False) and is_master
-    )
+    can_specify_role = _can_specify_wife(ev)
     specified_name = _normalize_role_name(specified_name)
     is_transient_draw = is_debug_active or bool(specified_name)
 
@@ -310,7 +308,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         )
         return await _send_prefixed(
             bot,
-            f'只有开启“主人指定老婆”后，机器人主人才可以指定{title}哦。',
+            f'只有机器人主人或指定老婆白名单用户才能指定{title}哦。',
             kind=mode,
         )
 
@@ -593,7 +591,7 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     await _send_prefixed(bot, _wife_list_text_from_items(title_text, items), kind=mode)
 
 
-@daily_wife_sv.on_prefix(
+@specify_wife_sv.on_prefix(
     ('今日老婆', '娶婆娘', 'jrlp', 'qlp'),
     block=True,
     to_ai="""抽取当前用户今天的老婆。
@@ -623,13 +621,13 @@ async def daily_wife_full(bot: Bot, ev: Event):
     await _send_daily_wife(bot, ev, mode='wife', specified_name='')
 
 
-@daily_nte_wife_sv.on_prefix(
+@specify_wife_sv.on_prefix(
     '今日异环老婆',
     block=True,
     to_ai="""抽取当前用户今天的异环老婆。
-    该功能需要先在控制台开启。开启“主人指定老婆”后，主人可把角色名放入 text。
+    该功能需要先在控制台开启。机器人主人或指定老婆白名单用户可把角色名放入 text。
     Args:
-        text: 可选，主人启用指定老婆后可填写异环角色名；普通用户留空。
+        text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。
     """,
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event):
@@ -692,7 +690,7 @@ async def assign_wife_usage(bot: Bot, ev: Event):
     await _send_assign_wife(bot, ev)
 
 
-@daily_husband_sv.on_prefix(
+@specify_wife_sv.on_prefix(
     '今日老公',
     block=True,
     to_ai="""抽取当前用户今天的老公。
