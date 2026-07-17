@@ -74,7 +74,8 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn("_cfg_bool('DailyWifeNteMixedEnabled', False)", shared)
         self.assertIn('_load_pgr_local_candidates()', shared)
         self.assertIn("pools.append(('pgr', pgr_candidates))", shared)
-        self.assertIn('rng.shuffle(pool_order)', daily)
+        self.assertIn('source, candidates = rng.choice(pools)', daily)
+        self.assertNotIn('for source, candidates in pool_order:', daily)
         self.assertIn('_pick_mixed_wife_record(pools, rng, key)', daily)
 
     def test_owner_debug_random_draw_uses_the_same_game_pool_logic(self) -> None:

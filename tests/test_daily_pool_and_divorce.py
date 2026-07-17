@@ -39,10 +39,13 @@ class _Logger:
     def info(self, _message: str) -> None:
         pass
 
+    def warning(self, _message: str) -> None:
+        pass
 
-class _ReverseRng:
-    def shuffle(self, rows: list[Any]) -> None:
-        rows.reverse()
+
+class _LastPoolRng:
+    def choice(self, rows):
+        return rows[-1]
 
 
 class NteRosterTests(unittest.TestCase):
@@ -211,7 +214,7 @@ class MixedPoolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(pools, ())
         self.assertEqual(error, '融合模式未启用任何游戏池。')
 
-    async def test_mixed_draw_selects_a_game_pool_before_a_character(self) -> None:
+    async def test_mixed_draw_never_falls_back_to_another_game_pool(self) -> None:
         calls: list[str] = []
 
         async def pick(candidates, _rng, _mode):
@@ -235,10 +238,10 @@ class MixedPoolTests(unittest.IsolatedAsyncioTestCase):
             ('pgr', (_RoleCandidate('露西亚', ('露西亚',), ('pgr.png',)),)),
         )
 
-        result = await pick_mixed(pools, _ReverseRng(), 'user')
+        result = await pick_mixed(pools, _LastPoolRng(), 'user')
 
-        self.assertEqual(calls, ['露西亚', '早雾'])
-        self.assertEqual(result.name, '早雾')
+        self.assertEqual(calls, ['露西亚'])
+        self.assertIsNone(result)
 
 
 class UnifiedDivorceTests(unittest.TestCase):

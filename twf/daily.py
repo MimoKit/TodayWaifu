@@ -142,18 +142,21 @@ async def _pick_mixed_wife_record(
     rng: random.Random,
     user_key: str,
 ) -> WifeRecord | None:
-    """先等概率打乱游戏池，再在池内抽取角色。"""
-    pool_order = list(pools)
-    rng.shuffle(pool_order)
-    for source, candidates in pool_order:
-        chosen = await _pick_nsfw_checked_role_record(candidates, rng, 'wife')
-        if chosen is not None:
-            logger.info(
-                f'{LOG_PREFIX} 融合模式为用户 {user_key} 选中游戏池 {source}: '
-                f'{chosen.name}'
-            )
-            return chosen
-    return None
+    """等概率选择一个游戏池，只在选中的游戏内抽取角色。"""
+    source, candidates = rng.choice(pools)
+    logger.info(f'{LOG_PREFIX} 融合模式为用户 {user_key} 抽中游戏池 {source}')
+    chosen = await _pick_nsfw_checked_role_record(candidates, rng, 'wife')
+    if chosen is None:
+        logger.warning(
+            f'{LOG_PREFIX} 融合模式选中的游戏池 {source} '
+            '没有通过 NSFW 检测的可用图片'
+        )
+        return None
+    logger.info(
+        f'{LOG_PREFIX} 融合模式为用户 {user_key} 选中游戏池 {source}: '
+        f'{chosen.name}'
+    )
+    return chosen
 
 
 
