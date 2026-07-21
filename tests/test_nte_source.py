@@ -115,6 +115,27 @@ class NteConfigAndCommandTests(unittest.TestCase):
         self.assertIn('custom', nte_source, 'NTE 加载器应传入本地自定义立绘目录')
         self.assertIn('default', nte_source, 'NTE 加载器应传入默认立绘目录作为兜底')
 
+    def test_mixed_wife_feature_is_removed(self) -> None:
+        config = (ROOT / 'config_default.py').read_text(encoding='utf-8-sig')
+        runtime = '\n'.join(
+            (ROOT / 'twf' / name).read_text(encoding='utf-8-sig')
+            for name in ('shared.py', 'daily.py')
+        )
+        removed_symbols = (
+            'DailyWifeNteMixedEnabled',
+            'DailyWifeMixedWuwaEnabled',
+            'DailyWifeMixedNteEnabled',
+            'DailyWifeMixedPgrEnabled',
+            '_load_wife_candidate_pools',
+            '_pick_mixed_wife_record',
+        )
+
+        for symbol in removed_symbols:
+            self.assertNotIn(symbol, config)
+            self.assertNotIn(symbol, runtime)
+        self.assertIn("'DailyWifeNteEnabled'", config)
+        self.assertIn("'DailyWifePgrEnabled'", config)
+
 
 class NteCandidateBehaviorTests(unittest.TestCase):
     def _collector(self):
@@ -170,63 +191,6 @@ class NteCandidateBehaviorTests(unittest.TestCase):
 
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].images, (str(default_image),))
-
-    def test_mixed_mode_defaults_off_and_includes_all_game_candidate_types(self) -> None:
-        entries = _config_entries()
-        mixed = [
-            entry
-            for entry in entries
-            if entry[0] == 'DailyWifeNteMixedEnabled'
-        ]
-        self.assertEqual(len(mixed), 1, '应保留兼容旧配置的融合模式总开关')
-        self.assertFalse(_bool_default(mixed[0][3]))
-
-        game_switches = {
-            key: _bool_default(call)
-            for key, _title, _description, call in entries
-            if key
-            in {
-                'DailyWifeMixedWuwaEnabled',
-                'DailyWifeMixedNteEnabled',
-                'DailyWifeMixedPgrEnabled',
-            }
-        }
-        self.assertEqual(
-            game_switches,
-            {
-                'DailyWifeMixedWuwaEnabled': True,
-                'DailyWifeMixedNteEnabled': True,
-                'DailyWifeMixedPgrEnabled': True,
-            },
-        )
-
-        config_key = mixed[0][0]
-        runtime_source = '\n'.join(
-            (ROOT / 'twf' / name).read_text(encoding='utf-8')
-            for name in ('shared.py', 'daily.py')
-        )
-        self.assertIn(config_key, runtime_source, '混合模式配置必须接入候选加载流程')
-        for key in game_switches:
-            self.assertIn(key, runtime_source)
-
-        merge = _extract_function(
-            '_merge_role_candidates',
-            {
-                'Any': Any,
-                'RoleCandidate': _RoleCandidate,
-                '_normalize_role_name': lambda name: name.strip().casefold(),
-            },
-        )
-        wuwa = (_RoleCandidate('今汐', ('1304',), ('wuwa.png',)),)
-        nte = (_RoleCandidate('早雾', ('1003',), ('nte.png',)),)
-        pgr = (_RoleCandidate('露西亚', ('露西亚',), ('pgr.png',)),)
-
-        result = merge(merge(wuwa, nte), pgr)
-
-        self.assertEqual({candidate.name for candidate in result}, {'今汐', '早雾', '露西亚'})
-
-        self.assertIn('_load_pgr_local_candidates()', runtime_source)
-
 
 if __name__ == '__main__':
     unittest.main()

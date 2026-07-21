@@ -39,26 +39,6 @@
         "expr": "GsListStrConfig('图片上传白名单', '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单', [])"
       },
       {
-        "key": "_DividerMixedWife",
-        "expr": "GsDivider('融合老婆', '')"
-      },
-      {
-        "key": "DailyWifeNteMixedEnabled",
-        "expr": "GsBoolConfig('启用融合老婆', '开启后“今日老婆”会先从已启用的游戏池中等概率选择一个游戏，再抽取该游戏角色', False)"
-      },
-      {
-        "key": "DailyWifeMixedWuwaEnabled",
-        "expr": "GsBoolConfig('融合鸣潮', '控制鸣潮角色是否参与“今日老婆”融合抽取', True)"
-      },
-      {
-        "key": "DailyWifeMixedNteEnabled",
-        "expr": "GsBoolConfig('融合异环', '控制异环角色是否参与“今日老婆”融合抽取；不影响独立的“今日异环老婆”功能', True)"
-      },
-      {
-        "key": "DailyWifeMixedPgrEnabled",
-        "expr": "GsBoolConfig('融合战双', '控制战双角色是否参与“今日老婆”融合抽取；不影响独立的“今日战双老婆”功能', True)"
-      },
-      {
         "key": "_DividerNteWife",
         "expr": "GsDivider('异环老婆', '')"
       },

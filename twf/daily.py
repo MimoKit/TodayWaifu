@@ -98,22 +98,15 @@ async def _ensure_daily_wife_record(
 
     if chosen is None:
         rng = _daily_rng(ev, key, salt)
-        if mode == 'wife' and _cfg_bool('DailyWifeNteMixedEnabled', False):
-            pools, error = await _load_wife_candidate_pools()
-            if error or not pools:
-                logger.error(f'{LOG_PREFIX} 获取融合候选池失败: {error}')
-                return None
-            chosen = await _pick_mixed_wife_record(pools, rng, key)
-        else:
-            candidates, error = await _load_candidates(mode)
-            if error or not candidates:
-                logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
-                return None
-            candidates = _filter_by_mode(candidates, mode)
-            if not candidates:
-                logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
-                return None
-            chosen = await _pick_nsfw_checked_role_record(candidates, rng, mode)
+        candidates, error = await _load_candidates(mode)
+        if error or not candidates:
+            logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
+            return None
+        candidates = _filter_by_mode(candidates, mode)
+        if not candidates:
+            logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
+            return None
+        chosen = await _pick_nsfw_checked_role_record(candidates, rng, mode)
         if chosen is None:
             logger.warning(f'{LOG_PREFIX} 没有通过 NSFW 检测的 {mode} 角色图片')
             return None
@@ -135,29 +128,6 @@ async def _ensure_daily_wife_record(
     context[bucket][key] = _record_to_dict(chosen, ev, key)
     _save_wife_data(data)
     return chosen
-
-
-async def _pick_mixed_wife_record(
-    pools: tuple[tuple[str, tuple[RoleCandidate, ...]], ...],
-    rng: random.Random,
-    user_key: str,
-) -> WifeRecord | None:
-    """等概率选择一个游戏池，只在选中的游戏内抽取角色。"""
-    source, candidates = rng.choice(pools)
-    logger.info(f'{LOG_PREFIX} 融合模式为用户 {user_key} 抽中游戏池 {source}')
-    chosen = await _pick_nsfw_checked_role_record(candidates, rng, 'wife')
-    if chosen is None:
-        logger.warning(
-            f'{LOG_PREFIX} 融合模式选中的游戏池 {source} '
-            '没有通过 NSFW 检测的可用图片'
-        )
-        return None
-    logger.info(
-        f'{LOG_PREFIX} 融合模式为用户 {user_key} 选中游戏池 {source}: '
-        f'{chosen.name}'
-    )
-    return chosen
-
 
 
 async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
@@ -401,36 +371,19 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.debug(f'{LOG_PREFIX} 主人 Debug 模式开启')
         if specified_name:
             logger.debug(f'{LOG_PREFIX} 主人指定抽取 {title}: {specified_name}')
-        if mode == 'wife' and not specified_name and _cfg_bool(
-            'DailyWifeNteMixedEnabled',
-            False,
-        ):
-            pools, error = await _load_wife_candidate_pools()
-            if error or not pools:
-                return await _send_prefixed(
-                    bot,
-                    error or '没有找到可用角色。',
-                    kind=mode,
-                )
-            record = await _pick_mixed_wife_record(
-                pools,
-                random,
-                _user_key(ev),
+        candidates, error = await _load_candidates(mode)
+        if error or not candidates:
+            return await _send_prefixed(
+                bot,
+                error or '没有找到可用角色。',
+                kind=mode,
             )
-        else:
-            candidates, error = await _load_candidates(mode)
-            if error or not candidates:
-                return await _send_prefixed(
-                    bot,
-                    error or '没有找到可用角色。',
-                    kind=mode,
-                )
-            if not candidates:
-                return await _send_prefixed(
-                    bot,
-                    f'没有找到可用的{title}角色。',
-                    kind=mode,
-                )
+        if not candidates:
+            return await _send_prefixed(
+                bot,
+                f'没有找到可用的{title}角色。',
+                kind=mode,
+            )
         if specified_name:
             target_candidates = [c for c in candidates if c.name == specified_name]
             if not target_candidates:
@@ -441,9 +394,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                 )
             candidates = tuple(target_candidates)
             record = await _pick_nsfw_checked_role_record(candidates, random, mode)
-        elif record is None and not (
-            mode == 'wife' and _cfg_bool('DailyWifeNteMixedEnabled', False)
-        ):
+        elif record is None:
             candidates = _filter_by_mode(candidates, mode)
             record = await _pick_nsfw_checked_role_record(candidates, random, mode)
         if record is None:

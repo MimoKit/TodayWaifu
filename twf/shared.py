@@ -115,7 +115,7 @@ __all__ = [
     '_gallery_api_url', '_gallery_mode_enabled',
     '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
-    '_get_other_daily_wife_name', '_load_wife_candidate_pools',
+    '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
@@ -1266,30 +1266,13 @@ def _husband_available() -> bool:
 def _filter_by_mode(
     candidates: tuple['RoleCandidate', ...],
     mode: str,
-    include_mixed_sources: bool = True,
 ) -> tuple['RoleCandidate', ...]:
     role_map = _load_mode_role_map(mode)
     role_mode = _role_mode(mode)
     if role_mode == 'wife':
         role_map.update(_load_custom_upload_role_map())
-        if (
-            include_mixed_sources
-            and _cfg_bool('DailyWifeNteMixedEnabled', False)
-            and _cfg_bool('DailyWifeMixedNteEnabled', True)
-        ):
-            role_map.update(_load_mode_role_map('nte'))
     allowed_ids = set(role_map)
     allowed_names = {_normalize_role_name(name) for name in role_map.values()}
-    if (
-        role_mode == 'wife'
-        and include_mixed_sources
-        and _cfg_bool('DailyWifeNteMixedEnabled', False)
-        and _cfg_bool('DailyWifeMixedPgrEnabled', True)
-    ):
-        allowed_names.update(
-            _normalize_role_name(candidate.name)
-            for candidate in _load_pgr_local_candidates()
-        )
     return tuple(
         role
         for role in candidates
@@ -1454,71 +1437,10 @@ async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
     return candidates, None
 
 
-async def _load_wife_candidate_pools() -> tuple[
-    tuple[tuple[str, tuple[RoleCandidate, ...]], ...],
-    str | None,
-]:
-    """加载今日老婆可用游戏池；融合模式下各游戏池独立降级。"""
-    pools: list[tuple[str, tuple[RoleCandidate, ...]]] = []
-    errors: list[str] = []
-    mixed_enabled = _cfg_bool('DailyWifeNteMixedEnabled', False)
-    wuwa_enabled = not mixed_enabled or _cfg_bool('DailyWifeMixedWuwaEnabled', True)
-    nte_enabled = mixed_enabled and _cfg_bool('DailyWifeMixedNteEnabled', True)
-    pgr_enabled = mixed_enabled and _cfg_bool('DailyWifeMixedPgrEnabled', True)
-
-    if mixed_enabled and not any((wuwa_enabled, nte_enabled, pgr_enabled)):
-        return (), '融合模式未启用任何游戏池。'
-
-    if wuwa_enabled:
-        wuwa_candidates, wuwa_error = await _load_wuwa_candidates('wife')
-        if wuwa_candidates:
-            filtered_wuwa = _filter_by_mode(
-                wuwa_candidates,
-                'wife',
-                include_mixed_sources=False,
-            )
-            if filtered_wuwa:
-                pools.append(('wuwa', filtered_wuwa))
-        elif wuwa_error:
-            errors.append(f'鸣潮：{wuwa_error}')
-
-    if not mixed_enabled:
-        if pools:
-            return tuple(pools), None
-        return (), errors[0] if errors else '没有找到可用的老婆角色。'
-
-    if nte_enabled:
-        nte_candidates, nte_error = await _load_nte_candidates()
-        if nte_candidates:
-            pools.append(('nte', nte_candidates))
-        elif nte_error:
-            errors.append(f'异环：{nte_error}')
-
-    if pgr_enabled:
-        pgr_candidates = await asyncio.to_thread(_load_pgr_local_candidates)
-        if pgr_candidates:
-            pools.append(('pgr', pgr_candidates))
-        else:
-            errors.append('战双：图库中没有可用图片。')
-
-    if pools:
-        return tuple(pools), None
-    return (), '；'.join(errors) or '没有找到可用的老婆角色。'
-
-
 async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
     if role_mode == 'nte':
         return await _load_nte_candidates()
-
-    if role_mode == 'wife':
-        pools, error = await _load_wife_candidate_pools()
-        if error or not pools:
-            return None, error
-        candidates: tuple[RoleCandidate, ...] = ()
-        for _, pool_candidates in pools:
-            candidates = _merge_role_candidates(candidates, pool_candidates)
-        return candidates, None
 
     candidates, error = await _load_wuwa_candidates(role_mode)
     if error or not candidates:
