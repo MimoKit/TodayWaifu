@@ -26,6 +26,13 @@ class CommandPriorityTests(unittest.TestCase):
             int(specify_priority.group(1)),
         )
 
+    def test_daily_wife_prefix_routes_help_alias(self) -> None:
+        source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
+        self.assertIn("str(ev.command or '').strip() == '今日老婆'", source)
+        self.assertIn("specified_name == '帮助'", source)
+        self.assertIn('from .help import daily_wife_help', source)
+        self.assertIn('return await daily_wife_help(bot, ev)', source)
+
 
 if __name__ == '__main__':
     unittest.main()

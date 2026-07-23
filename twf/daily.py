@@ -554,6 +554,13 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
 )
 async def daily_wife_prefix(bot: Bot, ev: Event):
     specified_name = str(ev.text or '').strip()
+    # GsCore may select this prefix matcher before the exact help matcher and
+    # expose "今日老婆帮助" as command="今日老婆", text="帮助". Route that
+    # unambiguous alias to the real help handler instead of looking up a role.
+    if str(ev.command or '').strip() == '今日老婆' and specified_name == '帮助':
+        from .help import daily_wife_help
+
+        return await daily_wife_help(bot, ev)
     if specified_name == '列表':
         return await _send_wife_list(bot, ev, mode='wife')
     await _send_daily_wife(bot, ev, mode='wife', specified_name=specified_name)
