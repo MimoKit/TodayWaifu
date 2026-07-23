@@ -43,17 +43,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
         'https://loli.xlinxc.cn',
     ),
-    'DailyWifeOfficialImageGalleryUrl': GsStrConfig(
-        '官方机器人图库地址',
-        '用于 QQ 官方机器人将结果图片上传图库并合并为 Markdown 消息。填写图库服务根地址，留空时不启用',
-        '',
-    ),
-    'DailyWifeOfficialImageGalleryToken': GsStrConfig(
-        '官方机器人图库上传令牌',
-        '图库 /upload 接口的 Bearer Token。仅保存在本地运行配置中，请勿提交到公开仓库',
-        '',
-        secret=True,
-    ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(
         '图片上传白名单',
         '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',

@@ -11,15 +11,12 @@ import shutil
 import time
 from dataclasses import dataclass
 from datetime import date
-from io import BytesIO
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
-
-from PIL import Image
 
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
@@ -100,7 +97,7 @@ __all__ = [
     'CUSTOM_ROLE_ID_START', 'CoreUser', 'DAILY_KIND_METADATA', 'DEFAULT_GALLERY_API_URL',
     'DailyKindMetadata', 'DailyWifeConfig',
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
-    'HTTPError', 'IMAGE_EXTENSIONS', 'Image', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
+    'HTTPError', 'IMAGE_EXTENSIONS', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS', 'NSFW_CHECK_MAX_ATTEMPTS',
     'HUSBAND_REPLY_PREFIX', 'LOLI_REPLY_PREFIX', 'PGR_REPLY_PREFIX', 'MEMBER_AVATAR_CACHE_SECONDS',
@@ -129,7 +126,6 @@ __all__ = [
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_nsfw_checked_role_record',
-    '_get_reply_prefix', '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
@@ -209,22 +205,6 @@ async def _target_send_without_bot_hooks(
     )
 
 
-QQ_OFFICIAL_BOT_IDS = {'qqgroup'}
-
-
-def _official_image_gallery_url() -> str:
-    return str(_cfg('DailyWifeOfficialImageGalleryUrl') or '').strip().rstrip('/')
-
-
-def _official_image_gallery_token() -> str:
-    return str(_cfg('DailyWifeOfficialImageGalleryToken') or '').strip()
-
-
-def _is_official_qq_bot(bot: Bot) -> bool:
-    platform = str(bot.ev.real_bot_id or bot.ev.bot_id or '')
-    return platform.split(':', 1)[0].strip().lower() in QQ_OFFICIAL_BOT_IDS
-
-
 def _is_at_message(item: Any) -> bool:
     return isinstance(item, Message) and item.type == 'at'
 
@@ -252,140 +232,6 @@ def _adapt_mentions_for_platform(bot: Bot, message: Any) -> Any:
     if bot.ev.user_type == 'direct':
         return _remove_private_mentions(message)
     return message
-
-
-def _official_gallery_image_info(image: bytes) -> tuple[str, tuple[int, int]]:
-    format_extensions = {
-        'JPEG': 'jpg',
-        'PNG': 'png',
-        'GIF': 'gif',
-        'WEBP': 'webp',
-    }
-    with Image.open(BytesIO(image)) as opened:
-        image_format = str(opened.format or '').upper()
-        size = opened.size
-    extension = format_extensions.get(image_format)
-    if extension is None:
-        raise RuntimeError(f'官方机器人图库不支持 {image_format or "未知"} 图片格式')
-    return extension, size
-
-
-async def _official_gallery_image_bytes(image: Any) -> bytes:
-    if isinstance(image, bytes):
-        return image
-    if isinstance(image, (bytearray, memoryview)):
-        return bytes(image)
-    if isinstance(image, Image.Image):
-        output = BytesIO()
-        image.save(output, format='PNG')
-        return output.getvalue()
-    if isinstance(image, Path):
-        return await asyncio.to_thread(image.read_bytes)
-    if isinstance(image, str):
-        if image.startswith(('http://', 'https://')):
-            return await _download_image(image)
-        path = Path(image)
-        if path.is_file():
-            return await asyncio.to_thread(path.read_bytes)
-    raise RuntimeError('无法读取需要上传到官方机器人图库的图片')
-
-
-def _upload_official_gallery_image_sync(image: bytes) -> tuple[str, tuple[int, int]]:
-    gallery_url = _official_image_gallery_url()
-    if not gallery_url:
-        raise RuntimeError('未配置官方机器人图库地址')
-
-    extension, size = _official_gallery_image_info(image)
-    filename = f'todaywaifu-{hashlib.sha256(image).hexdigest()[:32]}.{extension}'
-    headers = {
-        'User-Agent': 'TodayWaifu/1.0',
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': filename,
-    }
-    token = _official_image_gallery_token()
-    if token:
-        headers['Authorization'] = f'Bearer {token}'
-
-    request = Request(f'{gallery_url}/upload', data=image, headers=headers, method='POST')
-    try:
-        with urlopen(request, timeout=20) as response:
-            raw = response.read()
-    except HTTPError as exc:
-        raise RuntimeError(f'官方机器人图库上传失败，HTTP {exc.code}') from exc
-    except URLError as exc:
-        raise RuntimeError(f'官方机器人图库上传失败：{exc.reason}') from exc
-    except TimeoutError as exc:
-        raise RuntimeError('官方机器人图库上传超时') from exc
-
-    try:
-        payload = json.loads(raw.decode('utf-8'))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError('官方机器人图库返回内容不是有效 JSON') from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError('官方机器人图库返回格式不正确')
-
-    public_url = str(payload.get('url') or '').strip()
-    parsed = urlparse(public_url)
-    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
-        raise RuntimeError('官方机器人图库没有返回有效图片地址')
-    return public_url, size
-
-
-def _official_markdown_image_size(size: tuple[int, int]) -> tuple[int, int]:
-    width, height = size
-    if width <= 0 or height <= 0:
-        return 260, 360
-    scale = min(260 / width, 360 / height, 1.0)
-    return max(1, round(width * scale)), max(1, round(height * scale))
-
-
-def _build_official_qq_image_markdown(
-    image_url: str,
-    size: tuple[int, int],
-    text: str | None,
-    user_id: str | int | None,
-    is_group: bool,
-    kind: str,
-) -> str:
-    header_parts: list[str] = []
-    if is_group and user_id is not None and _cfg_bool('DailyWifeAtUser', True):
-        header_parts.append(f'<@{user_id}>')
-    if text:
-        if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
-            text = _reply_text(text, kind)
-        header_parts.append(text)
-    width, height = _official_markdown_image_size(size)
-    parts = [' '.join(header_parts)] if header_parts else []
-    parts.append(f'![image #{width}px #{height}px]({image_url})')
-    return '\n\n'.join(parts)
-
-
-async def _try_send_official_qq_image_markdown(
-    bot: Bot,
-    image: Any,
-    text: str | None,
-    user_id: str | int | None,
-    is_group: bool,
-    kind: str,
-) -> bool:
-    if not _is_official_qq_bot(bot) or not _official_image_gallery_url():
-        return False
-    try:
-        image_bytes = await _official_gallery_image_bytes(image)
-        public_url, size = await asyncio.to_thread(_upload_official_gallery_image_sync, image_bytes)
-        markdown = _build_official_qq_image_markdown(
-            public_url,
-            size,
-            text,
-            user_id,
-            is_group,
-            kind,
-        )
-        await _safe_send(bot, MessageSegment.markdown(markdown))
-    except Exception as exc:
-        logger.warning(f'{LOG_PREFIX} 官方机器人图库 Markdown 发送失败，降级为普通图片: {exc}')
-        return False
-    return True
 
 
 async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
@@ -2066,9 +1912,6 @@ async def _send_role_image(
             return
         image = Path(image_url)
 
-    if await _try_send_official_qq_image_markdown(bot, image, text, user_id, is_group, kind):
-        return
-
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -2112,8 +1955,6 @@ async def _send_loli_result_image(
         image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
     else:
         image_ref = image
-    if await _try_send_official_qq_image_markdown(bot, image_ref, text, user_id, is_group, 'loli'):
-        return
     messages.append(MessageSegment.image(image_ref))
     await _send_prefixed(bot, messages, kind='loli')
 
@@ -2127,17 +1968,6 @@ async def _send_local_image(
     is_group: bool = True,
     kind: str = 'wife',
 ) -> None:
-    if image_url and Path(image_url).is_file():
-        if await _try_send_official_qq_image_markdown(
-            bot,
-            Path(image_url),
-            text,
-            user_id,
-            is_group,
-            kind,
-        ):
-            return
-
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))

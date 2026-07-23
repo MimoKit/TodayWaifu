@@ -4,37 +4,6 @@ from __future__ import annotations
 from .shared import *  # noqa: F403
 
 
-OFFICIAL_MARKDOWN_BOT_IDS = {'qqgroup', 'qqguild'}
-
-
-def _is_official_markdown_event(ev: Event) -> bool:
-    for bot_id in (
-        getattr(ev, 'real_bot_id', ''),
-        getattr(ev, 'bot_id', ''),
-        getattr(ev, 'WS_BOT_ID', ''),
-    ):
-        bot_id_text = str(bot_id or '').split(':', 1)[0].strip().lower()
-        if bot_id_text in OFFICIAL_MARKDOWN_BOT_IDS:
-            return True
-    return False
-
-
-def _blockquote_markdown(text: str) -> str:
-    lines = text.splitlines() or ['']
-    return '\n'.join(f'> {line}' if line else '>' for line in lines)
-
-
-def _wife_list_markdown_from_items(
-    title_text: str,
-    items: list[tuple[int, str, str]],
-    mode: str = 'wife',
-) -> str:
-    text = _wife_list_text_from_items(title_text, items)
-    if _cfg_bool('DailyWifeReplyPrefixEnabled', True):
-        text = _reply_text(text, mode)
-    return _blockquote_markdown(text)
-
-
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
     metadata = _daily_kind_metadata(mode)
     template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
@@ -528,10 +497,6 @@ async def _send_group_member_wife(bot: Bot, ev: Event):
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
     title_text, items = await _wife_list_items(ev, mode)
-    if _is_official_markdown_event(ev):
-        markdown = _wife_list_markdown_from_items(title_text, items, mode)
-        await _safe_send(bot, MessageSegment.markdown(markdown))
-        return
     if len(items) > LIST_FORWARD_THRESHOLD:
         await _send_prefixed(
             bot,

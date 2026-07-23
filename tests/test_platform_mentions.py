@@ -26,8 +26,9 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
     namespace: dict[str, Any] = {
         'Any': Any,
         'Bot': object,
+        'Event': object,
         'Message': FakeMessage,
-        'QQ_OFFICIAL_BOT_IDS': {'qqgroup'},
+        're': __import__('re'),
         '_cfg': lambda key: values.get(key, ''),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
         '_reply_text': lambda text, kind='wife': f'[{kind}]{text}',
@@ -37,22 +38,60 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
 
 
 class PlatformMentionTests(unittest.TestCase):
-    def test_platform_detection_only_matches_qq_official(self) -> None:
-        functions = _load_functions({'_is_official_qq_bot'})
-        detect = functions['_is_official_qq_bot']
-        official = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqgroup:official-1', bot_id='qqgroup'))
-        personal = SimpleNamespace(ev=SimpleNamespace(real_bot_id='onebot:llbot', bot_id='onebot'))
-        guild = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqguild:channel', bot_id='qqguild'))
-        self.assertTrue(detect(official))
-        self.assertFalse(detect(personal))
-        self.assertFalse(detect(guild))
+    def test_personal_target_formats_are_supported(self) -> None:
+        functions = _load_functions(
+            {'_normalise_target_user_id', '_target_user_id_from_text', '_iter_event_messages', '_get_event_target_user_id'}
+        )
+        normalise = functions['_normalise_target_user_id']
+        parse_text = functions['_target_user_id_from_text']
+        get_target = functions['_get_event_target_user_id']
+
+        self.assertEqual(normalise({'qq': '123456789'}), '123456789')
+        self.assertEqual(normalise({'user_id': '10001'}), '10001')
+        self.assertEqual(parse_text('[CQ:at,qq=123456789]'), '123456789')
+        self.assertEqual(parse_text('抢老婆 @123456789'), '123456789')
+        self.assertEqual(parse_text('送老婆 123456789'), '123456789')
+        self.assertEqual(
+            get_target(
+                SimpleNamespace(
+                    at_list=None,
+                    at=None,
+                    target_id=None,
+                    target_user_id=None,
+                    content=[FakeMessage('at', {'qq': '123456789'})],
+                    message=None,
+                    original_message=None,
+                    raw_text='',
+                )
+            ),
+            '123456789',
+        )
+
+    def test_target_user_id_falls_back_to_personal_message_text(self) -> None:
+        functions = _load_functions(
+            {'_normalise_target_user_id', '_target_user_id_from_text', '_iter_event_messages', '_get_event_target_user_id'}
+        )
+        get_target = functions['_get_event_target_user_id']
+        event = SimpleNamespace(
+            at_list=None,
+            at=None,
+            target_id=None,
+            target_user_id=None,
+            content=None,
+            message=None,
+            original_message=None,
+            text='抢老婆 QQ:123456789',
+            raw_text='',
+            raw_message='',
+        )
+        self.assertEqual(get_target(event), '123456789')
 
     def test_generic_send_boundary_only_removes_private_mentions(self) -> None:
         functions = _load_functions(
             {'_is_at_message', '_remove_private_mentions', '_adapt_mentions_for_platform'}
         )
         adapt = functions['_adapt_mentions_for_platform']
-        outgoing = [FakeMessage('at', 'OPENID_123'), '\n', '结果文字', FakeMessage('image', 'x')]
+        outgoing = [FakeMessage('at', '123456789'), '\n', '结果文字', FakeMessage('image', 'x')]
 
         group_bot = SimpleNamespace(ev=SimpleNamespace(user_type='group'))
         self.assertIs(adapt(group_bot, outgoing), outgoing)
@@ -62,60 +101,30 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertEqual(direct[0], '结果文字')
         self.assertEqual(direct[1].type, 'image')
 
-    def test_official_markdown_combines_mention_text_and_image(self) -> None:
-        functions = _load_functions(
-            {'_official_markdown_image_size', '_build_official_qq_image_markdown'},
-            {
-                'DailyWifeAtUser': True,
-                'DailyWifeReplyPrefixEnabled': True,
-            },
-        )
-        markdown = functions['_build_official_qq_image_markdown'](
-            'https://gallery.example.test/todaywaifu.png',
-            (1000, 1500),
-            '你今天的老婆是今汐',
-            'OPENID_123',
-            True,
-            'wife',
-        )
-        self.assertEqual(
-            markdown,
-            '<@OPENID_123> [wife]你今天的老婆是今汐\n\n'
-            '![image #240px #360px](https://gallery.example.test/todaywaifu.png)',
-        )
-
-    def test_official_private_markdown_has_no_mention(self) -> None:
-        functions = _load_functions(
-            {'_official_markdown_image_size', '_build_official_qq_image_markdown'},
-            {
-                'DailyWifeAtUser': True,
-                'DailyWifeReplyPrefixEnabled': True,
-            },
-        )
-        markdown = functions['_build_official_qq_image_markdown'](
-            'https://gallery.example.test/todaywaifu.png',
-            (800, 1200),
-            '你今天的老婆是今汐',
-            'OPENID_123',
-            False,
-            'wife',
-        )
-        self.assertNotIn('<@', markdown)
-        self.assertIn('[wife]你今天的老婆是今汐', markdown)
-
-    def test_repository_defaults_do_not_contain_private_gallery_config(self) -> None:
-        source = (ROOT / 'config_default.py').read_text(encoding='utf-8')
-        self.assertIn("'DailyWifeOfficialImageGalleryUrl'", source)
-        self.assertIn("'DailyWifeOfficialImageGalleryToken'", source)
-        self.assertNotIn('qq.xlinxc.cn', source)
-
-    def test_all_result_image_senders_try_plugin_scoped_markdown(self) -> None:
+    def test_result_image_senders_keep_personal_message_segments(self) -> None:
         source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
         for function_name in ('_send_role_image', '_send_loli_result_image', '_send_local_image'):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
             block = source[start:next_function if next_function >= 0 else None]
-            self.assertIn('_try_send_official_qq_image_markdown(', block)
+            self.assertIn('MessageSegment.image(', block)
+
+    def test_personal_compatibility_is_not_removed(self) -> None:
+        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        self.assertIn('_target_user_id_from_text', source)
+        self.assertIn('_qq_avatar_url', source)
+        self.assertIn('CQ:at', source)
+        self.assertNotIn('_try_send_official_qq_image_markdown', source)
+        self.assertNotIn('DailyWifeOfficialImageGalleryUrl', source)
+        self.assertNotIn('DailyWifeOfficialImageGalleryToken', source)
+
+    def test_private_account_prompts_remain_compatible(self) -> None:
+        daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')
+        rob = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
+        gift = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
+        self.assertIn('CQ:at', daily)
+        self.assertIn('对方 QQ', rob)
+        self.assertIn('对方 QQ', gift)
 
     def test_daily_loli_results_use_the_shared_sender(self) -> None:
         source = (ROOT / 'twf' / 'loli.py').read_text(encoding='utf-8')
