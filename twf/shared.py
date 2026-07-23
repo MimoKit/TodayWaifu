@@ -212,12 +212,24 @@ async def _target_send_without_bot_hooks(
 QQ_OFFICIAL_BOT_IDS = {'qqgroup', 'qqguild'}
 
 
-def _official_image_gallery_url() -> str:
-    return str(_cfg('DailyWifeOfficialImageGalleryUrl') or '').strip().rstrip('/')
+def _official_cnb_api_base() -> str:
+    return str(_cfg('DailyWifeOfficialCnbApiBase') or 'https://api.cnb.cool').strip().rstrip('/')
 
 
-def _official_image_gallery_token() -> str:
-    return str(_cfg('DailyWifeOfficialImageGalleryToken') or '').strip()
+def _official_cnb_public_base() -> str:
+    return str(_cfg('DailyWifeOfficialCnbPublicBase') or 'https://cnb.cool').strip().rstrip('/')
+
+
+def _official_cnb_repo() -> str:
+    return str(_cfg('DailyWifeOfficialCnbRepo') or '').strip().strip('/')
+
+
+def _official_cnb_token() -> str:
+    return str(_cfg('DailyWifeOfficialCnbToken') or '').strip()
+
+
+def _official_cnb_configured() -> bool:
+    return bool(_official_cnb_repo() and _official_cnb_token())
 
 
 def _is_official_qq_bot(bot: Bot) -> bool:
@@ -291,43 +303,67 @@ async def _official_gallery_image_bytes(image: Any) -> bytes:
 
 
 def _upload_official_gallery_image_sync(image: bytes) -> tuple[str, tuple[int, int]]:
-    gallery_url = _official_image_gallery_url()
-    if not gallery_url:
-        raise RuntimeError('未配置官方机器人图库地址')
+    api_base = _official_cnb_api_base()
+    public_base = _official_cnb_public_base()
+    repo = _official_cnb_repo()
+    token = _official_cnb_token()
+    if not repo or not token:
+        raise RuntimeError('未配置官方机器人 CNB 仓库或令牌')
 
     extension, size = _official_gallery_image_info(image)
     filename = f'todaywaifu-{hashlib.sha256(image).hexdigest()[:32]}.{extension}'
     headers = {
         'User-Agent': 'TodayWaifu/1.0',
-        'Content-Type': 'application/octet-stream',
-        'X-Filename': filename,
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
     }
-    token = _official_image_gallery_token()
-    if token:
-        headers['Authorization'] = f'Bearer {token}'
-
-    request = Request(f'{gallery_url}/upload', data=image, headers=headers, method='POST')
+    request = Request(
+        f'{api_base}/{repo}/-/upload/imgs',
+        data=json.dumps({'name': filename, 'size': len(image)}).encode('utf-8'),
+        headers=headers,
+        method='POST',
+    )
     try:
         with urlopen(request, timeout=20) as response:
             raw = response.read()
     except HTTPError as exc:
-        raise RuntimeError(f'官方机器人图库上传失败，HTTP {exc.code}') from exc
+        raise RuntimeError(f'官方机器人 CNB 上传初始化失败，HTTP {exc.code}') from exc
     except URLError as exc:
-        raise RuntimeError(f'官方机器人图库上传失败：{exc.reason}') from exc
+        raise RuntimeError(f'官方机器人 CNB 上传初始化失败：{exc.reason}') from exc
     except TimeoutError as exc:
-        raise RuntimeError('官方机器人图库上传超时') from exc
+        raise RuntimeError('官方机器人 CNB 上传初始化超时') from exc
 
     try:
         payload = json.loads(raw.decode('utf-8'))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError('官方机器人图库返回内容不是有效 JSON') from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError('官方机器人图库返回格式不正确')
+        upload_url = str(payload['upload_url']).strip()
+        asset_path = str(payload['assets']['path']).strip()
+    except (KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError('官方机器人 CNB 上传初始化返回格式不正确') from exc
 
-    public_url = str(payload.get('url') or '').strip()
+    parsed_upload_url = urlparse(upload_url)
+    if parsed_upload_url.scheme != 'https' or not parsed_upload_url.netloc:
+        raise RuntimeError('官方机器人 CNB 没有返回有效上传地址')
+
+    upload_request = Request(
+        upload_url,
+        data=image,
+        headers={'Content-Type': f'image/{"jpeg" if extension == "jpg" else extension}'},
+        method='PUT',
+    )
+    try:
+        with urlopen(upload_request, timeout=20) as response:
+            response.read()
+    except HTTPError as exc:
+        raise RuntimeError(f'官方机器人 CNB 图片上传失败，HTTP {exc.code}') from exc
+    except URLError as exc:
+        raise RuntimeError(f'官方机器人 CNB 图片上传失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('官方机器人 CNB 图片上传超时') from exc
+
+    public_url = f'{public_base}/{asset_path.lstrip("/")}'
     parsed = urlparse(public_url)
-    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
-        raise RuntimeError('官方机器人图库没有返回有效图片地址')
+    if parsed.scheme != 'https' or not parsed.netloc:
+        raise RuntimeError('官方机器人 CNB 没有生成有效图片地址')
     return public_url, size
 
 
@@ -368,7 +404,7 @@ async def _try_send_official_qq_image_markdown(
     is_group: bool,
     kind: str,
 ) -> bool:
-    if not _is_official_qq_bot(bot) or not _official_image_gallery_url():
+    if not _is_official_qq_bot(bot) or not _official_cnb_configured():
         return False
     try:
         image_bytes = await _official_gallery_image_bytes(image)

@@ -43,14 +43,24 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
         'https://loli.xlinxc.cn',
     ),
-    'DailyWifeOfficialImageGalleryUrl': GsStrConfig(
-        '官方机器人图库地址',
-        '用于 QQ 官方机器人将结果图片上传图库并合并为 Markdown 消息。填写图库服务根地址，留空时不启用',
+    'DailyWifeOfficialCnbApiBase': GsStrConfig(
+        '官方机器人 CNB API 地址',
+        'QQ 官方机器人结果图直传使用的 CNB API 根地址',
+        'https://api.cnb.cool',
+    ),
+    'DailyWifeOfficialCnbPublicBase': GsStrConfig(
+        '官方机器人 CNB 公共地址',
+        '上传完成后用于组合公开图片 URL 的 CNB 根地址',
+        'https://cnb.cool',
+    ),
+    'DailyWifeOfficialCnbRepo': GsStrConfig(
+        '官方机器人 CNB 仓库',
+        '接收 QQ 官方机器人结果图片的 CNB 仓库，格式为组织名/仓库名',
         '',
     ),
-    'DailyWifeOfficialImageGalleryToken': GsStrConfig(
-        '官方机器人图库上传令牌',
-        '图库 /upload 接口的 Bearer Token。仅保存在本地运行配置中，请勿提交到公开仓库',
+    'DailyWifeOfficialCnbToken': GsStrConfig(
+        '官方机器人 CNB 令牌',
+        '具有目标仓库图片上传权限的 CNB Bearer Token，仅保存在本地运行配置中',
         '',
         secret=True,
     ),

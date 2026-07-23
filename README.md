@@ -82,8 +82,10 @@ gsuid_core/data/TodayWaifu/pgr_wife/角色名/图片文件
 | 角色 ID 对照表路径 | 空 | 留空使用内置 `wife_role_id_map.txt` |
 | 图库接口地址 | 默认指向官方图库 | 图库模式生效，可在控制台自行更换 |
 | 今日萝莉接口地址 | `https://loli.xlinxc.cn` | GET 直接返回随机图片 |
-| 官方机器人图库地址 | 空 | QQ 官方机器人专用；填写图库服务根地址后，将结果图片上传并合并为一条 Markdown |
-| 官方机器人图库上传令牌 | 空 | 图库 `/upload` 接口的 Bearer Token，仅保存在部署者自己的运行配置中 |
+| 官方机器人 CNB API 地址 | `https://api.cnb.cool` | QQ 官方机器人结果图直传使用的 CNB API 根地址 |
+| 官方机器人 CNB 公共地址 | `https://cnb.cool` | 上传完成后用于组合公开图片 URL |
+| 官方机器人 CNB 仓库 | 空 | 接收结果图片的 CNB 仓库，格式为 `组织名/仓库名` |
+| 官方机器人 CNB 令牌 | 空 | 具有目标仓库图片上传权限的 Bearer Token，仅保存在部署者自己的运行配置中 |
 | 图片上传白名单 | 空 | 允许使用全部图片上传功能的用户 ID；机器人主人无需加入白名单 |
 | 发送文字说明 | 开启 | 图片前附带“你今天的老婆是xxx” |
 | 显示角色 ID | 关闭 | 开启后文字说明额外附带一行角色 ID |
@@ -119,27 +121,18 @@ gsuid_core/data/TodayWaifu/pgr_wife/角色名/图片文件
 
 指定角色命令统一由「今日老婆-指定老婆」SV 服务管理。主人始终可以指定；其他用户需要加入「指定老婆白名单」。支持 `今日老婆 角色名`、`今日老公 角色名`、`今日异环老婆 角色名` 和 `今日战双老婆 角色名`。
 
-### QQ 官方机器人图库 Markdown
+### QQ 官方机器人 CNB 图片 Markdown
 
-配置「官方机器人图库地址」后，插件会对 `qqgroup` 和 `qqguild` 平台的今日老婆结果图启用图库 Markdown。
+配置「官方机器人 CNB 仓库」和「官方机器人 CNB 令牌」后，插件会对 `qqgroup` 和 `qqguild` 平台的今日老婆结果图启用图片 Markdown。
 群聊消息会将结构化艾特、回复文字和图片合并在一条 Markdown 中；私聊不会添加艾特。此实验分支仅面向 QQ 官方机器人，不再解析 CQ 码、QQ 号码参数或其他个人号协议。
 
-图库服务需要提供：
+插件直接调用 CNB 官方两阶段上传接口，不需要部署图库中转服务：
 
-```text
-POST {图库地址}/upload
-Authorization: Bearer {上传令牌}
-Content-Type: application/octet-stream
-X-Filename: todaywaifu-<sha256>.<ext>
-```
+1. `POST {CNB API 地址}/{仓库}/-/upload/imgs` 获取 `upload_url` 和 `assets.path`。
+2. `PUT upload_url` 上传图片内容。
+3. 使用「CNB 公共地址」和 `assets.path` 组合 HTTPS 图片地址并发送 Markdown。
 
-成功时返回：
-
-```json
-{"url": "https://gallery.example.com/todaywaifu-xxx.png"}
-```
-
-仓库中的图库地址和上传令牌默认均为空，不包含任何部署者的私人配置。参考后端见 `tools/qq_gallery_server.py`。
+仓库和令牌默认均为空，不包含任何部署者的私人配置；未配置或上传失败时会降级为普通图片消息。
 
 ## 数据
 

@@ -1,8 +1,15 @@
 import ast
+import hashlib
+import io
+import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import urlparse
+from urllib.request import Request
+
+from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +36,16 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
         'Event': object,
         'Message': FakeMessage,
         'QQ_OFFICIAL_BOT_IDS': {'qqgroup', 'qqguild'},
+        'BytesIO': io.BytesIO,
+        'HTTPError': Exception,
+        'Image': Image,
+        'Request': Request,
+        'TimeoutError': TimeoutError,
+        'URLError': Exception,
+        'hashlib': hashlib,
+        'json': json,
+        'urlparse': urlparse,
+        'urlopen': None,
         '_cfg': lambda key: values.get(key, ''),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
         '_reply_text': lambda text, kind='wife': f'[{kind}]{text}',
@@ -149,11 +166,83 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertNotIn('<@', markdown)
         self.assertIn('[wife]你今天的老婆是今汐', markdown)
 
-    def test_repository_defaults_do_not_contain_private_gallery_config(self) -> None:
+    def test_repository_defaults_use_direct_cnb_config(self) -> None:
         source = (ROOT / 'config_default.py').read_text(encoding='utf-8')
-        self.assertIn("'DailyWifeOfficialImageGalleryUrl'", source)
-        self.assertIn("'DailyWifeOfficialImageGalleryToken'", source)
-        self.assertNotIn('qq.xlinxc.cn', source)
+        for key in (
+            'DailyWifeOfficialCnbApiBase',
+            'DailyWifeOfficialCnbPublicBase',
+            'DailyWifeOfficialCnbRepo',
+            'DailyWifeOfficialCnbToken',
+        ):
+            self.assertIn(f"'{key}'", source)
+        self.assertNotIn('DailyWifeOfficialImageGalleryUrl', source)
+        self.assertNotIn('DailyWifeOfficialImageGalleryToken', source)
+
+    def test_direct_cnb_upload_uses_two_stage_api(self) -> None:
+        functions = _load_functions(
+            {
+                '_official_cnb_api_base',
+                '_official_cnb_public_base',
+                '_official_cnb_repo',
+                '_official_cnb_token',
+                '_official_gallery_image_info',
+                '_upload_official_gallery_image_sync',
+            },
+            {
+                'DailyWifeOfficialCnbApiBase': 'https://api.cnb.test',
+                'DailyWifeOfficialCnbPublicBase': 'https://public.cnb.test',
+                'DailyWifeOfficialCnbRepo': 'owner/repo',
+                'DailyWifeOfficialCnbToken': 'secret-token',
+            },
+        )
+        image_output = io.BytesIO()
+        Image.new('RGB', (32, 48), 'white').save(image_output, format='PNG')
+        image = image_output.getvalue()
+        requests: list[Request] = []
+
+        class FakeResponse:
+            def __init__(self, body: bytes = b'') -> None:
+                self.body = body
+
+            def __enter__(self) -> 'FakeResponse':
+                return self
+
+            def __exit__(self, *args: Any) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return self.body
+
+        def fake_urlopen(request: Request, timeout: int) -> FakeResponse:
+            self.assertEqual(timeout, 20)
+            requests.append(request)
+            if len(requests) == 1:
+                return FakeResponse(
+                    json.dumps(
+                        {
+                            'upload_url': 'https://upload.cnb.test/signed',
+                            'assets': {'path': '/owner/repo/-/imgs/result.png'},
+                        }
+                    ).encode()
+                )
+            return FakeResponse()
+
+        upload = functions['_upload_official_gallery_image_sync']
+        upload.__globals__['urlopen'] = fake_urlopen
+        public_url, size = upload(image)
+
+        self.assertEqual(public_url, 'https://public.cnb.test/owner/repo/-/imgs/result.png')
+        self.assertEqual(size, (32, 48))
+        self.assertEqual(requests[0].full_url, 'https://api.cnb.test/owner/repo/-/upload/imgs')
+        self.assertEqual(requests[0].method, 'POST')
+        self.assertEqual(requests[0].headers['Authorization'], 'Bearer secret-token')
+        self.assertEqual(json.loads(requests[0].data or b'{}')['size'], len(image))
+        self.assertEqual(requests[1].full_url, 'https://upload.cnb.test/signed')
+        self.assertEqual(requests[1].method, 'PUT')
+        self.assertEqual(requests[1].data, image)
+
+    def test_plugin_scoped_gallery_server_is_removed(self) -> None:
+        self.assertFalse((ROOT / 'tools' / 'qq_gallery_server.py').exists())
 
     def test_all_result_image_senders_try_plugin_scoped_markdown(self) -> None:
         source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
