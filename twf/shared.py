@@ -45,7 +45,7 @@ Plugins(
 
 # 控制台 SV 服务拆分：不要把所有功能塞进同一个 SV，便于单独开关。
 # priority 数字越小越先执行；短前缀命令放到低优先级，避免抢到长命令。
-help_sv = SV('今日老婆-帮助', priority=1)
+help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
 assign_wife_sv = SV('今日老婆-主人分配', pm=1, priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
