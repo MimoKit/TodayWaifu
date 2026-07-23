@@ -26,8 +26,9 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
     namespace: dict[str, Any] = {
         'Any': Any,
         'Bot': object,
+        'Event': object,
         'Message': FakeMessage,
-        'QQ_OFFICIAL_BOT_IDS': {'qqgroup'},
+        'QQ_OFFICIAL_BOT_IDS': {'qqgroup', 'qqguild'},
         '_cfg': lambda key: values.get(key, ''),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
         '_reply_text': lambda text, kind='wife': f'[{kind}]{text}',
@@ -37,15 +38,60 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
 
 
 class PlatformMentionTests(unittest.TestCase):
-    def test_platform_detection_only_matches_qq_official(self) -> None:
+    def test_platform_detection_matches_qq_official_platforms(self) -> None:
         functions = _load_functions({'_is_official_qq_bot'})
         detect = functions['_is_official_qq_bot']
-        official = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqgroup:official-1', bot_id='qqgroup'))
-        personal = SimpleNamespace(ev=SimpleNamespace(real_bot_id='onebot:llbot', bot_id='onebot'))
+        group = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqgroup:official-1', bot_id='qqgroup'))
         guild = SimpleNamespace(ev=SimpleNamespace(real_bot_id='qqguild:channel', bot_id='qqguild'))
-        self.assertTrue(detect(official))
-        self.assertFalse(detect(personal))
-        self.assertFalse(detect(guild))
+        unsupported = SimpleNamespace(ev=SimpleNamespace(real_bot_id='other:bot', bot_id='other'))
+        self.assertTrue(detect(group))
+        self.assertTrue(detect(guild))
+        self.assertFalse(detect(unsupported))
+
+    def test_target_user_id_only_uses_structured_official_fields(self) -> None:
+        functions = _load_functions(
+            {'_normalise_target_user_id', '_iter_event_messages', '_get_event_target_user_id'}
+        )
+        get_target = functions['_get_event_target_user_id']
+
+        self.assertEqual(
+            get_target(SimpleNamespace(target_user_id='OPENID_123', at_list=None, at=None, target_id=None)),
+            'OPENID_123',
+        )
+        self.assertEqual(
+            get_target(SimpleNamespace(at_list=['OPENID_456'], at=None, target_id=None, target_user_id=None)),
+            'OPENID_456',
+        )
+        self.assertEqual(
+            get_target(
+                SimpleNamespace(
+                    at_list=None,
+                    at=None,
+                    target_id=None,
+                    target_user_id=None,
+                    content=[FakeMessage('mention_user', {'openid': 'OPENID_789'})],
+                    message=None,
+                    original_message=None,
+                )
+            ),
+            'OPENID_789',
+        )
+
+    def test_private_account_target_formats_are_not_supported(self) -> None:
+        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        self.assertNotIn('_target_user_id_from_text', source)
+        self.assertNotIn("'qq', 'openid'", source)
+        self.assertNotIn('CQ:at', source)
+        self.assertNotIn('qlogo.cn', source)
+        self.assertNotIn('_qq_avatar_url', source)
+
+    def test_private_account_prompts_and_cleanup_are_removed(self) -> None:
+        daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')
+        rob = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
+        gift = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
+        self.assertNotIn('CQ:at', daily)
+        self.assertNotIn('对方 QQ', rob)
+        self.assertNotIn('对方 QQ', gift)
 
     def test_generic_send_boundary_only_removes_private_mentions(self) -> None:
         functions = _load_functions(

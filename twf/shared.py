@@ -129,7 +129,7 @@ __all__ = [
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_nsfw_checked_role_record',
-    '_get_reply_prefix', '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
+    '_get_reply_prefix', '_prefix_outgoing_message', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
@@ -209,7 +209,7 @@ async def _target_send_without_bot_hooks(
     )
 
 
-QQ_OFFICIAL_BOT_IDS = {'qqgroup'}
+QQ_OFFICIAL_BOT_IDS = {'qqgroup', 'qqguild'}
 
 
 def _official_image_gallery_url() -> str:
@@ -1573,10 +1573,6 @@ def _valid_member_text(value: Any) -> str:
     return text
 
 
-def _qq_avatar_url(user_id: str) -> str:
-    return f'https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640'
-
-
 def _member_avatar_cache_path(user_id: str) -> Path:
     safe_user_id = re.sub(r'[^0-9A-Za-z_-]+', '_', str(user_id)) or 'unknown'
     return _custom_upload_data_root() / 'group_member_avatar_cache' / f'{safe_user_id}.jpg'
@@ -1630,9 +1626,6 @@ def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
                 return str(local_path)
         except Exception:
             pass
-
-    if str(user_id).isdigit() and _download_avatar(_qq_avatar_url(str(user_id)), cache_path):
-        return str(cache_path)
 
     if _usable_cached_avatar(cache_path, check_ttl=False):
         return str(cache_path)
@@ -1949,7 +1942,7 @@ def _normalise_target_user_id(value: Any) -> str:
     if isinstance(value, Message):
         value = value.data
     if isinstance(value, dict):
-        for field in ('user_id', 'qq', 'openid', 'open_id', 'id', 'data'):
+        for field in ('user_id', 'openid', 'open_id', 'id', 'data'):
             user_id = _normalise_target_user_id(value.get(field))
             if user_id:
                 return user_id
@@ -1958,24 +1951,6 @@ def _normalise_target_user_id(value: Any) -> str:
     if not text or text.lower() in {'none', 'true', 'false', 'all'}:
         return ''
     return text
-
-
-def _target_user_id_from_text(text: str) -> str | None:
-    text = str(text or '').strip()
-    if not text:
-        return None
-
-    patterns = (
-        r'\[CQ:at,[^\]]*qq=([0-9A-Za-z_-]{5,})',
-        r'<at[^>]*(?:id|qq|user_id)=["\']?([0-9A-Za-z_-]{5,})',
-        r'(?:qq=|qq:|QQ=|QQ:|@)\s*([0-9A-Za-z_-]{5,})',
-        r'\b(\d{5,20})\b',
-    )
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
-    return None
 
 
 def _iter_event_messages(ev: Event):
@@ -1999,11 +1974,6 @@ def _get_event_target_user_id(ev: Event) -> str | None:
 
             user_id = _normalise_target_user_id(value)
             if user_id:
-                if 'CQ:at' in user_id or '<at' in user_id:
-                    parsed = _target_user_id_from_text(user_id)
-                    if parsed:
-                        return parsed
-                    continue
                 return user_id
 
     for item in _iter_event_messages(ev):
@@ -2014,13 +1984,6 @@ def _get_event_target_user_id(ev: Event) -> str | None:
                 return user_id
         if isinstance(item, dict) and item.get('type') in {'at', 'mention_user', 'mention'}:
             user_id = _normalise_target_user_id(item.get('data'))
-            if user_id:
-                return user_id
-
-    for attr in ('text', 'raw_text', 'raw_message', 'message', 'original_message'):
-        t = getattr(ev, attr, None)
-        if t is not None:
-            user_id = _target_user_id_from_text(str(t))
             if user_id:
                 return user_id
 

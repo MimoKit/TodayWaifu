@@ -409,7 +409,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         member = record.to_member()
         logger.debug(
             f'{LOG_PREFIX} mode={mode} user={ev.user_id} group={ev.group_id or "direct"} '
-            f'member={member.name} qq={member.user_id} avatar={record.image} debug={is_debug_active}'
+            f'member={member.name} user_id={member.user_id} avatar={record.image} debug={is_debug_active}'
         )
     else:
         role = record.to_role()
@@ -425,13 +425,12 @@ def _assignment_role_name(ev: Event, target_user_id: str) -> str:
     if not text:
         return ''
 
-    text = re.sub(r'\[CQ:at,[^\]]*\]', ' ', text)
     text = re.sub(r'<(?:qqbot-)?at[^>]*>', ' ', text)
     text = re.sub(r'<qqbot-at-user[^>]*/?>', ' ', text)
     text = re.sub(r'@\S+', ' ', text)
     if target_user_id:
         text = text.replace(target_user_id, ' ')
-    text = re.sub(r'\b(?:qq|QQ|id|user_id|openid|open_id)\s*[:=]\s*\S+', ' ', text)
+    text = re.sub(r'\b(?:id|user_id|openid|open_id)\s*[:=]\s*\S+', ' ', text)
     text = re.sub(r'[，,。；;：:\n\r\t]+', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
@@ -519,7 +518,7 @@ async def _send_group_member_wife(bot: Bot, ev: Event):
 
     logger.info(
         f'{LOG_PREFIX} marry_member user={ev.user_id} group={ev.group_id} '
-        f'member={member.name} qq={member.user_id} avatar={member.avatar}'
+        f'member={member.name} user_id={member.user_id} avatar={member.avatar}'
     )
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
     await _send_local_image(bot, member.avatar, '本地群友头像文件不存在，请稍后重试。', text, ev.user_id, ev.group_id is not None)

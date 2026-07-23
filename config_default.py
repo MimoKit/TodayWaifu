@@ -169,7 +169,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeGroupMemberTextTemplate': GsStrConfig(
         '今日老婆抽群友文字模板',
-        '今日老婆命中群友时的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
+        '今日老婆命中群友时的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友用户 ID',
         '你今天的老婆是{name}',
     ),
     'DailyWifeMarryGroupMemberEnabled': GsBoolConfig(
@@ -179,7 +179,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeMarryGroupMemberTextTemplate': GsStrConfig(
         '娶群友文字模板',
-        '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
+        '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友用户 ID',
         '你娶到的群友是{name}',
     ),
 

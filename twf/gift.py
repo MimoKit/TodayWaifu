@@ -123,7 +123,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, '要送给谁？请艾特对方或在命令后面写对方 QQ。', kind=kind)
+        return await _send_prefixed(bot, '要送给谁？请在命令中艾特对方。', kind=kind)
 
     giver_id = _user_key(ev)
     if target_user_id == giver_id:
