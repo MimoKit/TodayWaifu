@@ -18,6 +18,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from PIL import Image
 
@@ -26,6 +27,7 @@ from gsuid_core.config import core_config
 from gsuid_core.data_store import get_res_path
 from gsuid_core.help.utils import register_help
 from gsuid_core.logger import logger
+from gsuid_core.message_models import Button
 from gsuid_core.models import Event, Message
 from gsuid_core.segment import MessageSegment
 from gsuid_core.sv import Plugins, SV
@@ -119,6 +121,7 @@ __all__ = [
     '_get_today_context',
     '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
+    '_meme_generator_configured', '_meme_generator_url',
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
@@ -134,6 +137,8 @@ __all__ = [
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
+    '_send_marry_member_result_image', '_send_member_petpet_markdown',
+    '_build_marry_member_keyboard', '_generate_petpet_meme',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text',
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image',
     '_send_prefixed', '_send_role_image',
@@ -230,6 +235,103 @@ def _official_cnb_token() -> str:
 
 def _official_cnb_configured() -> bool:
     return bool(_official_cnb_repo() and _official_cnb_token())
+
+
+def _meme_generator_url() -> str:
+    return str(_cfg('DailyWifeMemeGeneratorUrl') or '').strip().rstrip('/')
+
+
+def _meme_generator_configured() -> bool:
+    return bool(_meme_generator_url())
+
+
+def _official_command_button(label: str, command: str) -> Button:
+    return Button(
+        text=label,
+        pressed_text=label,
+        data=command,
+        style=1,
+        action=2,
+        permisson=2,
+        unsupport_tips='请升级 QQ 后再使用按钮',
+    )
+
+
+def _build_marry_member_keyboard() -> list[list[Button]]:
+    return [[
+        _official_command_button('摸头', '摸头'),
+        _official_command_button('离婚', '离婚'),
+    ]]
+
+
+def _multipart_form_data(
+    fields: dict[str, str],
+    files: list[tuple[str, str, str, bytes]],
+) -> tuple[bytes, str]:
+    boundary = f'----TodayWaifu{uuid4().hex}'
+    body_parts: list[bytes] = []
+    for name, value in fields.items():
+        body_parts.append(
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f'{value}\r\n'
+            .encode('utf-8')
+        )
+    for name, filename, content_type, content in files:
+        safe_filename = filename.replace('"', '_').replace('\r', '_').replace('\n', '_')
+        body_parts.append(
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="{name}"; filename="{safe_filename}"\r\n'
+            f'Content-Type: {content_type}\r\n\r\n'
+            .encode('utf-8')
+            + content
+            + b'\r\n'
+        )
+    body_parts.append(f'--{boundary}--\r\n'.encode('utf-8'))
+    return b''.join(body_parts), boundary
+
+
+def _generate_petpet_meme_sync(avatar: bytes) -> bytes:
+    base_url = _meme_generator_url()
+    if not base_url:
+        raise RuntimeError('未配置表情包后端地址')
+
+    extension, _size = _official_gallery_image_info(avatar)
+    content_type = f'image/{"jpeg" if extension == "jpg" else extension}'
+    body, boundary = _multipart_form_data(
+        {'args': json.dumps({'user_infos': [], 'circle': False})},
+        [('images', f'avatar.{extension}', content_type, avatar)],
+    )
+    request = Request(
+        f'{base_url}/memes/petpet/',
+        data=body,
+        headers={
+            'User-Agent': 'TodayWaifu/1.0',
+            'Content-Type': f'multipart/form-data; boundary={boundary}',
+        },
+        method='POST',
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            content_type = str(response.headers.get('content-type') or '').lower()
+            result = response.read(12 * 1024 * 1024 + 1)
+    except HTTPError as exc:
+        raise RuntimeError(f'表情包后端返回 HTTP {exc.code}') from exc
+    except URLError as exc:
+        raise RuntimeError(f'表情包后端请求失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('表情包后端请求超时') from exc
+
+    if not result or len(result) > 12 * 1024 * 1024:
+        raise RuntimeError('表情包后端返回内容为空或过大')
+    if not content_type.startswith('image/'):
+        raise RuntimeError('表情包后端没有返回图片')
+    return result
+
+
+async def _generate_petpet_meme(avatar_image: Any) -> bytes:
+    avatar = await _official_gallery_image_bytes(avatar_image)
+    return await asyncio.to_thread(_generate_petpet_meme_sync, avatar)
 
 
 def _is_official_qq_bot(bot: Bot) -> bool:
@@ -391,7 +493,7 @@ def _build_official_qq_image_markdown(
             text = _reply_text(text, kind)
         header_parts.append(text)
     width, height = _official_markdown_image_size(size)
-    parts = [' '.join(header_parts)] if header_parts else []
+    parts = header_parts[:]
     parts.append(f'![image #{width}px #{height}px]({image_url})')
     return '\n\n'.join(parts)
 
@@ -403,6 +505,7 @@ async def _try_send_official_qq_image_markdown(
     user_id: str | int | None,
     is_group: bool,
     kind: str,
+    keyboard: Any | None = None,
 ) -> bool:
     if not _is_official_qq_bot(bot) or not _official_cnb_configured():
         return False
@@ -417,11 +520,93 @@ async def _try_send_official_qq_image_markdown(
             is_group,
             kind,
         )
-        await _safe_send(bot, MessageSegment.markdown(markdown))
+        message: Any = MessageSegment.markdown(markdown, buttons=keyboard)
+        await _safe_send(bot, message)
     except Exception as exc:
         logger.warning(f'{LOG_PREFIX} 官方机器人图库 Markdown 发送失败，降级为普通图片: {exc}')
         return False
     return True
+
+
+
+
+async def _send_marry_member_result_image(
+    bot: Bot,
+    member: MemberCandidate,
+    text: str | None,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+    keyboard = _build_marry_member_keyboard() if is_group else None
+    if member.avatar and Path(member.avatar).is_file():
+        if await _try_send_official_qq_image_markdown(
+            bot,
+            Path(member.avatar),
+            text,
+            user_id,
+            is_group,
+            'wife',
+            keyboard,
+        ):
+            return
+    await _send_local_image(
+        bot,
+        member.avatar,
+        '本地群友头像文件不存在，请稍后重试。',
+        text,
+        user_id,
+        is_group,
+        'wife',
+    )
+
+
+def _official_markdown_inline_text(text: Any, fallback: str = '这位群友') -> str:
+    value = re.sub(r'\s+', ' ', str(text or '')).strip() or fallback
+    return re.sub(r'([\\`*_\[\]()#>\-!])', r'\\\1', value)
+
+
+async def _send_member_petpet_notice(bot: Bot, member: MemberCandidate) -> None:
+    member_name = _official_markdown_inline_text(member.name)
+    text = (
+        f'摸了摸 {member.name} 的头。\n'
+        '头像合规提醒：这张表情包使用本次「娶群友」缓存的群成员头像生成；如果头像异常、侵权或涉嫌违规，可能触发 QQ 平台审核或被举报，请确认头像合规后再使用。'
+    )
+    if _is_official_qq_bot(bot):
+        markdown = (
+            f'## 摸了摸 {member_name} 的头\n\n'
+            '> **头像合规提醒**\n'
+            '> \n'
+            '> 这张表情包使用本次「娶群友」缓存的群成员头像生成。\n'
+            '> 如果头像异常、侵权或涉嫌违规，可能触发 QQ 平台审核或被举报；请确认头像合规后再使用。\n\n'
+            '---\n\n'
+            '表情包见下一条消息。'
+        )
+        try:
+            await _safe_send(bot, MessageSegment.markdown(markdown))
+            return
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} 官方机器人摸头提示 Markdown 发送失败，降级为普通文本: {exc}')
+    await _send_prefixed(bot, text)
+
+
+async def _send_member_petpet_markdown(
+    bot: Bot,
+    member: MemberCandidate,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+    if not _meme_generator_configured():
+        await _send_prefixed(bot, '摸头功能还没配置表情包后端地址，请在控制台填写「表情包后端地址」。')
+        return
+    try:
+        image = await _generate_petpet_meme(member.avatar)
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 摸头表情包生成失败: {exc}')
+        await _send_prefixed(bot, f'摸头生成失败：{exc}')
+        return
+
+    await _send_member_petpet_notice(bot, member)
+    await _safe_send(bot, MessageSegment.image(image))
 
 
 async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
@@ -1807,6 +1992,8 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
 
 
 def _daily_bucket_name(kind: str) -> str:
+    if kind == 'marry_member':
+        return 'marry_members'
     return _daily_kind_metadata(kind).bucket
 
 
@@ -1819,7 +2006,7 @@ def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
 
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
-ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'marry_member')
 
 
 def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:

@@ -163,6 +163,10 @@
         "expr": "GsStrConfig('娶群友文字模板', '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友用户 ID', '你娶到的群友是{name}')"
       },
       {
+        "key": "DailyWifeMemeGeneratorUrl",
+        "expr": "GsStrConfig('表情包后端地址', '用于「娶群友」摸头按钮的 meme-generator 后端地址，留空则不启用摸头生成；请只配置自己信任的后端', '')"
+      },
+      {
         "key": "_DividerDailyHusband",
         "expr": "GsDivider('今日老公', '')"
       },
@@ -350,9 +354,14 @@
       "decorator": "marry_member_sv.on_fullmatch(('娶群友', '取群友'), block=True, to_ai='随机抽取当前群里的一个群友作为今日互动对象。\\n    当用户说“娶群友”“随机娶一个群友”“帮我抽个群友”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
+      "file": "twf/daily.py",
+      "function": "group_member_petpet",
+      "decorator": "marry_member_sv.on_fullmatch(('摸头', '群友摸头'), block=True, to_ai='用最近一次娶到的群友头像生成摸头表情包。\\n    当用户点击“娶群友”结果里的摸头按钮，或说“摸头”“群友摸头”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
       "file": "twf/divorce.py",
       "function": "divorce_all",
-      "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='一次性结束当前用户今天的全部婚姻关系。\\n    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。\\n    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+      "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='一次性结束当前用户今天的全部婚姻关系。\\n    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉、娶群友和补偿老婆。\\n    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/gift.py",

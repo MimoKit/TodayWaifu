@@ -192,6 +192,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友用户 ID',
         '你娶到的群友是{name}',
     ),
+    'DailyWifeMemeGeneratorUrl': GsStrConfig(
+        '表情包后端地址',
+        '用于「娶群友」摸头按钮的 meme-generator 后端地址，留空则不启用摸头生成；请只配置自己信任的后端',
+        '',
+    ),
 
     '_DividerDailyHusband': GsDivider('今日老公', ''),
     'DailyWifeHusbandEnabled': GsBoolConfig(

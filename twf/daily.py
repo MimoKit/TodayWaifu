@@ -520,8 +520,33 @@ async def _send_group_member_wife(bot: Bot, ev: Event):
         f'{LOG_PREFIX} marry_member user={ev.user_id} group={ev.group_id} '
         f'member={member.name} user_id={member.user_id} avatar={member.avatar}'
     )
+    user_key = _user_key(ev)
+    record = WifeRecord.from_member(member)
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    context['marry_members'][user_key] = _record_to_dict(record, ev, user_key)
+    _save_wife_data(data)
+
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
-    await _send_local_image(bot, member.avatar, '本地群友头像文件不存在，请稍后重试。', text, ev.user_id, ev.group_id is not None)
+    await _send_marry_member_result_image(bot, member, text, ev.user_id, ev.group_id is not None)
+
+
+async def _send_group_member_petpet(bot: Bot, ev: Event):
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了摸头命令')
+    if not ev.group_id:
+        return await _send_prefixed(bot, '这个命令只能在群聊里使用。')
+
+    user_key = _user_key(ev)
+    data = _load_wife_data()
+    context = _get_today_context(data, ev)
+    raw_record = context['marry_members'].get(user_key)
+    if not _has_active_wife(raw_record):
+        return await _send_prefixed(bot, '你还没有娶到群友，先发送“娶群友”试试。')
+    record = _record_from_dict(raw_record)
+    if record is None or record.record_type != 'member':
+        return await _send_prefixed(bot, '没有找到可用的群友头像，重新发送“娶群友”试试。')
+
+    await _send_member_petpet_markdown(bot, record.to_member(), ev.user_id, ev.group_id is not None)
 
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
@@ -700,3 +725,16 @@ async def daily_husband_list(bot: Bot, ev: Event):
 )
 async def group_member_wife(bot: Bot, ev: Event):
     await _send_group_member_wife(bot, ev)
+
+
+@marry_member_sv.on_fullmatch(
+    ('摸头', '群友摸头'),
+    block=True,
+    to_ai="""用最近一次娶到的群友头像生成摸头表情包。
+    当用户点击“娶群友”结果里的摸头按钮，或说“摸头”“群友摸头”时调用；只能在群聊使用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def group_member_petpet(bot: Bot, ev: Event):
+    await _send_group_member_petpet(bot, ev)

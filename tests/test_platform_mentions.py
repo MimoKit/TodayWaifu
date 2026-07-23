@@ -143,7 +143,7 @@ class PlatformMentionTests(unittest.TestCase):
         )
         self.assertEqual(
             markdown,
-            '<@OPENID_123> [wife]你今天的老婆是今汐\n\n'
+            '<@OPENID_123>\n\n[wife]你今天的老婆是今汐\n\n'
             '![image #240px #360px](https://gallery.example.test/todaywaifu.png)',
         )
 
@@ -240,6 +240,29 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertEqual(requests[1].full_url, 'https://upload.cnb.test/signed')
         self.assertEqual(requests[1].method, 'PUT')
         self.assertEqual(requests[1].data, image)
+
+    def test_marry_member_keyboard_and_petpet_use_configured_backend(self) -> None:
+        shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        config_source = (ROOT / 'config_default.py').read_text(encoding='utf-8')
+        self.assertIn("'DailyWifeMemeGeneratorUrl'", config_source)
+        self.assertIn("_cfg('DailyWifeMemeGeneratorUrl')", shared_source)
+        self.assertIn("from gsuid_core.message_models import Button", shared_source)
+        self.assertIn("_official_command_button('摸头', '摸头')", shared_source)
+        self.assertIn("_official_command_button('离婚', '离婚')", shared_source)
+        self.assertIn('MessageSegment.markdown(markdown, buttons=keyboard)', shared_source)
+        self.assertIn('async def _send_member_petpet_notice(bot: Bot, member: MemberCandidate)', shared_source)
+        self.assertIn('## 摸了摸 {member_name} 的头', shared_source)
+        self.assertIn('> **头像合规提醒**', shared_source)
+        self.assertIn('可能触发 QQ 平台审核或被举报', shared_source)
+        self.assertIn('表情包见下一条消息。', shared_source)
+        self.assertLess(
+            shared_source.index('await _send_member_petpet_notice(bot, member)'),
+            shared_source.index('await _safe_send(bot, MessageSegment.image(image))'),
+        )
+        petpet_start = shared_source.index('async def _send_member_petpet_markdown(')
+        petpet_end = shared_source.index('\n\nasync def _safe_send(', petpet_start)
+        petpet_block = shared_source[petpet_start:petpet_end]
+        self.assertNotIn('_try_send_official_qq_image_markdown', petpet_block)
 
     def test_plugin_scoped_gallery_server_is_removed(self) -> None:
         self.assertFalse((ROOT / 'tools' / 'qq_gallery_server.py').exists())

@@ -74,7 +74,7 @@ async def _send_divorce_all(bot: Bot, ev: Event) -> None:
     DIVORCE_COMMANDS,
     block=True,
     to_ai="""一次性结束当前用户今天的全部婚姻关系。
-    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。
+    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉、娶群友和补偿老婆。
     当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。
     Args:
         text: 无需参数，留空。

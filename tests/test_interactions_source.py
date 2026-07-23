@@ -34,6 +34,7 @@ class InteractionConfigSourceTests(unittest.TestCase):
                         keys.add(key.value)
         expected = {
             'DailyWifeLoliApiUrl',
+            'DailyWifeMemeGeneratorUrl',
             'DailyHusbandRobEnabled',
             'DailyHusbandRobSuccessTemplate',
             'DailyHusbandGiftEnabled',
@@ -122,12 +123,34 @@ class InteractionSourceTests(unittest.TestCase):
             self.assertIn(word, loli_source)
         self.assertIn('老婆帮助', help_source)
 
+    def test_marry_member_petpet_command_uses_stored_member(self) -> None:
+        daily_source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')
+        shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        self.assertIn("context['marry_members'][user_key] = _record_to_dict(record, ev, user_key)", daily_source)
+        self.assertIn('_send_marry_member_result_image(bot, member, text, ev.user_id, ev.group_id is not None)', daily_source)
+        self.assertIn("marry_member_sv.on_fullmatch(\n    ('摸头', '群友摸头')", daily_source)
+        self.assertIn("context['marry_members'].get(user_key)", daily_source)
+        self.assertIn('_send_member_petpet_markdown(bot, record.to_member(), ev.user_id, ev.group_id is not None)', daily_source)
+        self.assertIn('async def _send_member_petpet_notice(bot: Bot, member: MemberCandidate)', shared_source)
+        self.assertIn('可能触发 QQ 平台审核或被举报', shared_source)
+        self.assertLess(
+            shared_source.index('await _send_member_petpet_notice(bot, member)'),
+            shared_source.index('await _safe_send(bot, MessageSegment.image(image))'),
+        )
+        petpet_start = shared_source.index('async def _send_member_petpet_markdown(')
+        petpet_end = shared_source.index('\n\nasync def _safe_send(', petpet_start)
+        petpet_block = shared_source[petpet_start:petpet_end]
+        self.assertNotIn('_try_send_official_qq_image_markdown', petpet_block)
+        self.assertIn("'marry_member'", shared_source)
+        self.assertIn("return 'marry_members'", shared_source)
+
     def test_divorce_marks_all_daily_records_with_divorced_state(self) -> None:
         shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
         divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8')
         self.assertIn("raw.get('divorced')", shared_source)
         self.assertIn("return 'divorced'", shared_source)
         self.assertIn('ALL_DAILY_RECORD_KINDS', shared_source)
+        self.assertIn("'marry_member'", shared_source)
         self.assertIn("context['safe_wives']", shared_source)
         self.assertIn('_mark_all_daily_records_divorced(', divorce_source)
         self.assertIn('clear_pending_gifts_for_user(', divorce_source)
