@@ -14,16 +14,17 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
 def collect_image_refs(event: Any) -> tuple[str, ...]:
     refs: list[str] = []
-    for content in event.content or []:
+    for content in getattr(event, "content", None) or []:
         if content.type in {"image", "img"} and isinstance(content.data, str):
             ref = content.data.strip()
             if ref:
                 refs.append(ref)
-    for item in event.image_list or []:
+    for item in getattr(event, "image_list", None) or []:
         if isinstance(item, str) and item.strip():
             refs.append(item.strip())
-    if isinstance(event.image, str) and event.image.strip():
-        refs.append(event.image.strip())
+    image = getattr(event, "image", None)
+    if isinstance(image, str) and image.strip():
+        refs.append(image.strip())
     return tuple(dict.fromkeys(refs))
 
 

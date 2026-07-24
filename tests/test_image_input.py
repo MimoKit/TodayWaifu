@@ -27,6 +27,11 @@ class ImageInputTests(unittest.TestCase):
         )
         self.assertEqual(image_input.collect_image_refs(event), ("a", "b", "c"))
 
+    def test_collect_image_refs_allows_missing_optional_event_fields(self) -> None:
+        image_input = _load_module()
+        event = SimpleNamespace(content=[SimpleNamespace(type="image", data=" a ")])
+        self.assertEqual(image_input.collect_image_refs(event), ("a",))
+
     def test_detect_image_suffix_prefers_file_signature(self) -> None:
         image_input = _load_module()
         self.assertEqual(image_input.detect_image_suffix(b"\x89PNG\r\n\x1a\nrest", "fake.jpg"), ".png")
