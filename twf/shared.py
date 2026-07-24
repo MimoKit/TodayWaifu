@@ -126,6 +126,7 @@ __all__ = [
     '_nsfw_check_enabled', '_nsfw_check_image_ref', '_nsfw_record_passes',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_nsfw_checked_role_record',
+    '_get_reply_prefix', '_prefix_outgoing_message', '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_reply_text', '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
