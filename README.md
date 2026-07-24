@@ -37,3 +37,8 @@ bot 会返回插件帮助图，按帮助图里的说明使用即可。
 
 - 本项目仅供学习使用，请勿用于商业用途。
 - 本项目采用 **GNU General Public License v3.0（GPLv3）** 开源。你可以使用、修改和分发，但需保留许可证与版权声明；分发修改版时按 GPLv3 继续开放对应源码。
+
+  
+## 致谢
+> 感谢[An](https://github.com/An-Sun110) 提供的老婆图库服务器
+> 感谢[CWalkene](https://github.com/CWalkene) 插件修改建议
