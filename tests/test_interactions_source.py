@@ -133,5 +133,11 @@ class InteractionSourceTests(unittest.TestCase):
         self.assertIn('clear_pending_gifts_for_user(', divorce_source)
 
 
+    def test_rob_rejects_when_robber_already_has_active_item(self) -> None:
+        rob_source = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
+        self.assertIn('robber_data = context[bucket].get(robber_id)', rob_source)
+        self.assertIn("f'你今天已经有{title}了，先离婚再抢吧~'", rob_source)
+
+
 if __name__ == '__main__':
     unittest.main()

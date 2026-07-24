@@ -128,16 +128,16 @@
         "need_admin": false
       },
       {
-        "name": "老婆离婚",
-        "desc": "主动放弃今天的老婆，不触发补偿",
-        "eg": "老婆离婚",
+        "name": "离婚",
+        "desc": "结束今天全部婚姻关系（老婆/老公/萝莉/异环/战双），不触发补偿",
+        "eg": "离婚",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
         "name": "老公离婚",
-        "desc": "主动放弃今天的老公",
+        "desc": "同「离婚」，结束今天全部婚姻关系",
         "eg": "老公离婚",
         "need_ck": false,
         "need_sk": false,
@@ -198,7 +198,7 @@
       },
       {
         "name": "萝莉离婚",
-        "desc": "主动放弃今天的萝莉",
+        "desc": "同「离婚」，结束今天全部婚姻关系",
         "eg": "萝莉离婚",
         "need_ck": false,
         "need_sk": false,

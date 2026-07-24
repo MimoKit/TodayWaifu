@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from PIL import Image
 from gsuid_core.help.draw_new_plugin_help import get_new_help
 
 from ..daily_wife_config import DailyWifeShowConfig

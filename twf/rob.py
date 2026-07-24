@@ -107,6 +107,14 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if not _has_active_wife(target_data):
         return await _send_prefixed(bot, f'对方今天还没有{title}呢~', kind=kind)
 
+    robber_data = context[bucket].get(robber_id)
+    if _has_active_wife(robber_data):
+        return await _send_prefixed(
+            bot,
+            f'你今天已经有{title}了，先离婚再抢吧~',
+            kind=kind,
+        )
+
     attempts = context.setdefault('rob_attempts', {})
     is_master = _is_master(ev)
     attempt_key = _rob_attempt_key(kind, robber_id)
