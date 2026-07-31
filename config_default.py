@@ -35,13 +35,13 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeGalleryApiUrl': GsStrConfig(
         '图库接口地址',
-        '图库角色立绘接口地址，默认使用 https://img.xlinxc.cn/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
-        'https://img.xlinxc.cn/api/xwuid/roles',
+        '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
+        'https://img.mimokit.dpdns.org/api/xwuid/roles',
     ),
     'DailyWifeLoliApiUrl': GsStrConfig(
         '今日萝莉接口地址',
         'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
-        'https://loli.xlinxc.cn',
+        'https://loli.mimokit.dpdns.org',
     ),
     'DailyWifeOfficialCnbApiBase': GsStrConfig(
         '官方机器人 CNB API 地址',
