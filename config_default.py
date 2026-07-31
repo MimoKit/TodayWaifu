@@ -91,19 +91,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 角色名，{role_id} 文件夹名称',
         '你今天的战双老婆是{name}。',
     ),
-    '_DividerNsfwCheck': GsDivider('NSFW 检测', ''),
-    'DailyWifeNsfwCheckEnabled': GsBoolConfig(
-        '启用 NSFW 检测',
-        '开启后发送今日老婆/老公图片前会调用检测服务；未通过的图片会静默重抽，不直接发出。默认关闭',
-        False,
-    ),
-    'DailyWifeNsfwCheckUrl': GsStrConfig(
-        'NSFW 检测地址',
-        '检测服务地址。可填服务根地址，也可填完整 /check/upload；如需鉴权可按检测服务要求配置查询参数',
-        '',
-        secret=True,
-    ),
-
     '_DividerBasicReply': GsDivider('基础回复设置', ''),
     'DailyWifeSendText': GsBoolConfig(
         '发送文字说明',
