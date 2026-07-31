@@ -81,7 +81,7 @@ gsuid_core/data/TodayWaifu/pgr_wife/角色名/图片文件
 | 本地角色图片目录 | 空 | 本地模式生效，留空自动查找 XWUID 目录 |
 | 角色 ID 对照表路径 | 空 | 留空使用内置 `wife_role_id_map.txt` |
 | 图库接口地址 | 默认指向官方图库 | 图库模式生效，可在控制台自行更换 |
-| 今日萝莉接口地址 | `https://loli.xlinxc.cn` | GET 直接返回随机图片 |
+| 今日萝莉接口地址 | `https://loli.mimokit.dpdns.org` | GET 直接返回随机图片 |
 | 官方机器人 CNB API 地址 | `https://api.cnb.cool` | QQ 官方机器人结果图直传使用的 CNB API 根地址 |
 | 官方机器人 CNB 公共地址 | `https://cnb.cool` | 上传完成后用于组合公开图片 URL |
 | 官方机器人 CNB 仓库 | 空 | 接收结果图片的 CNB 仓库，格式为 `组织名/仓库名` |
