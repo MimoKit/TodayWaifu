@@ -118,18 +118,14 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
         return None
     current = _stored_pgr_record(current_raw)
     if current is not None:
-        if await _nsfw_record_passes(current):
-            return current
-        context[bucket].pop(key, None)
-        _save_wife_data(data)
+        return current
 
     candidates = _load_pgr_wife_candidates()
     if not candidates:
         return None
-    chosen = await _pick_nsfw_checked_role_record(
+    chosen = _pick_role_record(
         candidates,
         _daily_rng(ev, key, 'pgr_wife'),
-        'pgr',
     )
     if chosen is None:
         return None
@@ -213,7 +209,7 @@ async def _send_daily_pgr_wife(
                     f'战双老婆图库中没有角色【{specified_name}】。',
                     kind='pgr',
                 )
-        record = await _pick_nsfw_checked_role_record(candidates, random, 'pgr')
+        record = _pick_role_record(candidates, random)
     else:
         record = await _ensure_daily_pgr_wife_record(ev)
     if record is None:

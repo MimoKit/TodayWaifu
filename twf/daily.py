@@ -49,21 +49,13 @@ async def _ensure_daily_wife_record(
             return None
         record = _record_from_dict(current)
         if record is not None:
-            if not await _nsfw_record_passes(record):
-                logger.info(f'{LOG_PREFIX} 已有 {mode} 记录未通过 NSFW 检测，静默替换: {record.name}')
-                context[bucket].pop(key, None)
-                _save_wife_data(data)
-            else:
-                logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
-                return record
+            logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
+            return record
 
     # 准备阶段：含 await，先不持有待写入的 data，避免覆盖期间其它协程的写入
     chosen: WifeRecord | None = None
     if mode == 'wife':
         chosen = await _roll_group_member_wife(ev, key)
-        if chosen is not None and not await _nsfw_record_passes(chosen):
-            logger.info(f'{LOG_PREFIX} 群友老婆未通过 NSFW 检测，改抽角色: {chosen.name}')
-            chosen = None
 
     if chosen is None:
         rng = _daily_rng(ev, key, salt)
@@ -75,9 +67,9 @@ async def _ensure_daily_wife_record(
         if not candidates:
             logger.warning(f'{LOG_PREFIX} 过滤后没有可用的 {mode} 角色')
             return None
-        chosen = await _pick_nsfw_checked_role_record(candidates, rng, mode)
+        chosen = _pick_role_record(candidates, rng)
         if chosen is None:
-            logger.warning(f'{LOG_PREFIX} 没有通过 NSFW 检测的 {mode} 角色图片')
+            logger.warning(f'{LOG_PREFIX} 没有可用的 {mode} 角色图片')
             return None
 
     # 写入阶段：重新加载并二次校验，整段不含 await，事件循环下保证原子
@@ -275,13 +267,8 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             if isinstance(safe_record, dict):
                 safe_wife = _record_from_dict(safe_record)
                 if safe_wife is not None:
-                    if not await _nsfw_record_passes(safe_wife):
-                        logger.info(f'{LOG_PREFIX} 已有补偿老婆未通过 NSFW 检测，静默替换: {safe_wife.name}')
-                        context['safe_wives'].pop(user_key, None)
-                        _save_wife_data(data)
-                    else:
-                        logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {safe_wife.name}')
-                        return await _send_record_image(bot, safe_wife, mode, ev.user_id, ev.group_id is not None)
+                    logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {safe_wife.name}')
+                    return await _send_record_image(bot, safe_wife, mode, ev.user_id, ev.group_id is not None)
 
             # 未抽过补偿老婆：抽一个，写入 safe_wives
             wife_name = current_record.get('name', '老婆')
@@ -293,9 +280,9 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                 return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
             rng = _daily_rng(ev, user_key, f'{mode}_safe')
             candidates = _filter_by_mode(candidates, mode)
-            safe_wife = await _pick_nsfw_checked_role_record(candidates, rng, mode)
+            safe_wife = _pick_role_record(candidates, rng)
             if safe_wife is None:
-                logger.warning(f'{LOG_PREFIX} 补偿抽取没有通过 NSFW 检测的图片')
+                logger.warning(f'{LOG_PREFIX} 补偿抽取没有可用图片')
                 return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
             context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
             context['safe_wives'][user_key]['safe'] = True
@@ -362,12 +349,12 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                     kind=mode,
                 )
             candidates = tuple(target_candidates)
-            record = await _pick_nsfw_checked_role_record(candidates, random, mode)
+            record = _pick_role_record(candidates, random)
         elif record is None:
             candidates = _filter_by_mode(candidates, mode)
-            record = await _pick_nsfw_checked_role_record(candidates, random, mode)
+            record = _pick_role_record(candidates, random)
         if record is None:
-            logger.warning(f'{LOG_PREFIX} Debug 抽取没有通过 NSFW 检测的图片')
+            logger.warning(f'{LOG_PREFIX} Debug 抽取没有可用图片')
             return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
     else:
         record = await _ensure_daily_wife_record(ev, mode=mode)
@@ -445,9 +432,9 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     if role is None:
         return await _send_prefixed(bot, f'未找到名为“{role_name}”的老婆角色。')
 
-    record = await _pick_nsfw_checked_role_record((role,), random, 'wife')
+    record = _pick_role_record((role,), random)
     if record is None:
-        logger.warning(f'{LOG_PREFIX} 主人分配老婆未找到通过 NSFW 检测的图片: {role.name}')
+        logger.warning(f'{LOG_PREFIX} 主人分配老婆未找到可用图片: {role.name}')
         return await _send_prefixed(bot, f'未找到“{role.name}”可用的老婆图片。')
     image = record.image
     target_key = str(target_user_id)

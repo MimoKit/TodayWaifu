@@ -138,7 +138,7 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('_pgr_candidates_by_name(candidates, specified_name)', function)
         self.assertIn('只有机器人主人或指定老婆白名单用户', function)
         self.assertIn('战双老婆图库中没有角色', function)
-        self.assertIn("_pick_nsfw_checked_role_record(candidates, random, 'pgr')", function)
+        self.assertIn('_pick_role_record(candidates, random)', function)
         self.assertIn('else:\n        record = await _ensure_daily_pgr_wife_record(ev)', function)
 
     def test_pgr_prefix_passes_specified_name(self) -> None:
