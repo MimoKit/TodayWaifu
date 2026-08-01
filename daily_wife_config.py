@@ -25,6 +25,24 @@ DailyWifeConfig = StringConfig(
     CONFIG_DEFAULT,
 )
 
+_LEGACY_DEFAULT_URLS = {
+    'DailyWifeGalleryApiUrl': (
+        'https://img.xlinxc.cn/api/xwuid/roles',
+        'https://img.mimokit.dpdns.org/api/xwuid/roles',
+    ),
+    'DailyWifeLoliApiUrl': (
+        'https://loli.xlinxc.cn',
+        'https://loli.mimokit.dpdns.org',
+    ),
+}
+_config_changed = False
+for _key, (_old_url, _new_url) in _LEGACY_DEFAULT_URLS.items():
+    if DailyWifeConfig.config[_key].data == _old_url:
+        DailyWifeConfig.config[_key].data = _new_url
+        _config_changed = True
+if _config_changed:
+    DailyWifeConfig.write_config()
+
 DailyWifeShowConfig = StringConfig(
     '今日老婆外观配置',
     get_res_path('TodayWaifu') / 'show_config.json',
