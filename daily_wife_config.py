@@ -25,23 +25,19 @@ DailyWifeConfig = StringConfig(
     CONFIG_DEFAULT,
 )
 
-_LEGACY_DEFAULT_URLS = {
-    'DailyWifeGalleryApiUrl': (
-        'https://img.xlinxc.cn/api/xwuid/roles',
-        'https://img.mimokit.dpdns.org/api/xwuid/roles',
-    ),
-    'DailyWifeLoliApiUrl': (
-        'https://loli.xlinxc.cn',
-        'https://loli.mimokit.dpdns.org',
-    ),
+_FORCED_URL_MIGRATION_MARKER = CONFIG_PATH.parent / '.remote_urls_v2_migrated'
+_FORCED_REMOTE_URLS = {
+    'DailyWifeGalleryApiUrl': 'https://img.mimokit.dpdns.org/api/xwuid/roles',
+    'DailyWifeLoliApiUrl': 'https://loli.mimokit.dpdns.org',
 }
-_config_changed = False
-for _key, (_old_url, _new_url) in _LEGACY_DEFAULT_URLS.items():
-    if DailyWifeConfig.config[_key].data == _old_url:
-        DailyWifeConfig.config[_key].data = _new_url
-        _config_changed = True
-if _config_changed:
+if not _FORCED_URL_MIGRATION_MARKER.is_file():
+    for _key, _url in _FORCED_REMOTE_URLS.items():
+        DailyWifeConfig.config[_key].data = _url
     DailyWifeConfig.write_config()
+    try:
+        _FORCED_URL_MIGRATION_MARKER.touch()
+    except OSError:
+        pass
 
 DailyWifeShowConfig = StringConfig(
     '今日老婆外观配置',
