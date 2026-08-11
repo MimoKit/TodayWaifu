@@ -113,7 +113,7 @@ __all__ = [
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
     '_get_other_daily_wife_name',
     '_get_today_context',
-    '_has_active_wife', '_http_get', '_husband_available', '_husband_enabled',
+    '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
@@ -958,12 +958,42 @@ def _http_get(url: str, *, timeout: int = 15) -> bytes:
         return resp.read()
 
 
+def _http_get_with_retry(
+    url: str,
+    *,
+    timeout: int = 15,
+    retries: int = 3,
+    delay: float = 5,
+) -> bytes:
+    """请求远程图库接口，失败或超时时重试 `retries` 次，每次间隔 `delay` 秒。
+
+    401 属于认证错误，重试无意义，直接抛出。
+    """
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return _http_get(url, timeout=timeout)
+        except HTTPError as exc:
+            if exc.code == 401:
+                raise
+            last_exc = exc
+        except (URLError, TimeoutError, OSError) as exc:
+            last_exc = exc
+        if attempt < retries:
+            logger.warning(
+                f'{LOG_PREFIX} 请求远程图库失败(第{attempt + 1}/{retries}次重试): {url}，'
+                f'{int(delay)} 秒后重试: {last_exc}'
+            )
+            time.sleep(delay)
+    raise last_exc  # type: ignore[misc]
+
+
 def _fetch_gallery_payload_sync() -> dict[str, Any]:
     api_url = _gallery_api_url()
     if not api_url:
         raise RuntimeError('未配置图库接口地址。')
     try:
-        body = _http_get(api_url, timeout=15)
+        body = _http_get_with_retry(api_url, timeout=15)
     except HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError('图库账号或密码不正确，接口返回 401。') from exc
@@ -1024,7 +1054,7 @@ def _parse_role_candidates(
 
 def _download_image_sync(url: str) -> bytes:
     try:
-        return _http_get(url, timeout=20)
+        return _http_get_with_retry(url, timeout=20)
     except HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError('图库账号或密码不正确，图片返回 401。') from exc
@@ -1038,6 +1068,22 @@ def _download_image_sync(url: str) -> bytes:
 async def _download_image(url: str) -> bytes:
     return await asyncio.to_thread(_download_image_sync, url)
 
+
+
+async def _fallback_to_local_candidates(
+    role_mode: str,
+    custom_candidates: tuple[RoleCandidate, ...],
+    fallback_error: str,
+) -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    """图库接口失败后的兜底：优先回退本地图片目录，其次使用本地上传候选。"""
+    local_candidates, local_error = await asyncio.to_thread(_load_local_candidates, role_mode)
+    if local_candidates:
+        logger.warning(f'{LOG_PREFIX} 图库接口不可用，已回退本地图片目录。')
+        return local_candidates, None
+    if custom_candidates:
+        logger.warning(f'{LOG_PREFIX} 图库接口不可用，已回退本地上传候选。')
+        return custom_candidates, None
+    return None, local_error or fallback_error
 
 
 async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
@@ -1069,16 +1115,18 @@ async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate
         candidates = _merge_role_candidates(candidates, custom_candidates)
     except RuntimeError as exc:
         logger.warning(f'{LOG_PREFIX} 读取图库接口失败: {exc}')
-        if custom_candidates:
-            CANDIDATE_CACHE[cache_key] = (now, custom_candidates)
-            return custom_candidates, None
-        return None, str(exc)
+        candidates, error = await _fallback_to_local_candidates(role_mode, custom_candidates, str(exc))
+        if error or not candidates:
+            return None, error
+        CANDIDATE_CACHE[cache_key] = (now, candidates)
+        return candidates, None
     except Exception as exc:
         logger.warning(f'{LOG_PREFIX} 读取图库接口异常: {exc}')
-        if custom_candidates:
-            CANDIDATE_CACHE[cache_key] = (now, custom_candidates)
-            return custom_candidates, None
-        return None, '读取图库接口失败。'
+        candidates, error = await _fallback_to_local_candidates(role_mode, custom_candidates, '读取图库接口失败。')
+        if error or not candidates:
+            return None, error
+        CANDIDATE_CACHE[cache_key] = (now, candidates)
+        return candidates, None
 
     if not candidates:
         return None, '图库接口里没有找到可用的角色立绘。'
@@ -1705,6 +1753,24 @@ def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord
 
 
 
+async def _find_local_role_image(role: RoleCandidate, kind: str) -> str | None:
+    """图库图片下载失败时，尝试从本地图片目录为该角色找一张图。"""
+    try:
+        candidates, error = await asyncio.to_thread(_load_local_candidates, kind)
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} 回退本地图片失败: {exc}')
+        return None
+    if error or not candidates:
+        logger.warning(f'{LOG_PREFIX} 回退本地图片失败: {error}')
+        return None
+    role_ids = set(role.role_ids)
+    for candidate in candidates:
+        if candidate.name == role.name or (role_ids & set(candidate.role_ids)):
+            if candidate.images:
+                return candidate.images[0]
+    return None
+
+
 async def _send_role_image(
     bot: Bot,
     role: RoleCandidate,
@@ -1720,8 +1786,13 @@ async def _send_role_image(
             image: Any = await _download_image(image_url)
         except RuntimeError as exc:
             logger.warning(f'{LOG_PREFIX} 下载图库图片失败: {exc}')
-            await _send_prefixed(bot, str(exc), kind=kind)
-            return
+            local_image = await _find_local_role_image(role, kind)
+            if local_image is not None:
+                logger.warning(f'{LOG_PREFIX} 已回退本地图片: {local_image}')
+                image = Path(local_image)
+            else:
+                await _send_prefixed(bot, str(exc), kind=kind)
+                return
     else:
         if not Path(image_url).is_file():
             logger.warning(f'{LOG_PREFIX} 本地图片不存在: {image_url}')

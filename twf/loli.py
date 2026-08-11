@@ -129,27 +129,28 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
     if custom_url:
         logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，接口: {custom_url}')
         try:
-            data = await asyncio.to_thread(lambda: _http_get(custom_url, timeout=15))
-        except Exception:
-            return await _send_loli_text(bot, '暂无图片')
-        record = WifeRecord(
-            name='萝莉',
-            role_ids=('接口',),
-            image=custom_url,
-            record_type='loli',
-        )
-        save_data = _load_wife_data()
-        save_context = _get_today_context(save_data, ev)
-        save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-        _save_wife_data(save_data)
-        await _send_loli_result_image(
-            bot,
-            data,
-            '你今天的萝莉是',
-            ev.user_id,
-            ev.group_id is not None,
-        )
-        return
+            data = await asyncio.to_thread(lambda: _http_get_with_retry(custom_url, timeout=15))
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} 远程萝莉接口失败，回退本地图片: {exc}')
+        else:
+            record = WifeRecord(
+                name='萝莉',
+                role_ids=('接口',),
+                image=custom_url,
+                record_type='loli',
+            )
+            save_data = _load_wife_data()
+            save_context = _get_today_context(save_data, ev)
+            save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
+            _save_wife_data(save_data)
+            await _send_loli_result_image(
+                bot,
+                data,
+                '你今天的萝莉是',
+                ev.user_id,
+                ev.group_id is not None,
+            )
+            return
 
     images = _loli_image_paths()
     if not images:
