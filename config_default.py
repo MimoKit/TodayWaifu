@@ -40,7 +40,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeLoliApiUrl': GsStrConfig(
         '今日萝莉接口地址',
-        'GET 后直接返回图片内容的接口地址，留空则改用本地萝莉图库',
+        'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库',
         'https://loli.mimokit.dpdns.org',
     ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(

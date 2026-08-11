@@ -91,6 +91,128 @@ def _loli_record_name(image: str) -> str:
     return f'萝莉图{_loli_image_hash_id(image)}'
 
 
+def _parse_loli_image_urls(payload: dict[str, Any]) -> tuple[str, ...]:
+    if 'roles' not in payload or not isinstance(payload['roles'], list):
+        raise RuntimeError('萝莉图库接口缺少 roles 列表。')
+
+    loli_role_found = False
+    image_urls: list[str] = []
+    seen_urls: set[str] = set()
+    for role_data in payload['roles']:
+        if not isinstance(role_data, dict):
+            raise RuntimeError('萝莉图库接口的 roles 项必须是对象。')
+        if 'role_ids' not in role_data or not isinstance(role_data['role_ids'], list):
+            raise RuntimeError('萝莉图库接口的 role_ids 必须是列表。')
+
+        role_ids = tuple(str(role_id).strip() for role_id in role_data['role_ids'])
+        if 'loli' not in role_ids:
+            continue
+        loli_role_found = True
+
+        if 'images' not in role_data or not isinstance(role_data['images'], list):
+            raise RuntimeError('萝莉图库接口的 images 必须是列表。')
+        for image_data in role_data['images']:
+            if not isinstance(image_data, dict):
+                raise RuntimeError('萝莉图库接口的 images 项必须是对象。')
+            if 'url' not in image_data or not isinstance(image_data['url'], str):
+                raise RuntimeError('萝莉图库接口的图片缺少 url 字符串。')
+            image_url = image_data['url'].strip()
+            if not image_url.startswith(('http://', 'https://')):
+                raise RuntimeError('萝莉图库接口返回了无效的图片 URL。')
+            if image_url not in seen_urls:
+                seen_urls.add(image_url)
+                image_urls.append(image_url)
+
+    if not loli_role_found:
+        raise RuntimeError('萝莉图库接口缺少 role_ids=["loli"] 的角色项。')
+    if not image_urls:
+        raise RuntimeError('萝莉图库接口没有可用图片。')
+    return tuple(image_urls)
+
+
+def _fetch_loli_image_urls_sync(api_url: str) -> tuple[str, ...]:
+    try:
+        body = _http_get_with_retry(api_url, timeout=15)
+    except HTTPError as exc:
+        raise RuntimeError(f'请求萝莉图库接口失败，HTTP {exc.code}。') from exc
+    except URLError as exc:
+        raise RuntimeError(f'请求萝莉图库接口失败：{exc.reason}') from exc
+    except TimeoutError as exc:
+        raise RuntimeError('请求萝莉图库接口超时。') from exc
+    except OSError as exc:
+        raise RuntimeError(f'请求萝莉图库接口失败：{exc}') from exc
+
+    try:
+        payload = json.loads(body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError('萝莉图库接口返回内容不是有效 JSON。') from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError('萝莉图库接口返回格式不正确。')
+    return _parse_loli_image_urls(payload)
+
+
+def _is_legacy_remote_loli_record(record: WifeRecord) -> bool:
+    return record.record_type == 'loli' and record.role_ids == ('接口',)
+
+
+def _loli_unavailable_text(record_data: dict[str, Any]) -> str | None:
+    state = _wife_state(record_data)
+    if state == 'lost_stolen':
+        robber = record_data['stolen_by'] if 'stolen_by' in record_data else ''
+        if 'stolen_by_name' in record_data and record_data['stolen_by_name']:
+            robber = record_data['stolen_by_name']
+        return f'你的萝莉已经被{robber}抢走了，今天就先忍忍吧~'
+    if state == 'lost_gifted':
+        receiver = record_data['gifted_to'] if 'gifted_to' in record_data else ''
+        if 'gifted_to_name' in record_data and record_data['gifted_to_name']:
+            receiver = record_data['gifted_to_name']
+        return f'你的萝莉已经送给{receiver}了，今天就先忍忍吧~'
+    if state == 'divorced':
+        return '你今天已经和萝莉离婚了，明天再来吧~'
+    return None
+
+
+async def _roll_loli_record(
+    ev: Event,
+    user_key: str,
+) -> tuple[WifeRecord | None, str | None]:
+    custom_url = str(_cfg('DailyWifeLoliApiUrl') or '').strip()
+    remote_error: str | None = None
+    if custom_url:
+        logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉列表，接口: {custom_url}')
+        try:
+            image_urls = await asyncio.to_thread(_fetch_loli_image_urls_sync, custom_url)
+        except RuntimeError as exc:
+            remote_error = str(exc)
+            logger.warning(f'{LOG_PREFIX} 远程萝莉接口失败，回退本地图片: {exc}')
+        else:
+            image_url = _daily_rng(ev, user_key, 'loli').choice(image_urls)
+            return (
+                WifeRecord(
+                    name=_loli_record_name(image_url),
+                    role_ids=('loli',),
+                    image=image_url,
+                    record_type='loli',
+                ),
+                None,
+            )
+
+    images = _loli_image_paths()
+    if not images:
+        return None, remote_error or '暂无图片'
+    image = _daily_rng(ev, user_key, 'loli').choice(images)
+    logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，选中本地图片: {image}')
+    return (
+        WifeRecord(
+            name=_loli_record_name(str(image)),
+            role_ids=(_loli_image_hash_id(image),),
+            image=str(image),
+            record_type='loli',
+        ),
+        None,
+    )
+
+
 async def _send_loli_record(
     bot: Bot,
     ev: Event,
@@ -110,62 +232,51 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
     data = _load_wife_data()
     context = _get_today_context(data, ev)
     user_key = _user_key(ev)
-    current = context['lolis'].get(user_key)
+    current = context['lolis'][user_key] if user_key in context['lolis'] else None
     if isinstance(current, dict):
-        state = _wife_state(current)
-        if state == 'lost_stolen':
-            stolen_by_name = current.get('stolen_by_name') or current.get('stolen_by')
-            return await _send_loli_text(bot, f'你的萝莉已经被{stolen_by_name}抢走了，今天就先忍忍吧~')
-        if state == 'lost_gifted':
-            gifted_to_name = current.get('gifted_to_name') or current.get('gifted_to')
-            return await _send_loli_text(bot, f'你的萝莉已经送给{gifted_to_name}了，今天就先忍忍吧~')
-        if state == 'divorced':
-            return await _send_loli_text(bot, '你今天已经和萝莉离婚了，明天再来吧~')
+        unavailable_text = _loli_unavailable_text(current)
+        if unavailable_text is not None:
+            return await _send_loli_text(bot, unavailable_text)
         record = _record_from_dict(current)
-        if record is not None:
+        if record is not None and not _is_legacy_remote_loli_record(record):
             return await _send_loli_record(bot, ev, record)
-
-    custom_url = str(_cfg('DailyWifeLoliApiUrl') or '').strip()
-    if custom_url:
-        logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，接口: {custom_url}')
-        try:
-            data = await asyncio.to_thread(lambda: _http_get_with_retry(custom_url, timeout=15))
-        except Exception as exc:
-            logger.warning(f'{LOG_PREFIX} 远程萝莉接口失败，回退本地图片: {exc}')
-        else:
-            record = WifeRecord(
-                name='萝莉',
-                role_ids=('接口',),
-                image=custom_url,
-                record_type='loli',
+        if record is not None:
+            logger.warning(
+                f'{LOG_PREFIX} 用户 {user_key} 的旧版萝莉记录只保存了随机接口地址，'
+                '将迁移为当天固定图片 URL'
             )
-            save_data = _load_wife_data()
-            save_context = _get_today_context(save_data, ev)
-            save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-            _save_wife_data(save_data)
-            await _send_loli_result_image(
-                bot,
-                data,
-                '你今天的萝莉是',
-                ev.user_id,
-                ev.group_id is not None,
-            )
-            return
 
-    images = _loli_image_paths()
-    if not images:
-        return await _send_loli_text(bot, '暂无图片')
-    image = random.choice(images)
-    logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉，发送本地图片: {image}')
-    record = WifeRecord(
-        name=_loli_record_name(str(image)),
-        role_ids=(_loli_image_hash_id(image),),
-        image=str(image),
-        record_type='loli',
-    )
+    record, error = await _roll_loli_record(ev, user_key)
+    if record is None:
+        return await _send_loli_text(bot, error or '暂无图片')
+
+    # 网络请求期间可能有其它协程完成写入，因此保存前重新加载并复用最新记录。
     save_data = _load_wife_data()
     save_context = _get_today_context(save_data, ev)
-    save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
+    existing = (
+        save_context['lolis'][user_key]
+        if user_key in save_context['lolis']
+        else None
+    )
+    if isinstance(existing, dict):
+        unavailable_text = _loli_unavailable_text(existing)
+        if unavailable_text is not None:
+            return await _send_loli_text(bot, unavailable_text)
+        existing_record = _record_from_dict(existing)
+        if (
+            existing_record is not None
+            and not _is_legacy_remote_loli_record(existing_record)
+        ):
+            return await _send_loli_record(bot, ev, existing_record)
+        if existing_record is not None:
+            # 仅更新记录本体，保留 stolen_from / gifted_from 等来源状态。
+            replacement = _record_to_dict(record, ev, user_key)
+            for key in ('name', 'role_ids', 'image', 'record_type', 'updated_at'):
+                existing[key] = replacement[key]
+        else:
+            save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
+    else:
+        save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
     _save_wife_data(save_data)
     await _send_loli_record(bot, ev, record)
 
