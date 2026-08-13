@@ -13,7 +13,7 @@ from .shared import *  # noqa: F403
 _HELP_JSON_PATH = BASE_DIR / 'help.json'
 _TEXTURE_DIR = BASE_DIR / 'texture2d'
 _BANNER_BG_PATH = BASE_DIR / 'fb93f5370f556a51db172863420aa50e.png'
-_BG_PATH = _TEXTURE_DIR / 'bg.jpg'
+_BG_PATH = _TEXTURE_DIR / 'bj.jpg'
 _ICON_PATH = _TEXTURE_DIR / 'icons'
 
 
