@@ -12,6 +12,7 @@ from .shared import (
     _cfg_bool,
     _cfg_probability,
     _daily_bucket_name,
+    _daily_data_lock,
     _daily_item_title,
     _daily_kind_metadata,
     _get_event_target_user_id,
@@ -90,55 +91,63 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if target_user_id == robber_id:
         return await _send_prefixed(bot, f'自己抢自己的{title}也太奇怪了吧！', kind=kind)
 
-    target_record = _get_existing_daily_record(ev, target_user_id, kind)
+    target_record = await _get_existing_daily_record(ev, target_user_id, kind)
     if target_record is None:
         return await _send_prefixed(bot, f'对方今天还没有{title}呢~', kind=kind)
 
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    bucket = _daily_bucket_name(kind)
-    target_key = _user_key(ev, target_user_id)
-    target_data = context[bucket].get(target_key)
+    # 读-改-写全程持锁：校验、记次数、转移归属、落库串行执行，替代旧的"无 await"原子段
+    refusal: str | None = None
+    rob_failed = False
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        bucket = _daily_bucket_name(kind)
+        target_key = _user_key(ev, target_user_id)
+        target_data = context[bucket].get(target_key)
 
-    if _wife_state(target_data) != 'owned':
-        return await _send_prefixed(bot, f'对方的{title}已经不在身边了，抢不到了哦~', kind=kind)
-    if _is_secondhand_wife(target_data):
-        return await _send_prefixed(bot, f'对方这个{title}是抢来或别人送的，抢不动哦~', kind=kind)
-    if not _has_active_wife(target_data):
-        return await _send_prefixed(bot, f'对方今天还没有{title}呢~', kind=kind)
+        if _wife_state(target_data) != 'owned':
+            refusal = f'对方的{title}已经不在身边了，抢不到了哦~'
+        elif _is_secondhand_wife(target_data):
+            refusal = f'对方这个{title}是抢来或别人送的，抢不动哦~'
+        elif not _has_active_wife(target_data):
+            refusal = f'对方今天还没有{title}呢~'
 
-    robber_data = context[bucket].get(robber_id)
-    if _has_active_wife(robber_data):
-        return await _send_prefixed(
-            bot,
-            f'你今天已经有{title}了，先离婚再抢吧~',
-            kind=kind,
-        )
+        if refusal is None:
+            robber_data = context[bucket].get(robber_id)
+            if _has_active_wife(robber_data):
+                refusal = f'你今天已经有{title}了，先离婚再抢吧~'
 
-    attempts = context.setdefault('rob_attempts', {})
-    is_master = _is_master(ev)
-    attempt_key = _rob_attempt_key(kind, robber_id)
-    if not is_master and (attempts.get(attempt_key) or (kind == 'wife' and attempts.get(robber_id))):
-        logger.info(f'{LOG_PREFIX} 用户 {robber_id} 今天抢{title}次数已用尽')
-        return await _send_prefixed(bot, f'今天已经抢过{title}啦，明天再来吧！', kind=kind)
+        if refusal is None:
+            attempts = context.setdefault('rob_attempts', {})
+            is_master = _is_master(ev)
+            attempt_key = _rob_attempt_key(kind, robber_id)
+            if not is_master and (attempts.get(attempt_key) or (kind == 'wife' and attempts.get(robber_id))):
+                logger.info(f'{LOG_PREFIX} 用户 {robber_id} 今天抢{title}次数已用尽')
+                refusal = f'今天已经抢过{title}啦，明天再来吧！'
 
-    if not is_master:
-        attempts[attempt_key] = True
+        if refusal is None:
+            if not is_master:
+                attempts[attempt_key] = True
 
-    if random.random() >= _rob_success_rate(kind):
-        logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的{title}失败')
-        _save_wife_data(data)
+            if random.random() >= _rob_success_rate(kind):
+                logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的{title}失败')
+                rob_failed = True
+                await _save_wife_data(data)
+            else:
+                logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的{title}')
+                context[bucket][robber_id] = _record_to_dict(target_record, ev, robber_id)
+                context[bucket][robber_id]['stolen_from'] = target_user_id
+
+                if isinstance(context[bucket].get(target_key), dict):
+                    context[bucket][target_key]['stolen_by'] = robber_id
+                    context[bucket][target_key]['stolen_by_name'] = _user_display_name(ev, robber_id)
+
+                await _save_wife_data(data)
+
+    if refusal is not None:
+        return await _send_prefixed(bot, refusal, kind=kind)
+    if rob_failed:
         return await _send_prefixed(bot, f'这次没抢到{title}，下次再试试吧~', kind=kind)
-
-    logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的{title}')
-    context[bucket][robber_id] = _record_to_dict(target_record, ev, robber_id)
-    context[bucket][robber_id]['stolen_from'] = target_user_id
-
-    if isinstance(context[bucket].get(target_key), dict):
-        context[bucket][target_key]['stolen_by'] = robber_id
-        context[bucket][target_key]['stolen_by_name'] = _user_display_name(ev, robber_id)
-
-    _save_wife_data(data)
 
     role = target_record.to_role()
     await _send_rob_result_image(

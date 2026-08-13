@@ -40,7 +40,7 @@ async def _ensure_daily_wife_record(
     key = _user_key(ev, user_id)
 
     # 快速路径：当天已有记录直接返回
-    data = _load_wife_data()
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     current = context[bucket].get(key)
     if isinstance(current, dict):
@@ -72,112 +72,115 @@ async def _ensure_daily_wife_record(
             logger.warning(f'{LOG_PREFIX} 没有可用的 {mode} 角色图片')
             return None
 
-    # 写入阶段：重新加载并二次校验，整段不含 await，事件循环下保证原子
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    existing = context[bucket].get(key)
-    if isinstance(existing, dict):
-        if _wife_state(existing) != 'owned':
-            logger.debug(f'{LOG_PREFIX} 写入前发现已离手的 {mode} 记录，拒绝覆盖')
-            return None
-        existing_record = _record_from_dict(existing)
-        if existing_record is not None:
-            logger.debug(f'{LOG_PREFIX} 写入前发现已有 {mode} 记录，直接复用: {existing_record.name}')
-            return existing_record
+    # 写入阶段：持有 _daily_data_lock 重新加载并二次校验，锁内串行替代旧的"无 await"原子段
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        existing = context[bucket].get(key)
+        if isinstance(existing, dict):
+            if _wife_state(existing) != 'owned':
+                logger.debug(f'{LOG_PREFIX} 写入前发现已离手的 {mode} 记录，拒绝覆盖')
+                return None
+            existing_record = _record_from_dict(existing)
+            if existing_record is not None:
+                logger.debug(f'{LOG_PREFIX} 写入前发现已有 {mode} 记录，直接复用: {existing_record.name}')
+                return existing_record
 
-    logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的 {mode}: {chosen.name}')
-    context[bucket][key] = _record_to_dict(chosen, ev, key)
-    _save_wife_data(data)
+        logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的 {mode}: {chosen.name}')
+        context[bucket][key] = _record_to_dict(chosen, ev, key)
+        await _save_wife_data(data)
     return chosen
 
 
 async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
     bucket = 'husbands' if mode == 'husband' else 'wives'
     title = '老公' if mode == 'husband' else '老婆'
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    wives = context.get(bucket, {})
-    if not isinstance(wives, dict):
-        wives = {}
+    # 列表会回填显示名并写库，整个读-改-写段持有锁，与其它写入串行
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        wives = context.get(bucket, {})
+        if not isinstance(wives, dict):
+            wives = {}
 
-    group_display_names = await _load_group_display_names(ev)
-    data_changed = False
-    items: list[tuple[int, str, str]] = []
-    seen_users: set[str] = set()
-    for user_id, raw_record in wives.items():
-        if not isinstance(raw_record, dict):
-            continue
-        record = _record_from_dict(raw_record)
-        if record is None:
-            continue
-        seen_users.add(user_id)
-        display_name = _valid_display_name(raw_record.get('display_name'), user_id)
-        if not display_name:
-            display_name = group_display_names.get(str(user_id), '')
-            if display_name:
-                raw_record['display_name'] = display_name
-                raw_record['display_name_source'] = 'coreuser'
-                raw_record['display_name_updated_at'] = int(time.time())
-                data_changed = True
-        if not display_name:
-            display_name = str(user_id)
-        updated_at = raw_record.get('updated_at')
-        try:
-            order = int(updated_at)
-        except (TypeError, ValueError):
-            order = 0
-        state = _wife_state(raw_record)
-        # 被抢但有补偿老婆的，留给 safe_wives 循环显示补偿名字，不显示"被抢走了~"
-        if state == 'lost_stolen' and isinstance(context.get('safe_wives', {}).get(user_id), dict):
-            continue
-        if state == 'lost_stolen':
-            wife_name = '被抢走了~'
-        elif state == 'lost_gifted':
-            wife_name = '送出去了~'
-        elif state == 'divorced':
-            wife_name = '离婚了~'
-        else:
-            wife_name = record.name
+        group_display_names = await _load_group_display_names(ev)
+        data_changed = False
+        items: list[tuple[int, str, str]] = []
+        seen_users: set[str] = set()
+        for user_id, raw_record in wives.items():
+            if not isinstance(raw_record, dict):
+                continue
+            record = _record_from_dict(raw_record)
+            if record is None:
+                continue
+            seen_users.add(user_id)
+            display_name = _valid_display_name(raw_record.get('display_name'), user_id)
+            if not display_name:
+                display_name = group_display_names.get(str(user_id), '')
+                if display_name:
+                    raw_record['display_name'] = display_name
+                    raw_record['display_name_source'] = 'coreuser'
+                    raw_record['display_name_updated_at'] = int(time.time())
+                    data_changed = True
+            if not display_name:
+                display_name = str(user_id)
+            updated_at = raw_record.get('updated_at')
+            try:
+                order = int(updated_at)
+            except (TypeError, ValueError):
+                order = 0
+            state = _wife_state(raw_record)
+            # 被抢但有补偿老婆的，留给 safe_wives 循环显示补偿名字，不显示"被抢走了~"
+            if state == 'lost_stolen' and isinstance(context.get('safe_wives', {}).get(user_id), dict):
+                continue
+            if state == 'lost_stolen':
+                wife_name = '被抢走了~'
+            elif state == 'lost_gifted':
+                wife_name = '送出去了~'
+            elif state == 'divorced':
+                wife_name = '离婚了~'
+            else:
+                wife_name = record.name
 
-        items.append((order, display_name, wife_name))
+            items.append((order, display_name, wife_name))
 
-    # 补偿老婆（safe_wives）：被抢后重抽的补偿记录，显示"(补)"后缀
-    if mode == 'wife':
-        safe_wives = context.get('safe_wives', {})
-        if isinstance(safe_wives, dict):
-            for user_id, raw_record in safe_wives.items():
-                if not isinstance(raw_record, dict):
-                    continue
-                record = _record_from_dict(raw_record)
-                if record is None:
-                    continue
-                seen_users.add(user_id)
-                display_name = _valid_display_name(raw_record.get('display_name'), user_id)
-                if not display_name:
-                    display_name = group_display_names.get(str(user_id), '')
-                    if display_name:
-                        raw_record['display_name'] = display_name
-                        raw_record['display_name_source'] = 'coreuser'
-                        raw_record['display_name_updated_at'] = int(time.time())
-                        data_changed = True
-                if not display_name:
-                    display_name = str(user_id)
-                updated_at = raw_record.get('updated_at')
-                try:
-                    order = int(updated_at)
-                except (TypeError, ValueError):
-                    order = 0
-                state = _wife_state(raw_record)
-                if state == 'divorced':
-                    items.append((order, display_name, '离婚了~'))
-                else:
-                    items.append((order, display_name, record.name + '(补)'))
+        # 补偿老婆（safe_wives）：被抢后重抽的补偿记录，显示"(补)"后缀
+        if mode == 'wife':
+            safe_wives = context.get('safe_wives', {})
+            if isinstance(safe_wives, dict):
+                for user_id, raw_record in safe_wives.items():
+                    if not isinstance(raw_record, dict):
+                        continue
+                    record = _record_from_dict(raw_record)
+                    if record is None:
+                        continue
+                    seen_users.add(user_id)
+                    display_name = _valid_display_name(raw_record.get('display_name'), user_id)
+                    if not display_name:
+                        display_name = group_display_names.get(str(user_id), '')
+                        if display_name:
+                            raw_record['display_name'] = display_name
+                            raw_record['display_name_source'] = 'coreuser'
+                            raw_record['display_name_updated_at'] = int(time.time())
+                            data_changed = True
+                    if not display_name:
+                        display_name = str(user_id)
+                    updated_at = raw_record.get('updated_at')
+                    try:
+                        order = int(updated_at)
+                    except (TypeError, ValueError):
+                        order = 0
+                    state = _wife_state(raw_record)
+                    if state == 'divorced':
+                        items.append((order, display_name, '离婚了~'))
+                    else:
+                        items.append((order, display_name, record.name + '(补)'))
 
-    if not items:
-        return f'今天本群还没有可用的{title}记录。', []
+        if not items:
+            return f'今天本群还没有可用的{title}记录。', []
 
-    if data_changed:
-        _save_wife_data(data)
+        if data_changed:
+            await _save_wife_data(data)
 
     items.sort(key=lambda item: (item[0], item[1]))
     return f'今日{title}列表：', items
@@ -244,7 +247,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         )
 
     if not is_transient_draw:
-        other_wife_name = _get_other_daily_wife_name(ev, mode)
+        other_wife_name = await _get_other_daily_wife_name(ev, mode)
         if other_wife_name:
             return await _send_prefixed(
                 bot,
@@ -253,7 +256,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             )
 
     if not is_transient_draw:
-        data = _load_wife_data()
+        data = await _load_wife_data()
         context = _get_today_context(data, ev)
         user_key = _user_key(ev)
         bucket = _daily_bucket_name(mode)
@@ -284,9 +287,32 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             if safe_wife is None:
                 logger.warning(f'{LOG_PREFIX} 补偿抽取没有可用图片')
                 return await _send_prefixed(bot, f'没有找到可用的{title}角色。', kind=mode)
-            context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
-            context['safe_wives'][user_key]['safe'] = True
-            _save_wife_data(data)
+
+            # 候选加载期间可能有其它协程写入，持锁重新加载并复核状态后再落库
+            reused_safe_wife: WifeRecord | None = None
+            state_changed = False
+            async with _daily_data_lock:
+                data = await _load_wife_data()
+                context = _get_today_context(data, ev)
+                current_record = context[bucket].get(user_key)
+                if _wife_state(current_record) != 'lost_stolen':
+                    state_changed = True
+                else:
+                    latest_safe = context['safe_wives'].get(user_key)
+                    if isinstance(latest_safe, dict):
+                        reused_safe_wife = _record_from_dict(latest_safe)
+                    if reused_safe_wife is None:
+                        context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
+                        context['safe_wives'][user_key]['safe'] = True
+                        await _save_wife_data(data)
+
+            if state_changed:
+                # 状态已变化（离婚/赠送等），重走标准流程给出对应提示
+                return await _send_daily_wife(bot, ev, mode, specified_name='')
+            if reused_safe_wife is not None:
+                logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {reused_safe_wife.name}')
+                return await _send_record_image(bot, reused_safe_wife, mode, ev.user_id, ev.group_id is not None)
+
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆被抢，补偿抽取: {safe_wife.name}')
             return await _send_role_image(
                 bot, safe_wife.to_role(), safe_wife.image,
@@ -439,14 +465,15 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     image = record.image
     target_key = str(target_user_id)
 
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    context['wives'][target_key] = _record_to_dict(record, ev, target_key)
-    context['wives'][target_key]['assigned_by'] = _user_key(ev)
-    context['wives'][target_key]['assigned_by_name'] = _user_display_name(ev)
-    if isinstance(context.get('safe_wives'), dict):
-        context['safe_wives'].pop(target_key, None)
-    _save_wife_data(data)
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        context['wives'][target_key] = _record_to_dict(record, ev, target_key)
+        context['wives'][target_key]['assigned_by'] = _user_key(ev)
+        context['wives'][target_key]['assigned_by_name'] = _user_display_name(ev)
+        if isinstance(context.get('safe_wives'), dict):
+            context['safe_wives'].pop(target_key, None)
+        await _save_wife_data(data)
 
     logger.info(
         f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, '

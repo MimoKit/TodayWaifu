@@ -13,16 +13,37 @@ from .image_input import (
 
 # ── 本地图片目录读取 ─────────────────────────────────────────────────────────
 
+# 萝莉图片列表缓存：rglob 全量扫描在图多时是昂贵操作，0 点高峰每条指令都扫会拖垮核心
+_LOLI_PATHS_CACHE_TTL = 300.0
+_loli_paths_cache: tuple[float, tuple[Path, ...]] | None = None
+
+
+def _invalidate_loli_paths_cache() -> None:
+    global _loli_paths_cache
+    _loli_paths_cache = None
+
+
 def _loli_image_paths() -> tuple[Path, ...]:
+    global _loli_paths_cache
+    now = time.time()
+    if _loli_paths_cache is not None and now - _loli_paths_cache[0] < _LOLI_PATHS_CACHE_TTL:
+        return _loli_paths_cache[1]
     root = _loli_image_root()
     if not root.is_dir():
-        return ()
-    images = [
-        path
-        for path in root.rglob('*')
-        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-    ]
-    return tuple(sorted(images, key=lambda p: str(p).lower()))
+        paths: tuple[Path, ...] = ()
+    else:
+        paths = tuple(
+            sorted(
+                (
+                    path
+                    for path in root.rglob('*')
+                    if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+                ),
+                key=lambda p: str(p).lower(),
+            )
+        )
+    _loli_paths_cache = (now, paths)
+    return paths
 
 
 def _delete_loli_images() -> int:
@@ -30,6 +51,7 @@ def _delete_loli_images() -> int:
     count = len(_loli_image_paths())
     if root.exists():
         shutil.rmtree(root) if root.is_dir() else root.unlink()
+    _invalidate_loli_paths_cache()
     return count
 
 
@@ -75,6 +97,7 @@ def _save_loli_image(source: str, index: int) -> Path | None:
     root.mkdir(parents=True, exist_ok=True)
     path = _unique_loli_path(root, suffix, index)
     path.write_bytes(data)
+    _invalidate_loli_paths_cache()
     return path
 
 
@@ -229,7 +252,7 @@ async def _send_loli_record(
 
 
 async def _send_loli_image(bot: Bot, ev: Event) -> None:
-    data = _load_wife_data()
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     user_key = _user_key(ev)
     current = context['lolis'][user_key] if user_key in context['lolis'] else None
@@ -250,34 +273,35 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
     if record is None:
         return await _send_loli_text(bot, error or '暂无图片')
 
-    # 网络请求期间可能有其它协程完成写入，因此保存前重新加载并复用最新记录。
-    save_data = _load_wife_data()
-    save_context = _get_today_context(save_data, ev)
-    existing = (
-        save_context['lolis'][user_key]
-        if user_key in save_context['lolis']
-        else None
-    )
-    if isinstance(existing, dict):
-        unavailable_text = _loli_unavailable_text(existing)
-        if unavailable_text is not None:
-            return await _send_loli_text(bot, unavailable_text)
-        existing_record = _record_from_dict(existing)
-        if (
-            existing_record is not None
-            and not _is_legacy_remote_loli_record(existing_record)
-        ):
-            return await _send_loli_record(bot, ev, existing_record)
-        if existing_record is not None:
-            # 仅更新记录本体，保留 stolen_from / gifted_from 等来源状态。
-            replacement = _record_to_dict(record, ev, user_key)
-            for key in ('name', 'role_ids', 'image', 'record_type', 'updated_at'):
-                existing[key] = replacement[key]
+    # 网络请求期间可能有其它协程完成写入，因此保存前持锁重新加载并复用最新记录。
+    async with _daily_data_lock:
+        save_data = await _load_wife_data()
+        save_context = _get_today_context(save_data, ev)
+        existing = (
+            save_context['lolis'][user_key]
+            if user_key in save_context['lolis']
+            else None
+        )
+        if isinstance(existing, dict):
+            unavailable_text = _loli_unavailable_text(existing)
+            if unavailable_text is not None:
+                return await _send_loli_text(bot, unavailable_text)
+            existing_record = _record_from_dict(existing)
+            if (
+                existing_record is not None
+                and not _is_legacy_remote_loli_record(existing_record)
+            ):
+                return await _send_loli_record(bot, ev, existing_record)
+            if existing_record is not None:
+                # 仅更新记录本体，保留 stolen_from / gifted_from 等来源状态。
+                replacement = _record_to_dict(record, ev, user_key)
+                for key in ('name', 'role_ids', 'image', 'record_type', 'updated_at'):
+                    existing[key] = replacement[key]
+            else:
+                save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
         else:
             save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-    else:
-        save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-    _save_wife_data(save_data)
+        await _save_wife_data(save_data)
     await _send_loli_record(bot, ev, record)
 
 

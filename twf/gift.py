@@ -14,6 +14,7 @@ from .shared import (
     _cfg_bool,
     _context_key,
     _daily_bucket_name,
+    _daily_data_lock,
     _daily_item_title,
     _daily_kind_metadata,
     _get_event_target_user_id,
@@ -24,6 +25,7 @@ from .shared import (
     _husband_unavailable_message,
     _is_secondhand_wife,
     _load_wife_data,
+    _record_from_dict,
     _record_to_dict,
     _save_wife_data,
     _send_daily_result_image,
@@ -129,11 +131,11 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if target_user_id == giver_id:
         return await _send_prefixed(bot, f'不能把{title}送给自己哦！', kind=kind)
 
-    giver_record = _get_existing_daily_record(ev, giver_id, kind)
+    giver_record = await _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
         return await _send_prefixed(bot, f'你今天还没有{title}，先去抽一个吧~', kind=kind)
 
-    data = _load_wife_data()
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     bucket = _daily_bucket_name(kind)
     giver_data = context[bucket].get(giver_id)
@@ -190,7 +192,7 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if not _gift_enabled(kind):
         return await _send_prefixed(bot, f'送{title}功能已关闭，这次赠送已失效。', kind=kind)
 
-    giver_record = _get_existing_daily_record(ev, giver_id, kind)
+    giver_record = await _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
         return await _send_prefixed(
             bot,
@@ -198,36 +200,47 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
             kind=kind,
         )
 
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    bucket = _daily_bucket_name(kind)
-    giver_data = context[bucket].get(giver_id)
+    # 读-改-写持有锁，防止与抢老婆/离婚等并发写入互相覆盖
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        bucket = _daily_bucket_name(kind)
+        giver_data = context[bucket].get(giver_id)
 
-    state = _wife_state(giver_data)
-    if state == 'lost_stolen':
-        return await _send_prefixed(bot, f'对方的{title}已经被抢走了，赠送已失效~', kind=kind)
-    if state == 'lost_gifted':
-        return await _send_prefixed(bot, f'对方已经把{title}送给别人了，赠送已失效~', kind=kind)
-    if state == 'divorced':
-        return await _send_prefixed(bot, f'对方已经和{title}离婚了，赠送已失效~', kind=kind)
-    if _is_secondhand_wife(giver_data):
-        return await _send_prefixed(
-            bot,
-            f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~',
-            kind=kind,
-        )
+        state = _wife_state(giver_data)
+        if state == 'lost_stolen':
+            return await _send_prefixed(bot, f'对方的{title}已经被抢走了，赠送已失效~', kind=kind)
+        if state == 'lost_gifted':
+            return await _send_prefixed(bot, f'对方已经把{title}送给别人了，赠送已失效~', kind=kind)
+        if state == 'divorced':
+            return await _send_prefixed(bot, f'对方已经和{title}离婚了，赠送已失效~', kind=kind)
+        if _is_secondhand_wife(giver_data):
+            return await _send_prefixed(
+                bot,
+                f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~',
+                kind=kind,
+            )
 
-    if _has_active_wife(context[bucket].get(target_user_id)):
-        return await _send_prefixed(bot, f'你现在已经有{title}了，不需要接受赠送啦~', kind=kind)
+        if _has_active_wife(context[bucket].get(target_user_id)):
+            return await _send_prefixed(bot, f'你现在已经有{title}了，不需要接受赠送啦~', kind=kind)
 
-    context[bucket][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
-    context[bucket][target_user_id]['gifted_from'] = giver_id
+        # 以锁内重新读到的记录为准，避免锁外快照过期
+        giver_record = _record_from_dict(giver_data)
+        if giver_record is None:
+            return await _send_prefixed(
+                bot,
+                f'对方现在已经没有{title}可以送给你了，赠送已失效~',
+                kind=kind,
+            )
 
-    if isinstance(context[bucket].get(giver_id), dict):
-        context[bucket][giver_id]['gifted_to'] = target_user_id
-        context[bucket][giver_id]['gifted_to_name'] = _user_display_name(ev, target_user_id)
+        context[bucket][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
+        context[bucket][target_user_id]['gifted_from'] = giver_id
 
-    _save_wife_data(data)
+        if isinstance(context[bucket].get(giver_id), dict):
+            context[bucket][giver_id]['gifted_to'] = target_user_id
+            context[bucket][giver_id]['gifted_to_name'] = _user_display_name(ev, target_user_id)
+
+        await _save_wife_data(data)
 
     role = giver_record.to_role()
     await _send_gift_result_image(

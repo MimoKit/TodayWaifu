@@ -111,7 +111,7 @@ def _stored_pgr_record(raw: Any) -> WifeRecord | None:
 async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     key = _user_key(ev)
     bucket = _daily_bucket_name('pgr')
-    data = _load_wife_data()
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     current_raw = context[bucket].get(key)
     if isinstance(current_raw, dict) and _wife_state(current_raw) != 'owned':
@@ -130,18 +130,19 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     if chosen is None:
         return None
 
-    # await 后重新读取，避免并发命令覆盖已经生成的结果。
-    data = _load_wife_data()
-    context = _get_today_context(data, ev)
-    existing_raw = context[bucket].get(key)
-    if isinstance(existing_raw, dict) and _wife_state(existing_raw) != 'owned':
-        logger.debug(f'{LOG_PREFIX} 写入前发现已离手的战双老婆记录，拒绝覆盖')
-        return None
-    existing = _stored_pgr_record(existing_raw)
-    if existing is not None:
-        return existing
-    context[bucket][key] = _record_to_dict(chosen, ev, key)
-    _save_wife_data(data)
+    # 持有锁重新读取并二次校验，锁内串行替代旧的"无 await"原子段
+    async with _daily_data_lock:
+        data = await _load_wife_data()
+        context = _get_today_context(data, ev)
+        existing_raw = context[bucket].get(key)
+        if isinstance(existing_raw, dict) and _wife_state(existing_raw) != 'owned':
+            logger.debug(f'{LOG_PREFIX} 写入前发现已离手的战双老婆记录，拒绝覆盖')
+            return None
+        existing = _stored_pgr_record(existing_raw)
+        if existing is not None:
+            return existing
+        context[bucket][key] = _record_to_dict(chosen, ev, key)
+        await _save_wife_data(data)
     logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的战双老婆: {chosen.name}')
     return chosen
 
@@ -176,7 +177,7 @@ async def _send_daily_pgr_wife(
         )
 
     if not is_transient_draw:
-        data = _load_wife_data()
+        data = await _load_wife_data()
         context = _get_today_context(data, ev)
         current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
         state = _wife_state(current)
@@ -191,7 +192,7 @@ async def _send_daily_pgr_wife(
         if state == 'lost_gifted':
             return await _send_prefixed(bot, '你的战双老婆已经送出去了。', kind='pgr')
 
-        other_wife_name = _get_other_daily_wife_name(ev, 'pgr')
+        other_wife_name = await _get_other_daily_wife_name(ev, 'pgr')
         if other_wife_name:
             return await _send_prefixed(
                 bot,

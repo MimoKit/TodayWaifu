@@ -34,8 +34,8 @@ def _daily_record_count(day_data: Any, bucket_name: str) -> int:
     return count
 
 
-def _today_data() -> dict[str, Any]:
-    data = _load_wife_data()
+async def _today_data() -> dict[str, Any]:
+    data = await _load_wife_data()
     days = data.get('days')
     if not isinstance(days, dict):
         return {}
@@ -45,20 +45,20 @@ def _today_data() -> dict[str, Any]:
     return today
 
 
-def _today_record_count(kind: str) -> int:
-    return _daily_record_count(_today_data(), _daily_bucket_name(kind))
+async def _today_record_count(kind: str) -> int:
+    return _daily_record_count(await _today_data(), _daily_bucket_name(kind))
 
 
 async def get_today_wife_count() -> int:
-    return _today_record_count('wife')
+    return await _today_record_count('wife')
 
 
 async def get_today_loli_count() -> int:
-    return _today_record_count('loli')
+    return await _today_record_count('loli')
 
 
 async def get_today_husband_count() -> int:
-    return _today_record_count('husband')
+    return await _today_record_count('husband')
 
 
 register_status(

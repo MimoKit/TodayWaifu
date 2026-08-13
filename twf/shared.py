@@ -5,6 +5,7 @@ import asyncio
 import binascii
 import hashlib
 import json
+import os
 import random
 import re
 import shutil
@@ -25,13 +26,21 @@ from gsuid_core.help.utils import register_help
 from gsuid_core.logger import logger
 from gsuid_core.models import Event, Message
 from gsuid_core.segment import MessageSegment
+from gsuid_core.server import on_core_start_before
 from gsuid_core.sv import Plugins, SV
 from gsuid_core.utils.database.models import CoreUser
 
 from ..daily_wife_config import DailyWifeConfig
+from .file_cache import (
+    read_file_bytes_cached,
+    read_file_text_cached,
+    read_url_cache,
+    write_url_cache,
+)
 from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
-from .storage import atomic_write_json, read_json_dict
+from .models import DailyWifeRecord
+from .storage import read_json_dict
 from .upload_access import can_upload_images, normalized_user_ids
 
 Plugins(
@@ -135,6 +144,8 @@ __all__ = [
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_with_loli_reply_prefix', '_writable_role_map_path', '_writable_role_pile_root',
+    'DailyWifeRecord', '_daily_data_lock', '_migrate_legacy_wife_data',
+    'read_file_bytes_cached',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
@@ -622,7 +633,12 @@ def _nte_static_resource_roots() -> tuple[Path, ...]:
 
 def _load_role_map(path: Path) -> dict[str, str]:
     result: dict[str, str] = {}
-    for line in path.read_text(encoding='utf-8').splitlines():
+    # 角色对照表按 mtime 缓存文件内容，文件变更后自动失效，避免每次抽签都读盘
+    try:
+        text = read_file_text_cached(path)
+    except OSError:
+        return result
+    for line in text.splitlines():
         match = ROLE_MAP_RE.match(line)
         if not match:
             continue
@@ -881,11 +897,20 @@ def _pgr_wife_root() -> Path:
 
 
 def _load_pgr_local_candidates() -> tuple[RoleCandidate, ...]:
+    # 战双图库 rglob 全量扫描是昂贵操作，接入候选缓存（TTL 见 CACHE_TTL_SECONDS），
+    # 上传图片时 _invalidate_candidate_cache 会主动失效
+    cache_key = f'pgr_local:{_pgr_wife_root()}'
+    now = time.time()
+    cached = CANDIDATE_CACHE.get(cache_key)
+    if cached is not None and now - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1]
     rows = scan_named_role_directories(_pgr_wife_root(), IMAGE_EXTENSIONS)
-    return tuple(
+    candidates = tuple(
         RoleCandidate(name=name, role_ids=(name,), images=images)
         for name, images in rows
     )
+    CANDIDATE_CACHE[cache_key] = (now, candidates)
+    return candidates
 
 
 def _normalize_role_name(name: str) -> str:
@@ -1065,8 +1090,20 @@ def _download_image_sync(url: str) -> bytes:
         raise RuntimeError('下载图片超时。') from exc
 
 
+def _gallery_image_cache_root() -> Path:
+    return _custom_upload_data_root() / 'gallery_image_cache'
+
+
 async def _download_image(url: str) -> bytes:
-    return await asyncio.to_thread(_download_image_sync, url)
+    """下载图库图片；按 URL 哈希落盘缓存，命中时直接读缓存，避免重复 HTTP 下载。"""
+    cache_root = _gallery_image_cache_root()
+    cached = await asyncio.to_thread(read_url_cache, cache_root, url)
+    if cached is not None:
+        logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {url}')
+        return cached
+    data = await asyncio.to_thread(_download_image_sync, url)
+    await asyncio.to_thread(write_url_cache, cache_root, url, data)
+    return data
 
 
 
@@ -1442,36 +1479,38 @@ async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, r
     return WifeRecord.from_member(member)
 
 
-def _load_wife_data() -> dict[str, Any]:
-    path = _wife_data_path()
-    if not path.is_file():
-        # 兼容旧版本：把插件目录下的数据文件一次性迁移到 data 目录
-        legacy = BASE_DIR / 'daily_wife_data.json'
-        if legacy.is_file():
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(legacy.read_bytes())
-                logger.info(f'{LOG_PREFIX} 已迁移旧数据文件到 data 目录: {path}')
-            except OSError as exc:
-                logger.warning(f'{LOG_PREFIX} 迁移旧数据文件失败: {exc}')
-    if not path.is_file():
-        logger.debug(f'{LOG_PREFIX} 数据文件不存在，将创建新数据')
-        return {'days': {}}
-    data = read_json_dict(path)
-    if not data:
-        logger.warning(f'{LOG_PREFIX} 读取数据文件失败或内容为空，将使用空数据: {path}')
-        return {'days': {}}
-    logger.debug(f'{LOG_PREFIX} 成功加载数据文件: {path.name}')
-    data.setdefault('days', {})
-    return data
+# 每日记录读-改-写串行锁：所有「加载→校验→写入」的临界区都必须持有它，
+# 替代旧 JSON 时代「写入段无 await」的单事件循环原子性，防止 0 点并发抽签互相覆盖。
+_daily_data_lock = asyncio.Lock()
 
 
-def _save_wife_data(data: dict[str, Any]) -> None:
+async def _load_wife_data() -> dict[str, Any]:
+    """从数据库加载今天的全部记录，返回与旧 JSON 相同的 {'days': {today: {context: ...}}} 结构。"""
+    today = _today_key()
     try:
-        atomic_write_json(_wife_data_path(), data)
-        logger.debug(f'{LOG_PREFIX} 数据文件已保存')
-    except OSError as exc:
-        logger.error(f'{LOG_PREFIX} 保存数据文件失败: {exc}')
+        contexts = await DailyWifeRecord.load_day(today)
+    except Exception as exc:
+        logger.error(f'{LOG_PREFIX} 从数据库读取每日记录失败: {exc}')
+        contexts = {}
+    return {'days': {today: contexts}}
+
+
+async def _save_wife_data(data: dict[str, Any]) -> None:
+    """把 {'days': {day: {context_key: context}}} 结构整体写回数据库（按 context 先删后插）。"""
+    days = data.get('days') if isinstance(data, dict) else None
+    if not isinstance(days, dict):
+        return
+    for day, contexts in days.items():
+        if not isinstance(contexts, dict):
+            continue
+        for context_key, context in contexts.items():
+            if not isinstance(context, dict):
+                continue
+            bot_id, _, group_id = str(context_key).partition(':')
+            try:
+                await DailyWifeRecord.save_context(day, bot_id, group_id or 'direct', context)
+            except Exception as exc:
+                logger.error(f'{LOG_PREFIX} 保存每日记录到数据库失败: {exc}')
 
 
 def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
@@ -1486,6 +1525,52 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
     return context
+
+
+async def _migrate_legacy_wife_data() -> int:
+    """把旧版 daily_wife_data.json 导入数据库，导入成功后改名为 .migrated.bak 备份。
+
+    幂等：旧文件改名后即消失，重复启动不会重复导入；
+    即使备份失败残留旧文件，导入本身按 (day, context) 先删后插也不会产生重复行。
+    只迁移最近几天的数据，更老的直接丢弃（见 models.LEGACY_MIGRATION_KEEP_DAYS）。
+    """
+    path = _wife_data_path()
+    if not path.is_file():
+        # 兼容更旧版本：插件目录下的数据文件先搬到 data 目录再迁移
+        legacy = BASE_DIR / 'daily_wife_data.json'
+        if legacy.is_file():
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(legacy.read_bytes())
+                logger.info(f'{LOG_PREFIX} 已迁移旧数据文件到 data 目录: {path}')
+            except OSError as exc:
+                logger.warning(f'{LOG_PREFIX} 迁移旧数据文件失败: {exc}')
+                return 0
+        else:
+            return 0
+
+    data = read_json_dict(path)
+    if not data:
+        logger.warning(f'{LOG_PREFIX} 旧数据文件为空或已损坏，跳过导入: {path}')
+        imported = 0
+    else:
+        imported = await DailyWifeRecord.import_legacy_data(data)
+    backup = path.with_name(f'{path.name}.migrated.bak')
+    try:
+        os.replace(path, backup)
+        logger.info(f'{LOG_PREFIX} 旧数据文件已备份为 {backup.name}（导入 {imported} 条记录）')
+    except OSError as exc:
+        logger.warning(f'{LOG_PREFIX} 旧数据文件备份失败: {exc}')
+    return imported
+
+
+@on_core_start_before(priority=-70)
+async def _migrate_daily_wife_data_on_startup() -> None:
+    """插件启动钩子：在核心建表（priority=-90）之后执行旧 JSON 迁移。"""
+    try:
+        await _migrate_legacy_wife_data()
+    except Exception as exc:
+        logger.exception(f'{LOG_PREFIX} 旧每日记录迁移失败: {exc}')
 
 
 def _daily_bucket_name(kind: str) -> str:
@@ -1504,11 +1589,11 @@ DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
 ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
 
 
-def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
+async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
     """返回用户今天在其他老婆池已有的角色名。"""
     if requested_kind not in DAILY_WIFE_KINDS:
         return None
-    data = _load_wife_data()
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     user_key = _user_key(ev)
     for kind in DAILY_WIFE_KINDS:
@@ -1739,8 +1824,8 @@ def _get_event_target_user_id(ev: Event) -> str | None:
 
 
 
-def _get_existing_daily_record(ev: Event, user_id: str | int, kind: str = 'wife') -> WifeRecord | None:
-    data = _load_wife_data()
+async def _get_existing_daily_record(ev: Event, user_id: str | int, kind: str = 'wife') -> WifeRecord | None:
+    data = await _load_wife_data()
     context = _get_today_context(data, ev)
     current = context[_daily_bucket_name(kind)].get(_user_key(ev, user_id))
     if isinstance(current, dict):
@@ -1748,8 +1833,8 @@ def _get_existing_daily_record(ev: Event, user_id: str | int, kind: str = 'wife'
     return None
 
 
-def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord | None:
-    return _get_existing_daily_record(ev, user_id, 'wife')
+async def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord | None:
+    return await _get_existing_daily_record(ev, user_id, 'wife')
 
 
 
@@ -1789,7 +1874,7 @@ async def _send_role_image(
             local_image = await _find_local_role_image(role, kind)
             if local_image is not None:
                 logger.warning(f'{LOG_PREFIX} 已回退本地图片: {local_image}')
-                image = Path(local_image)
+                image = await asyncio.to_thread(read_file_bytes_cached, Path(local_image))
             else:
                 await _send_prefixed(bot, str(exc), kind=kind)
                 return
@@ -1798,7 +1883,8 @@ async def _send_role_image(
             logger.warning(f'{LOG_PREFIX} 本地图片不存在: {image_url}')
             await _send_prefixed(bot, '本地图片文件不存在，请检查 custom_role_pile 目录。', kind=kind)
             return
-        image = Path(image_url)
+        # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
+        image = await asyncio.to_thread(read_file_bytes_cached, Path(image_url))
 
     messages: list[Any] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
@@ -1840,7 +1926,11 @@ async def _send_loli_result_image(
         messages.append('\n')
     messages.append(text)
     if isinstance(image, str):
-        image_ref = image if image.startswith(('http://', 'https://')) else Path(image)
+        if image.startswith(('http://', 'https://')):
+            image_ref = image
+        else:
+            # 本地图片走 mtime 字节缓存，避免重复读盘
+            image_ref = await asyncio.to_thread(read_file_bytes_cached, Path(image))
     else:
         image_ref = image
     messages.append(MessageSegment.image(image_ref))
@@ -1869,7 +1959,8 @@ async def _send_local_image(
                 await _send_prefixed(bot, missing_hint, kind=kind)
                 return
         else:
-            messages.append(MessageSegment.image(Path(image_url)))
+            image_bytes = await asyncio.to_thread(read_file_bytes_cached, Path(image_url))
+            messages.append(MessageSegment.image(image_bytes))
 
     if not messages:
         await _send_prefixed(bot, missing_hint, kind=kind)
