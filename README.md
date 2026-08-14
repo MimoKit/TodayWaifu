@@ -74,7 +74,7 @@
 
 ## 丨数据存储
 
-- 每日抽取与交互数据保存在 GsCore 根目录下的 `data/TodayWaifu/daily_wife_data.json` 中。
+- 每日抽取与交互数据保存在 GsCore 根目录下的 `data/data.db` 中。
 - 插件配置自动保存在 `data/TodayWaifu/config.json`，无需手动编辑。
 
 <br/>
