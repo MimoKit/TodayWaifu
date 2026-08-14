@@ -1927,7 +1927,12 @@ async def _send_loli_result_image(
     messages.append(text)
     if isinstance(image, str):
         if image.startswith(('http://', 'https://')):
-            image_ref = image
+            try:
+                image_ref = await _download_image(image)
+            except RuntimeError as exc:
+                logger.warning(f'{LOG_PREFIX} 下载萝莉图片失败: {exc}')
+                await _send_loli_text(bot, str(exc))
+                return
         else:
             # 本地图片走 mtime 字节缓存，避免重复读盘
             image_ref = await asyncio.to_thread(read_file_bytes_cached, Path(image))

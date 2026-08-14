@@ -33,6 +33,18 @@ class ResultImageSenderTests(unittest.TestCase):
         self.assertIn("_send_role_image(bot, role, image, text, user_id, is_group, kind)", source)
         self.assertIn("_send_loli_result_image(bot, image, text, user_id, is_group)", source)
 
+    def test_loli_sender_downloads_remote_images_before_building_segment(self) -> None:
+        source = (ROOT / "twf" / "shared.py").read_text(encoding="utf-8")
+        function_start = source.index("async def _send_loli_result_image(")
+        function_end = source.index("async def _send_local_image(", function_start)
+        function = source[function_start:function_end]
+
+        self.assertIn("image_ref = await _download_image(image)", function)
+        self.assertNotIn(
+            "if image.startswith(('http://', 'https://')):\n            image_ref = image",
+            function,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
