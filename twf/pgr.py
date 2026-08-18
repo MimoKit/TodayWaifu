@@ -83,10 +83,6 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
     await _send_prefixed(bot, '\n'.join(lines), kind='pgr')
 
 
-def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
-    return _load_pgr_local_candidates()
-
-
 def _pgr_candidates_by_name(
     candidates: tuple[RoleCandidate, ...],
     specified_name: str,
@@ -103,7 +99,11 @@ def _stored_pgr_record(raw: Any) -> WifeRecord | None:
     if not isinstance(raw, dict) or _wife_state(raw) != 'owned':
         return None
     record = _record_from_dict(raw)
-    if record is None or not Path(record.image).is_file():
+    if record is None:
+        return None
+    if record.image.startswith(('http://', 'https://')):
+        return record
+    if not Path(record.image).is_file():
         return None
     return record
 
@@ -120,7 +120,7 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     if current is not None:
         return current
 
-    candidates = _load_pgr_wife_candidates()
+    candidates = await _load_pgr_wife_candidates()
     if not candidates:
         return None
     chosen = _pick_role_record(
@@ -201,7 +201,7 @@ async def _send_daily_pgr_wife(
             )
 
     if is_transient_draw:
-        candidates = _load_pgr_wife_candidates()
+        candidates = await _load_pgr_wife_candidates()
         if specified_name:
             candidates = _pgr_candidates_by_name(candidates, specified_name)
             if not candidates:
@@ -221,6 +221,18 @@ async def _send_daily_pgr_wife(
             f'把图片放成“{root}\\角色名\\图片文件”即可。',
             kind='pgr',
         )
+
+    if record.image.startswith(('http://', 'https://')):
+        await _send_role_image(
+            bot,
+            RoleCandidate(record.name, record.role_ids, (record.image,)),
+            record.image,
+            _pgr_result_text(record) or '',
+            ev.user_id,
+            ev.group_id is not None,
+            'pgr',
+        )
+        return
 
     await _send_local_image(
         bot,

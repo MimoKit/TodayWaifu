@@ -43,6 +43,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库',
         'https://loli.mimokit.dpdns.org',
     ),
+    'DailyWifePgrGalleryApiUrl': GsStrConfig(
+        '战双图库接口地址',
+        'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。',
+        'https://pgr.mimokit.dpdns.org/api/xwuid/roles',
+    ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(
         '图片上传白名单',
         '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',

@@ -116,7 +116,8 @@ __all__ = [
     '_collect_role_candidates', '_configured_path', '_context_key',
     '_custom_upload_data_root', '_custom_upload_role_map_path',
     '_custom_upload_role_pile_root', '_daily_rng', '_download_avatar', '_download_image',
-    '_download_image_sync', '_event_rng', '_fetch_gallery_payload_sync', '_filter_by_mode',
+    '_download_image_sync', '_event_rng', '_fetch_gallery_payload_from_url_sync',
+    '_fetch_gallery_payload_sync', '_filter_by_mode',
     '_gallery_api_url', '_gallery_mode_enabled',
     '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
@@ -127,7 +128,7 @@ __all__ = [
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
-    '_load_pgr_local_candidates', '_pgr_wife_root',
+    '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
     '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
     '_member_feature_enabled', '_member_probability',
@@ -896,6 +897,32 @@ def _pgr_wife_root() -> Path:
     return get_res_path('TodayWaifu') / PGR_WIFE_DIR_NAME
 
 
+def _pgr_gallery_api_url() -> str:
+    return str(_cfg('DailyWifePgrGalleryApiUrl') or '').strip()
+
+
+def _parse_pgr_gallery_candidates(payload: dict[str, Any]) -> tuple[RoleCandidate, ...]:
+    roles_data = payload.get('roles')
+    if not isinstance(roles_data, list):
+        return ()
+    candidates: list[RoleCandidate] = []
+    for item in roles_data:
+        if not isinstance(item, dict):
+            continue
+        role_ids = tuple(str(value).strip() for value in item.get('role_ids') or [] if str(value).strip())
+        if not role_ids:
+            continue
+        name = str(item.get('name') or role_ids[0]).strip()
+        images = tuple(
+            str(image.get('url') or '').strip()
+            for image in item.get('images') or []
+            if isinstance(image, dict) and str(image.get('url') or '').strip().startswith(('http://', 'https://'))
+        )
+        if name and images:
+            candidates.append(RoleCandidate(name=name, role_ids=role_ids, images=images))
+    return tuple(sorted(candidates, key=lambda role: role.name))
+
+
 def _load_pgr_local_candidates() -> tuple[RoleCandidate, ...]:
     # 战双图库 rglob 全量扫描是昂贵操作，接入候选缓存（TTL 见 CACHE_TTL_SECONDS），
     # 上传图片时 _invalidate_candidate_cache 会主动失效
@@ -911,6 +938,20 @@ def _load_pgr_local_candidates() -> tuple[RoleCandidate, ...]:
     )
     CANDIDATE_CACHE[cache_key] = (now, candidates)
     return candidates
+
+
+async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
+    api_url = _pgr_gallery_api_url()
+    if api_url:
+        try:
+            payload = await asyncio.to_thread(_fetch_gallery_payload_from_url_sync, api_url)
+            candidates = _parse_pgr_gallery_candidates(payload)
+            if candidates:
+                return candidates
+            logger.warning(f'{LOG_PREFIX} 战双远程图库没有可用角色，回退本地图库。')
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} 读取战双远程图库失败，回退本地图库: {exc}')
+    return _load_pgr_local_candidates()
 
 
 def _normalize_role_name(name: str) -> str:
@@ -1031,6 +1072,17 @@ def _fetch_gallery_payload_sync() -> dict[str, Any]:
     try:
         payload = json.loads(body.decode('utf-8'))
     except Exception as exc:
+        raise RuntimeError('图库接口返回内容不是有效 JSON。') from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError('图库接口返回格式不正确。')
+    return payload
+
+
+def _fetch_gallery_payload_from_url_sync(url: str) -> dict[str, Any]:
+    body = _http_get_with_retry(url, timeout=15)
+    try:
+        payload = json.loads(body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimeError('图库接口返回内容不是有效 JSON。') from exc
     if not isinstance(payload, dict):
         raise RuntimeError('图库接口返回格式不正确。')

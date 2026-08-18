@@ -14,6 +14,7 @@ class PgrFeatureSourceTests(unittest.TestCase):
 
         self.assertIn("'DailyWifePgrEnabled'", config)
         self.assertIn("'DailyWifePgrGalleryPath'", config)
+        self.assertIn("'DailyWifePgrGalleryApiUrl'", config)
         self.assertIn("'DailyWifePgrTextTemplate'", config)
         self.assertIn("'DailyWifeImageUploadWhitelist'", config)
         self.assertTrue(
@@ -32,6 +33,18 @@ class PgrFeatureSourceTests(unittest.TestCase):
         )
         self.assertIn("('今日战双老婆', 'jrzslp')", source)
         self.assertIn("('上传战双老婆图片', '战双老婆上传图片')", source)
+
+    def test_pgr_remote_gallery_is_used_with_local_fallback(self) -> None:
+        shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
+
+        self.assertIn('async def _load_pgr_wife_candidates()', shared)
+        self.assertIn("_cfg('DailyWifePgrGalleryApiUrl')", shared)
+        self.assertIn('_parse_pgr_gallery_candidates(payload)', shared)
+        self.assertIn('return _load_pgr_local_candidates()', shared)
+        self.assertIn('await _load_pgr_wife_candidates()', source)
+        self.assertIn("record.image.startswith(('http://', 'https://'))", source)
+        self.assertIn('await _send_role_image(', source)
 
     def test_all_image_uploads_share_global_whitelist(self) -> None:
         shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
