@@ -9,7 +9,7 @@
 
 <div align="center">
   <a href="https://github.com/Genshin-bots/gsuid_core">早柚核心</a> &nbsp;·&nbsp;
-  <a href="https://qm.qq.com/q/ejzCUfJ5le">交流 Q 群 (798949533)</a> &nbsp;·&nbsp;
+  <a href="https://qm.qq.com/q/pJVt8HNwrg">交流 Q 群 (798949533)</a> &nbsp;·&nbsp;
   <a href="https://github.com/MimoKit/TodayWaifu/issues">问题反馈</a>
 </div>
 
@@ -55,6 +55,10 @@
 
 - **`local`（本地模式，默认）**：优先读取本地 `XutheringWavesUID`、`NTEUID` 等插件的角色图片。
 - **`gallery`（图库模式）**：自动调用远程 API 获取图片，无需手动配置本地图片资源。
+
+图库接口启用令牌鉴权后，需在控制台填写 **图库访问令牌**（`DailyWifeGalleryToken`）才能正常取图。
+令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取；留空则请求不携带令牌，
+适用于未启用鉴权的部署。
 
 > [!WARNING]
 > 远程图库模式会从线上接口拉取并发送图片。部分图片可能存在风控风险，请自行评估是否启用；因使用远程图库产生的任何风险由部署者自行承担。
