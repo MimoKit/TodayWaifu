@@ -48,6 +48,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。',
         'https://pgr.mimokit.dpdns.org/api/xwuid/roles',
     ),
+    'DailyWifeGalleryToken': GsStrConfig(
+        '图库访问令牌',
+        '图库接口启用令牌鉴权后必填。到 https://twf.mimokit.dpdns.org 使用 GitHub 登录申请，审核通过后发放；留空则不携带令牌',
+        '',
+    ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(
         '图片上传白名单',
         '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',

@@ -1015,7 +1015,11 @@ def _gallery_api_url() -> str:
 
 
 def _request_headers() -> dict[str, str]:
-    return {'User-Agent': 'TodayWaifu/1.0'}
+    headers = {'User-Agent': 'TodayWaifu/1.0'}
+    token = str(_cfg('DailyWifeGalleryToken') or '').strip()
+    if token:
+        headers['X-Gallery-Token'] = token
+    return headers
 
 
 def _http_get(url: str, *, timeout: int = 15) -> bytes:
