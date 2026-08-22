@@ -13,6 +13,10 @@
   <a href="https://github.com/MimoKit/TodayWaifu/issues">问题反馈</a>
 </div>
 
+<p align="center">
+  <img src="./preview.gif" alt="TodayWaifu Preview" width="300">
+</p>
+
 <br/>
 
 ## 丨安装提醒
