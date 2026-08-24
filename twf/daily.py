@@ -490,9 +490,9 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
 
 
 async def _send_group_member_wife(bot: Bot, ev: Event):
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群友命令')
     if not _marry_member_enabled():
-        return await _send_prefixed(bot,'娶群友功能当前已关闭。')
+        return
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群友命令')
     if not ev.group_id:
         return await _send_prefixed(bot,'这个命令只能在群聊里使用。')
 
@@ -569,7 +569,7 @@ async def daily_wife_full(bot: Bot, ev: Event):
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event):
     if not _cfg_bool('DailyWifeNteEnabled', False):
-        return await _send_prefixed(bot, '今日异环老婆功能当前已关闭。')
+        return
     await _send_daily_wife(bot, ev, mode='nte', specified_name=str(ev.text or '').strip())
 
 
@@ -584,7 +584,7 @@ async def daily_nte_wife_prefix(bot: Bot, ev: Event):
 )
 async def daily_nte_wife_full(bot: Bot, ev: Event):
     if not _cfg_bool('DailyWifeNteEnabled', False):
-        return await _send_prefixed(bot, '今日异环老婆功能当前已关闭。')
+        return
     await _send_daily_wife(bot, ev, mode='nte', specified_name='')
 
 
@@ -639,7 +639,7 @@ async def assign_wife_usage(bot: Bot, ev: Event):
 )
 async def daily_husband_prefix(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
+        return
     specified_name = str(ev.text or '').strip()
     if specified_name == '列表':
         return await _send_wife_list(bot, ev, mode='husband')
@@ -657,7 +657,7 @@ async def daily_husband_prefix(bot: Bot, ev: Event):
 )
 async def daily_husband_full(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
+        return
     await _send_daily_wife(bot, ev, mode='husband', specified_name='')
 
 
@@ -672,7 +672,7 @@ async def daily_husband_full(bot: Bot, ev: Event):
 )
 async def daily_husband_list(bot: Bot, ev: Event):
     if not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind='husband')
+        return
     await _send_wife_list(bot, ev, mode='husband')
 
 

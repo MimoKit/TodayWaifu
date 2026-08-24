@@ -20,7 +20,6 @@ from .shared import (
     _get_today_context,
     _has_active_wife,
     _husband_available,
-    _husband_unavailable_message,
     _is_master,
     _is_secondhand_wife,
     _load_wife_data,
@@ -77,11 +76,11 @@ async def _send_rob_result_image(
 
 async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起抢{title}')
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
+        return
     if not _rob_enabled(kind):
-        return await _send_prefixed(bot, f'抢{title}功能当前已关闭。', kind=kind)
+        return
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起抢{title}')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:

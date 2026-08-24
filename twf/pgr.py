@@ -161,7 +161,7 @@ async def _send_daily_pgr_wife(
     specified_name: str = '',
 ) -> None:
     if not _cfg_bool('DailyWifePgrEnabled', True):
-        return await _send_prefixed(bot, '今日战双老婆功能当前已关闭。', kind='pgr')
+        return
 
     is_master = _is_master(ev)
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master

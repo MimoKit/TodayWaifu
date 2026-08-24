@@ -22,7 +22,6 @@ from .shared import (
     _get_today_context,
     _has_active_wife,
     _husband_available,
-    _husband_unavailable_message,
     _is_secondhand_wife,
     _load_wife_data,
     _record_from_dict,
@@ -117,11 +116,11 @@ def clear_pending_gifts_for_user(ev: Event, user_id: str) -> None:
 
 async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起送{title}')
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
+        return
     if not _gift_enabled(kind):
-        return await _send_prefixed(bot, f'送{title}功能当前已关闭。', kind=kind)
+        return
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起送{title}')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
@@ -188,9 +187,9 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _clear_pending_gift(ev, target_user_id, kind)
 
     if kind == 'husband' and not _husband_available():
-        return await _send_prefixed(bot, _husband_unavailable_message(), kind=kind)
+        return
     if not _gift_enabled(kind):
-        return await _send_prefixed(bot, f'送{title}功能已关闭，这次赠送已失效。', kind=kind)
+        return
 
     giver_record = await _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:

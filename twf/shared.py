@@ -124,7 +124,7 @@ __all__ = [
     '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
-    '_husband_unavailable_message', '_image_source', '_invalidate_candidate_cache',
+    '_image_source', '_invalidate_candidate_cache', '_loli_enabled',
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
@@ -980,12 +980,12 @@ def _husband_enabled() -> bool:
     return _cfg_bool('DailyWifeHusbandEnabled', False)
 
 
+def _loli_enabled() -> bool:
+    return _cfg_bool('DailyLoliEnabled', False)
+
+
 def _gallery_mode_enabled() -> bool:
     return _image_source() == 'gallery'
-
-
-def _husband_unavailable_message() -> str:
-    return '今日老公功能当前已关闭。'
 
 
 def _husband_available() -> bool:
