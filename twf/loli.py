@@ -375,6 +375,8 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
     """,
 )
 async def daily_loli(bot: Bot, ev: Event):
+    if not _loli_enabled():  # noqa: F405
+        return
     await _send_loli_image(bot, ev)
 
 

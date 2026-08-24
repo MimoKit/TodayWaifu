@@ -181,6 +181,13 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '你今天的老公是{name}',
     ),
 
+    '_DividerDailyLoli': GsDivider('今日萝莉', ''),
+    'DailyLoliEnabled': GsBoolConfig(
+        '启用今日萝莉',
+        '开启后可使用「今日萝莉」命令；关闭后命令不生效。图片内容风险请自行承担',
+        False,
+    ),
+
     '_DividerRob': GsDivider('抢夺设置', ''),
     'DailyWifeRobEnabled': GsBoolConfig(
         '启用抢老婆',
