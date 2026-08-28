@@ -42,7 +42,14 @@ from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
 from .models import DailyWifeRecord
 from .storage import read_json_dict
+from .messaging import (
+    _adapt_mentions_for_platform, _is_at_message, _parse_send_options,
+    _remove_private_mentions, _safe_send, _send_loli_text,
+    _target_send_without_bot_hooks,
+)
 from .types import MemberCandidate, RoleCandidate, WifeRecord
+from .upload_access import can_upload_images, normalized_user_ids
+
 
 Plugins(
     name='TodayWaifu',
@@ -158,107 +165,6 @@ __all__ = [
 ]
 
 
-# 本地图片读取相关常量
-def _is_xwuid_group_activity_hook_error(exc: Exception) -> bool:
-    message = str(exc)
-    return (
-        isinstance(exc, AttributeError)
-        and 'PluginHookManager' in message
-        and 'group_activity_hooks' in message
-    )
-
-
-def _parse_send_options(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[bool, Any, bool]:
-    options = dict(kwargs)
-    at_sender = options.pop('at_sender', False)
-    extra_metadata = options.pop('extra_metadata', None)
-    wait_recall = options.pop('wait_recall', False)
-
-    if len(args) > 3:
-        raise TypeError(f'Bot.send expected at most 3 positional options, got {len(args)}')
-    if len(args) >= 1:
-        at_sender = args[0]
-    if len(args) >= 2:
-        extra_metadata = args[1]
-    if len(args) >= 3:
-        wait_recall = args[2]
-    if options:
-        unexpected = ', '.join(options)
-        raise TypeError(f'Bot.send got unexpected keyword argument(s): {unexpected}')
-    return bool(at_sender), extra_metadata, bool(wait_recall)
-
-
-async def _target_send_without_bot_hooks(
-    bot: Bot,
-    message: Any,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    at_sender, extra_metadata, wait_recall = _parse_send_options(args, kwargs)
-    ev = bot.ev
-    target_type = ev.user_type
-    target_id = ev.user_id if ev.user_type == 'direct' else ev.group_id
-    return await bot.bot.target_send(
-        message,
-        target_type,
-        target_id,
-        ev.real_bot_id,
-        bot.bot_self_id,
-        ev.msg_id,
-        at_sender,
-        ev.user_id,
-        ev.group_id,
-        ev.task_id,
-        ev.task_event,
-        extra_metadata=extra_metadata,
-        wait_recall=wait_recall,
-    )
-
-
-def _is_at_message(item: Any) -> bool:
-    return isinstance(item, Message) and item.type == 'at'
-
-
-def _remove_private_mentions(message: Any) -> Any:
-    items = message if isinstance(message, list) else [message]
-    result: list[Any] = []
-    skip_linebreak = False
-    for item in items:
-        if _is_at_message(item):
-            skip_linebreak = True
-            continue
-        if skip_linebreak and isinstance(item, str) and item in ('\n', '\r\n'):
-            skip_linebreak = False
-            continue
-        skip_linebreak = False
-        result.append(item)
-
-    if isinstance(message, list):
-        return result
-    return result[0] if result else ''
-
-
-def _adapt_mentions_for_platform(bot: Bot, message: Any) -> Any:
-    if bot.ev.user_type == 'direct':
-        return _remove_private_mentions(message)
-    return message
-
-
-async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
-    message = _adapt_mentions_for_platform(bot, message)
-    try:
-        return await bot.send(message, *args, **kwargs)
-    except AttributeError as exc:
-        if not _is_xwuid_group_activity_hook_error(exc):
-            raise
-        logger.warning(f'{LOG_PREFIX} 检测到 XWUID BotHook 兼容问题，改用底层发送: {exc}')
-        return await _target_send_without_bot_hooks(bot, message, *args, **kwargs)
-
-
-async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
-    return await _safe_send(bot, text, *args, **kwargs)
-
-# 本地图片读取相关常量
 # 本地图片读取相关常量
 ROLE_MAP_RE = re.compile(r'^\s*(\d+)\s*[:：]\s*(.+?)\s*$')
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'}
