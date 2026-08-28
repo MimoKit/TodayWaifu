@@ -1729,6 +1729,18 @@ def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
     return daily_kind_metadata(kind)
 
 
+def _daily_bucket_name(kind: str) -> str:
+    return _daily_kind_metadata(kind).bucket
+
+
+def _daily_item_title(kind: str) -> str:
+    return _daily_kind_metadata(kind).title
+
+
+def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
+    return daily_kind_metadata(kind)
+
+
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
 ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
 
