@@ -37,6 +37,7 @@ from .file_cache import (
     read_file_text_cached,
     read_url_cache,
     write_url_cache,
+    clear_expired_files,
 )
 from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
@@ -80,6 +81,9 @@ NTE_DETAIL_CDN_BASE = 'https://webstatic.tajiduo.com/bbs/yh-game-records-web-sou
 PGR_WIFE_DIR_NAME = 'pgr_wife'
 CACHE_TTL_SECONDS = 300
 MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
+CACHE_MAINTENANCE_INTERVAL_SECONDS = 60 * 60
+CACHE_MAINTENANCE_FILE_LIMIT = 1000
+_CACHE_MAINTENANCE_TASK: asyncio.Task[None] | None = None
 LIST_FORWARD_THRESHOLD = 10
 CUSTOM_ROLE_ID_START = 900001
 UPLOAD_IMAGE_MAX_BYTES = 10 * 1024 * 1024
@@ -1673,7 +1677,47 @@ async def _migrate_daily_wife_data_on_startup() -> None:
         logger.exception(f'{LOG_PREFIX} 旧每日记录迁移失败: {exc}')
 
 
-def _daily_bucket_name(kind: str) -> str:
+async def _cache_maintenance_once() -> None:
+    now = time.time()
+    for key, (created, _) in list(CANDIDATE_CACHE.items()):
+        if now - created >= CACHE_TTL_SECONDS:
+            CANDIDATE_CACHE.pop(key, None)
+    today = _today_key()
+    for key in list(_DAILY_CONTEXT_CACHE):
+        if not key.startswith(f'{today}:'):
+            _DAILY_CONTEXT_CACHE.pop(key, None)
+    await asyncio.to_thread(
+        clear_expired_files,
+        _gallery_image_cache_root(),
+        30 * 24 * 60 * 60,
+        CACHE_MAINTENANCE_FILE_LIMIT,
+    )
+    await asyncio.to_thread(
+        clear_expired_files,
+        _custom_upload_data_root() / 'group_member_avatar_cache',
+        MEMBER_AVATAR_CACHE_SECONDS,
+        CACHE_MAINTENANCE_FILE_LIMIT,
+    )
+
+
+async def _cache_maintenance_loop() -> None:
+    await asyncio.sleep(17)
+    while True:
+        try:
+            await _cache_maintenance_once()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} 缓存维护失败: {exc}')
+        await asyncio.sleep(CACHE_MAINTENANCE_INTERVAL_SECONDS)
+
+
+@on_core_start_before(priority=-60)
+async def _start_cache_maintenance_on_startup() -> None:
+    global _CACHE_MAINTENANCE_TASK
+    if _CACHE_MAINTENANCE_TASK is None or _CACHE_MAINTENANCE_TASK.done():
+        _CACHE_MAINTENANCE_TASK = asyncio.create_task(_cache_maintenance_loop())
+
     return _daily_kind_metadata(kind).bucket
 
 

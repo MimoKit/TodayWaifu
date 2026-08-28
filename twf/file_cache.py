@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Optional
@@ -61,6 +62,29 @@ def read_url_cache(cache_root: Path, url: str) -> Optional[bytes]:
     except OSError:
         return None
     return None
+
+
+def clear_expired_files(cache_root: Path, max_age_seconds: float, limit: int = 1000) -> int:
+    """删除缓存目录中超过 TTL 的普通文件，返回删除数量。"""
+    if max_age_seconds < 0 or limit <= 0 or not cache_root.is_dir():
+        return 0
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    try:
+        for path in cache_root.iterdir():
+            if removed >= limit:
+                break
+            if not path.is_file() or path.name.endswith('.tmp') or path.name.startswith('.'):
+                continue
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue
+    except OSError:
+        return removed
+    return removed
 
 
 def write_url_cache(cache_root: Path, url: str, data: bytes) -> bool:

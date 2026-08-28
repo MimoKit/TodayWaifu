@@ -81,7 +81,25 @@ class UrlCacheTests(unittest.TestCase):
         self.assertEqual(p1, p2)
         self.assertNotEqual(p1, p3)
 
-    def test_write_empty_data_is_noop(self) -> None:
+    def test_expired_files_are_removed_but_temp_files_are_kept(self) -> None:
+        cache = _load_module()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            expired = root / 'expired'
+            fresh = root / 'fresh'
+            temporary = root / '.expired.tmp'
+            expired.write_bytes(b'old')
+            fresh.write_bytes(b'new')
+            temporary.write_bytes(b'tmp')
+            old_time = time.time() - 100
+            os.utime(expired, (old_time, old_time))
+            os.utime(temporary, (old_time, old_time))
+            removed = cache.clear_expired_files(root, 50)
+            self.assertEqual(removed, 1)
+            self.assertFalse(expired.exists())
+            self.assertTrue(fresh.exists())
+            self.assertTrue(temporary.exists())
+
         cache = _load_module()
         with TemporaryDirectory() as directory:
             self.assertFalse(cache.write_url_cache(Path(directory), "https://a", b""))
