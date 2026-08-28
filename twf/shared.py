@@ -11,7 +11,6 @@ import random
 import re
 import shutil
 import time
-from dataclasses import dataclass
 from datetime import date
 from importlib.util import find_spec
 from pathlib import Path
@@ -43,7 +42,7 @@ from .folder_gallery import scan_named_role_directories
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_metadata
 from .models import DailyWifeRecord
 from .storage import read_json_dict
-from .upload_access import can_upload_images, normalized_user_ids
+from .types import MemberCandidate, RoleCandidate, WifeRecord
 
 Plugins(
     name='TodayWaifu',
@@ -104,7 +103,7 @@ __all__ = [
     'Any', 'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
     'CUSTOM_ROLE_DELETE_CONFIRM_SECONDS', 'CUSTOM_ROLE_DELETE_PENDING',
     'CUSTOM_ROLE_ID_START', 'CoreUser', 'DAILY_KIND_METADATA', 'DEFAULT_GALLERY_API_URL',
-    'DailyKindMetadata', 'DailyWifeConfig',
+    'DailyKindMetadata', 'DailyWifeConfig', 'MemberCandidate', 'RoleCandidate', 'WifeRecord',
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
     'HTTPError', 'IMAGE_EXTENSIONS', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
@@ -299,41 +298,6 @@ _IMAGE_DOWNLOAD_SEMAPHORE = asyncio.Semaphore(8)
 CUSTOM_ROLE_DELETE_PENDING: dict[str, dict[str, Any]] = {}
 
 
-@dataclass(frozen=True)
-class RoleCandidate:
-    name: str
-    role_ids: tuple[str, ...]
-    images: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class MemberCandidate:
-    name: str
-    user_id: str
-    avatar: str
-
-
-@dataclass(frozen=True)
-class WifeRecord:
-    name: str
-    role_ids: tuple[str, ...]
-    image: str
-    record_type: str = 'role'
-    target_user_id: str = ''
-
-    @classmethod
-    def from_role(cls, role: RoleCandidate, image: str) -> 'WifeRecord':
-        return cls(role.name, role.role_ids, image)
-
-    @classmethod
-    def from_member(cls, member: MemberCandidate) -> 'WifeRecord':
-        return cls(member.name, ('群友',), member.avatar, 'member', member.user_id)
-
-    def to_role(self) -> RoleCandidate:
-        return RoleCandidate(self.name, self.role_ids, (self.image,))
-
-    def to_member(self) -> MemberCandidate:
-        return MemberCandidate(self.name, self.target_user_id, self.image)
 
 
 def _cfg(key: str) -> Any:
