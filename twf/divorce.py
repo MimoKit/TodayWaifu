@@ -5,11 +5,10 @@ from .shared import (
     Bot,
     Event,
     LOG_PREFIX,
-    _daily_data_lock,
-    _get_today_context,
-    _load_wife_data,
+    _daily_context_lock,
+    _load_daily_context,
+    _save_daily_context,
     _mark_all_daily_records_divorced,
-    _save_wife_data,
     _send_prefixed,
     _user_key,
     divorce_sv,
@@ -55,9 +54,8 @@ async def _send_divorce_all(bot: Bot, ev: Event) -> None:
     )
 
     # 读-改-写持有锁，与其它写入串行（0 点并发安全）
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         divorced = _mark_all_daily_records_divorced(context, user_key, int(time.time()))
 
         from .gift import clear_pending_gifts_for_user
@@ -66,7 +64,7 @@ async def _send_divorce_all(bot: Bot, ev: Event) -> None:
         if not divorced:
             return await _send_prefixed(bot, '你今天没有可以离婚的对象。')
 
-        await _save_wife_data(data)
+        await _save_daily_context(ev, context)
     names = '、'.join(
         dict.fromkeys(_divorce_result_name(kind, name) for kind, name in divorced)
     )

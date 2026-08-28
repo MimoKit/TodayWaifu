@@ -14,19 +14,18 @@ from .shared import (
     _cfg_bool,
     _context_key,
     _daily_bucket_name,
-    _daily_data_lock,
+    _daily_context_lock,
     _daily_item_title,
     _daily_kind_metadata,
     _get_event_target_user_id,
     _get_existing_daily_record,
-    _get_today_context,
     _has_active_wife,
     _husband_available,
     _is_secondhand_wife,
-    _load_wife_data,
+    _load_daily_context,
+    _save_daily_context,
     _record_from_dict,
     _record_to_dict,
-    _save_wife_data,
     _send_daily_result_image,
     _send_prefixed,
     _user_display_name,
@@ -134,8 +133,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if giver_record is None:
         return await _send_prefixed(bot, f'你今天还没有{title}，先去抽一个吧~', kind=kind)
 
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
+    context = await _load_daily_context(ev)
     bucket = _daily_bucket_name(kind)
     giver_data = context[bucket].get(giver_id)
 
@@ -200,9 +198,8 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         )
 
     # 读-改-写持有锁，防止与抢老婆/离婚等并发写入互相覆盖
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         bucket = _daily_bucket_name(kind)
         giver_data = context[bucket].get(giver_id)
 
@@ -239,7 +236,7 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
             context[bucket][giver_id]['gifted_to'] = target_user_id
             context[bucket][giver_id]['gifted_to_name'] = _user_display_name(ev, target_user_id)
 
-        await _save_wife_data(data)
+        await _save_daily_context(ev, context)
 
     role = giver_record.to_role()
     await _send_gift_result_image(

@@ -39,24 +39,21 @@ async def _ensure_daily_wife_record(
     salt = mode if mode != 'wife' else ''
     key = _user_key(ev, user_id)
 
-    # 快速路径：当天已有记录直接返回
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
-    current = context[bucket].get(key)
-    if isinstance(current, dict):
-        if _wife_state(current) != 'owned':
-            logger.debug(f'{LOG_PREFIX} 命中已离手的 {mode} 记录，拒绝复用')
-            return None
-        record = _record_from_dict(current)
-        if record is not None:
-            logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
-            return record
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
+        current = context[bucket].get(key)
+        if isinstance(current, dict):
+            if _wife_state(current) != 'owned':
+                logger.debug(f'{LOG_PREFIX} 命中已离手的 {mode} 记录，拒绝复用')
+                return None
+            record = _record_from_dict(current)
+            if record is not None:
+                logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
+                return record
 
-    # 准备阶段：含 await，先不持有待写入的 data，避免覆盖期间其它协程的写入
     chosen: WifeRecord | None = None
     if mode == 'wife':
         chosen = await _roll_group_member_wife(ev, key)
-
     if chosen is None:
         rng = _daily_rng(ev, key, salt)
         candidates, error = await _load_candidates(mode)
@@ -72,10 +69,8 @@ async def _ensure_daily_wife_record(
             logger.warning(f'{LOG_PREFIX} 没有可用的 {mode} 角色图片')
             return None
 
-    # 写入阶段：持有 _daily_data_lock 重新加载并二次校验，锁内串行替代旧的"无 await"原子段
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         existing = context[bucket].get(key)
         if isinstance(existing, dict):
             if _wife_state(existing) != 'owned':
@@ -86,24 +81,23 @@ async def _ensure_daily_wife_record(
                 logger.debug(f'{LOG_PREFIX} 写入前发现已有 {mode} 记录，直接复用: {existing_record.name}')
                 return existing_record
 
+        value = _record_to_dict(chosen, ev, key)
+        await _save_daily_record(ev, bucket, key, value)
         logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的 {mode}: {chosen.name}')
-        context[bucket][key] = _record_to_dict(chosen, ev, key)
-        await _save_wife_data(data)
     return chosen
 
 
 async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
     bucket = 'husbands' if mode == 'husband' else 'wives'
     title = '老公' if mode == 'husband' else '老婆'
-    # 列表会回填显示名并写库，整个读-改-写段持有锁，与其它写入串行
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    # 群成员查询可能访问数据库/适配器，必须移出每日记录锁，避免阻塞其它群的抽取。
+    group_display_names = await _load_group_display_names(ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         wives = context.get(bucket, {})
         if not isinstance(wives, dict):
             wives = {}
 
-        group_display_names = await _load_group_display_names(ev)
         data_changed = False
         items: list[tuple[int, str, str]] = []
         seen_users: set[str] = set()
@@ -180,7 +174,7 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             return f'今天本群还没有可用的{title}记录。', []
 
         if data_changed:
-            await _save_wife_data(data)
+            await _save_daily_context(ev, context)
 
     items.sort(key=lambda item: (item[0], item[1]))
     return f'今日{title}列表：', items
@@ -256,8 +250,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             )
 
     if not is_transient_draw:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+        context = await _load_daily_context(ev)
         user_key = _user_key(ev)
         bucket = _daily_bucket_name(mode)
         current_record = context[bucket].get(user_key)
@@ -291,9 +284,8 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             # 候选加载期间可能有其它协程写入，持锁重新加载并复核状态后再落库
             reused_safe_wife: WifeRecord | None = None
             state_changed = False
-            async with _daily_data_lock:
-                data = await _load_wife_data()
-                context = _get_today_context(data, ev)
+            async with _daily_context_lock(ev):
+                context = await _load_daily_context(ev)
                 current_record = context[bucket].get(user_key)
                 if _wife_state(current_record) != 'lost_stolen':
                     state_changed = True
@@ -304,7 +296,7 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                     if reused_safe_wife is None:
                         context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
                         context['safe_wives'][user_key]['safe'] = True
-                        await _save_wife_data(data)
+                        await _save_daily_context(ev, context)
 
             if state_changed:
                 # 状态已变化（离婚/赠送等），重走标准流程给出对应提示
@@ -465,15 +457,14 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     image = record.image
     target_key = str(target_user_id)
 
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         context['wives'][target_key] = _record_to_dict(record, ev, target_key)
         context['wives'][target_key]['assigned_by'] = _user_key(ev)
         context['wives'][target_key]['assigned_by_name'] = _user_display_name(ev)
         if isinstance(context.get('safe_wives'), dict):
             context['safe_wives'].pop(target_key, None)
-        await _save_wife_data(data)
+        await _save_daily_context(ev, context)
 
     logger.info(
         f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, '

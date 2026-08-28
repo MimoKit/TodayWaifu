@@ -252,8 +252,7 @@ async def _send_loli_record(
 
 
 async def _send_loli_image(bot: Bot, ev: Event) -> None:
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
+    context = await _load_daily_context(ev)
     user_key = _user_key(ev)
     current = context['lolis'][user_key] if user_key in context['lolis'] else None
     if isinstance(current, dict):
@@ -274,9 +273,8 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         return await _send_loli_text(bot, error or '暂无图片')
 
     # 网络请求期间可能有其它协程完成写入，因此保存前持锁重新加载并复用最新记录。
-    async with _daily_data_lock:
-        save_data = await _load_wife_data()
-        save_context = _get_today_context(save_data, ev)
+    async with _daily_context_lock(ev):
+        save_context = await _load_daily_context(ev)
         existing = (
             save_context['lolis'][user_key]
             if user_key in save_context['lolis']
@@ -301,7 +299,7 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
                 save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
         else:
             save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-        await _save_wife_data(save_data)
+        await _save_daily_context(ev, save_context)
     await _send_loli_record(bot, ev, record)
 
 

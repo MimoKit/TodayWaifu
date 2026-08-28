@@ -111,8 +111,7 @@ def _stored_pgr_record(raw: Any) -> WifeRecord | None:
 async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     key = _user_key(ev)
     bucket = _daily_bucket_name('pgr')
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
+    context = await _load_daily_context(ev)
     current_raw = context[bucket].get(key)
     if isinstance(current_raw, dict) and _wife_state(current_raw) != 'owned':
         return None
@@ -131,9 +130,8 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
         return None
 
     # 持有锁重新读取并二次校验，锁内串行替代旧的"无 await"原子段
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         existing_raw = context[bucket].get(key)
         if isinstance(existing_raw, dict) and _wife_state(existing_raw) != 'owned':
             logger.debug(f'{LOG_PREFIX} 写入前发现已离手的战双老婆记录，拒绝覆盖')
@@ -142,7 +140,7 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
         if existing is not None:
             return existing
         context[bucket][key] = _record_to_dict(chosen, ev, key)
-        await _save_wife_data(data)
+        await _save_daily_context(ev, context)
     logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的战双老婆: {chosen.name}')
     return chosen
 
@@ -177,8 +175,7 @@ async def _send_daily_pgr_wife(
         )
 
     if not is_transient_draw:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+        context = await _load_daily_context(ev)
         current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
         state = _wife_state(current)
         if state == 'divorced':

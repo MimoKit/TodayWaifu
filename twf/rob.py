@@ -12,19 +12,18 @@ from .shared import (
     _cfg_bool,
     _cfg_probability,
     _daily_bucket_name,
-    _daily_data_lock,
+    _daily_context_lock,
     _daily_item_title,
     _daily_kind_metadata,
     _get_event_target_user_id,
     _get_existing_daily_record,
-    _get_today_context,
     _has_active_wife,
     _husband_available,
     _is_master,
     _is_secondhand_wife,
-    _load_wife_data,
+    _load_daily_context,
+    _save_daily_context,
     _record_to_dict,
-    _save_wife_data,
     _send_daily_result_image,
     _send_prefixed,
     _user_display_name,
@@ -97,9 +96,8 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     # 读-改-写全程持锁：校验、记次数、转移归属、落库串行执行，替代旧的"无 await"原子段
     refusal: str | None = None
     rob_failed = False
-    async with _daily_data_lock:
-        data = await _load_wife_data()
-        context = _get_today_context(data, ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
         bucket = _daily_bucket_name(kind)
         target_key = _user_key(ev, target_user_id)
         target_data = context[bucket].get(target_key)
@@ -131,7 +129,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
             if random.random() >= _rob_success_rate(kind):
                 logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的{title}失败')
                 rob_failed = True
-                await _save_wife_data(data)
+                await _save_daily_context(ev, context)
             else:
                 logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的{title}')
                 context[bucket][robber_id] = _record_to_dict(target_record, ev, robber_id)
@@ -141,7 +139,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
                     context[bucket][target_key]['stolen_by'] = robber_id
                     context[bucket][target_key]['stolen_by_name'] = _user_display_name(ev, robber_id)
 
-                await _save_wife_data(data)
+                await _save_daily_context(ev, context)
 
     if refusal is not None:
         return await _send_prefixed(bot, refusal, kind=kind)

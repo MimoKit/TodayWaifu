@@ -12,11 +12,14 @@ import json
 from typing import Any, Dict, List
 
 from sqlmodel import Field, delete, select
+from sqlalchemy import UniqueConstraint
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gsuid_core.logger import logger
 from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
-from gsuid_core.utils.database.base_models import BaseModel, with_session
+from gsuid_core.utils.database.base_models import BaseModel, with_read_session, with_session
+from gsuid_core.utils.database.startup import exec_list
 
 LOG_PREFIX = '[鸣潮今日老婆]'
 
@@ -62,7 +65,10 @@ def split_context_key(context_key: str) -> tuple[str, str]:
 class DailyWifeRecord(BaseModel, table=True):
     """今日老婆每日记录表。"""
 
-    __table_args__: Dict[str, Any] = {"extend_existing": True}
+    __table_args__ = (
+        UniqueConstraint('day', 'bot_id', 'group_id', 'bucket', 'user_id'),
+        {'extend_existing': True},
+    )
 
     day: str = Field(title='日期', index=True)
     group_id: str = Field(default='direct', title='群号')
@@ -138,7 +144,187 @@ class DailyWifeRecord(BaseModel, table=True):
         )
 
     @classmethod
+    @with_read_session
+    async def get_context(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """只加载一个 bot/group 上下文，供每日热路径使用。"""
+        result = await session.execute(
+            select(cls)
+            .where(cls.day == day)
+            .where(cls.bot_id == bot_id)
+            .where(cls.group_id == group_id)
+        )
+        context: Dict[str, Dict[str, Any]] = {}
+        for row in result.scalars().all():
+            context.setdefault(row.bucket, {})[row.user_id] = row.to_record_value()
+        return context
+
+    @classmethod
     @with_session
+    async def upsert_record(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+        bucket: str,
+        user_key: str,
+        value: Any,
+    ) -> None:
+        """定向写入一条记录，不影响同一上下文的其它用户或桶。"""
+        row = cls._row_from_value(day, bot_id, group_id, bucket, user_key, value)
+        values = {
+            'name': row.name,
+            'display_name': row.display_name,
+            'image': row.image,
+            'record_type': row.record_type,
+            'state': row.state,
+            'origin': row.origin,
+            'updated_at': row.updated_at,
+            'payload': row.payload,
+        }
+        statement = sqlite_insert(cls).values(
+            day=day,
+            bot_id=bot_id,
+            group_id=group_id,
+            bucket=bucket,
+            user_id=str(user_key),
+            **values,
+        )
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=values,
+            )
+        )
+
+    @classmethod
+    @with_session
+    async def upsert_context(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+        context: Dict[str, Dict[str, Any]],
+    ) -> None:
+        """在一个写事务中 upsert 一个上下文的全部记录。"""
+        values = []
+        desired_keys: set[tuple[str, str]] = set()
+        for bucket, records in context.items():
+            if not isinstance(records, dict):
+                continue
+            for user_key, value in records.items():
+                user_key = str(user_key)
+                desired_keys.add((bucket, user_key))
+                row = cls._row_from_value(
+                    day, bot_id, group_id, bucket, user_key, value
+                )
+                values.append(
+                    {
+                        'day': day,
+                        'bot_id': bot_id,
+                        'group_id': group_id,
+                        'bucket': bucket,
+                        'user_id': user_key,
+                        'name': row.name,
+                        'display_name': row.display_name,
+                        'image': row.image,
+                        'record_type': row.record_type,
+                        'state': row.state,
+                        'origin': row.origin,
+                        'updated_at': row.updated_at,
+                        'payload': row.payload,
+                    }
+                )
+
+        # 快照也可能删除记录（离婚、赠送、补偿覆盖），先清理数据库中
+        # 不再存在的业务键，避免仅 upsert 导致旧记录重新 hydrate 出现。
+        existing = await session.execute(
+            select(cls.bucket, cls.user_id)
+            .where(cls.day == day)
+            .where(cls.bot_id == bot_id)
+            .where(cls.group_id == group_id)
+        )
+        for bucket, user_key in existing.all():
+            if (bucket, user_key) not in desired_keys:
+                await session.execute(
+                    delete(cls)
+                    .where(cls.day == day)
+                    .where(cls.bot_id == bot_id)
+                    .where(cls.group_id == group_id)
+                    .where(cls.bucket == bucket)
+                    .where(cls.user_id == user_key)
+                )
+
+        if not values:
+            return
+        statement = sqlite_insert(cls).values(values)
+        update_columns = {
+            key: getattr(statement.excluded, key)
+            for key in (
+                'name', 'display_name', 'image', 'record_type', 'state',
+                'origin', 'updated_at', 'payload',
+            )
+        }
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
+
+    @classmethod
+    @with_session
+    async def delete_record(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+        bucket: str,
+        user_key: str,
+    ) -> None:
+        """定向删除一条记录。"""
+        await session.execute(
+            delete(cls)
+            .where(cls.day == day)
+            .where(cls.bot_id == bot_id)
+            .where(cls.group_id == group_id)
+            .where(cls.bucket == bucket)
+            .where(cls.user_id == str(user_key))
+        )
+
+    @classmethod
+    @with_read_session
+    async def get_record(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+        bucket: str,
+        user_key: str,
+    ) -> Any:
+        """读取一个业务键对应的记录值。"""
+        result = await session.execute(
+            select(cls)
+            .where(cls.day == day)
+            .where(cls.bot_id == bot_id)
+            .where(cls.group_id == group_id)
+            .where(cls.bucket == bucket)
+            .where(cls.user_id == str(user_key))
+        )
+        row = result.scalar_one_or_none()
+        return row.to_record_value() if row is not None else None
+
+    @classmethod
+    @with_read_session
     async def load_day(
         cls,
         session: AsyncSession,
@@ -227,6 +413,14 @@ class DailyWifeRecord(BaseModel, table=True):
                     imported += len(rows)
         logger.info(f'{LOG_PREFIX} 旧 JSON 数据迁移完成，共导入 {imported} 条记录')
         return imported
+
+
+# 为已有数据库补充业务键唯一约束，供 SQLite upsert 使用。
+exec_list.append(
+    'CREATE UNIQUE INDEX IF NOT EXISTS '
+    'ix_daily_wife_record_business_key '
+    'ON DailyWifeRecord (day, bot_id, group_id, bucket, user_id)'
+)
 
 
 @site.register_admin

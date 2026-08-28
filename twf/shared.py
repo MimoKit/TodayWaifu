@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import binascii
 import hashlib
 import json
@@ -130,6 +131,9 @@ __all__ = [
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
+    '_daily_context_lock',
+    '_load_daily_context', '_save_daily_context',
+    '_save_daily_record',
     '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
     '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
@@ -359,6 +363,11 @@ NTE_EXCLUDED_ROLE_KEYWORDS = (
 )
 # 按数据源分别缓存候选，避免切换数据源后误用旧缓存
 CANDIDATE_CACHE: dict[str, tuple[float, tuple['RoleCandidate', ...]]] = {}
+_CANDIDATE_INFLIGHT: dict[str, asyncio.Task[tuple[tuple['RoleCandidate', ...] | None, str | None]]] = {}
+_CANDIDATE_CACHE_GENERATION = 0
+_CANDIDATE_LOAD_SEMAPHORE = asyncio.Semaphore(4)
+_IMAGE_INFLIGHT: dict[str, asyncio.Task[bytes]] = {}
+_IMAGE_DOWNLOAD_SEMAPHORE = asyncio.Semaphore(8)
 CUSTOM_ROLE_DELETE_PENDING: dict[str, dict[str, Any]] = {}
 
 
@@ -666,6 +675,8 @@ def _role_images(role_dir: Path) -> tuple[str, ...]:
 
 
 def _invalidate_candidate_cache() -> None:
+    global _CANDIDATE_CACHE_GENERATION
+    _CANDIDATE_CACHE_GENERATION += 1
     CANDIDATE_CACHE.clear()
 
 
@@ -1151,15 +1162,30 @@ def _gallery_image_cache_root() -> Path:
 
 
 async def _download_image(url: str) -> bytes:
-    """下载图库图片；按 URL 哈希落盘缓存，命中时直接读缓存，避免重复 HTTP 下载。"""
+    """下载图库图片；按 URL 哈希落盘缓存，并合并相同 URL 的并发下载。"""
     cache_root = _gallery_image_cache_root()
     cached = await asyncio.to_thread(read_url_cache, cache_root, url)
     if cached is not None:
         logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {url}')
         return cached
-    data = await asyncio.to_thread(_download_image_sync, url)
-    await asyncio.to_thread(write_url_cache, cache_root, url, data)
-    return data
+
+    task = _IMAGE_INFLIGHT.get(url)
+    if task is None:
+        async def download() -> bytes:
+            async with _IMAGE_DOWNLOAD_SEMAPHORE:
+                second_cached = await asyncio.to_thread(read_url_cache, cache_root, url)
+                if second_cached is not None:
+                    return second_cached
+                data = await asyncio.to_thread(_download_image_sync, url)
+                await asyncio.to_thread(write_url_cache, cache_root, url, data)
+                return data
+        task = asyncio.create_task(download())
+        _IMAGE_INFLIGHT[url] = task
+    try:
+        return await task
+    finally:
+        if task.done() and _IMAGE_INFLIGHT.get(url) is task:
+            _IMAGE_INFLIGHT.pop(url, None)
 
 
 
@@ -1179,7 +1205,7 @@ async def _fallback_to_local_candidates(
     return None, local_error or fallback_error
 
 
-async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     source = _image_source()
     role_mode = _role_mode(mode)
     now = time.time()
@@ -1228,17 +1254,51 @@ async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate
     return candidates, None
 
 
+async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    role_mode = _role_mode(mode)
+    cache_key = f'{_image_source()}:{role_mode}'
+    cached = CANDIDATE_CACHE.get(cache_key)
+    if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1], None
+    task = _CANDIDATE_INFLIGHT.get(cache_key)
+    if task is None:
+        generation = _CANDIDATE_CACHE_GENERATION
+        async def load() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+            async with _CANDIDATE_LOAD_SEMAPHORE:
+                result = await _load_wuwa_candidates_uncached(role_mode)
+                if generation != _CANDIDATE_CACHE_GENERATION:
+                    CANDIDATE_CACHE.pop(cache_key, None)
+                return result
+        task = asyncio.create_task(load())
+        _CANDIDATE_INFLIGHT[cache_key] = task
+    try:
+        return await task
+    finally:
+        if task.done() and _CANDIDATE_INFLIGHT.get(cache_key) is task:
+            _CANDIDATE_INFLIGHT.pop(cache_key, None)
+
+
 async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     cache_key = 'local:nte'
-    now = time.time()
     cached = CANDIDATE_CACHE.get(cache_key)
-    if cached and now - cached[0] < CACHE_TTL_SECONDS:
+    if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1], None
-    candidates, error = await asyncio.to_thread(_load_nte_local_candidates)
-    if error or not candidates:
-        return None, error
-    CANDIDATE_CACHE[cache_key] = (now, candidates)
-    return candidates, None
+    task = _CANDIDATE_INFLIGHT.get(cache_key)
+    if task is None:
+        async def load() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+            async with _CANDIDATE_LOAD_SEMAPHORE:
+                candidates, error = await asyncio.to_thread(_load_nte_local_candidates)
+                if error or not candidates:
+                    return None, error
+                CANDIDATE_CACHE[cache_key] = (time.time(), candidates)
+                return candidates, None
+        task = asyncio.create_task(load())
+        _CANDIDATE_INFLIGHT[cache_key] = task
+    try:
+        return await task
+    finally:
+        if task.done() and _CANDIDATE_INFLIGHT.get(cache_key) is task:
+            _CANDIDATE_INFLIGHT.pop(cache_key, None)
 
 
 async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
@@ -1538,16 +1598,76 @@ async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, r
 # 每日记录读-改-写串行锁：所有「加载→校验→写入」的临界区都必须持有它，
 # 替代旧 JSON 时代「写入段无 await」的单事件循环原子性，防止 0 点并发抽签互相覆盖。
 _daily_data_lock = asyncio.Lock()
+_DAILY_CONTEXT_LOCKS: dict[str, asyncio.Lock] = {}
+_DAILY_CONTEXT_CACHE: dict[str, tuple[str, dict[str, Any]]] = {}
+_DAILY_CONTEXT_INFLIGHT: dict[str, asyncio.Task[dict[str, Any]]] = {}
 
+
+def _daily_context_lock(ev: Event) -> asyncio.Lock:
+    """返回按 bot/group 分片的每日记录锁，避免不同群互相阻塞。"""
+    key = f'{_today_key()}:{_context_key(ev)}'
+    lock = _DAILY_CONTEXT_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _DAILY_CONTEXT_LOCKS[key] = lock
+    return lock
+
+
+async def _load_daily_context(ev: Event) -> dict[str, Any]:
+    """按上下文 hydrate 一次每日快照；数据库失败直接向调用方传播。"""
+    day = _today_key()
+    cache_key = f'{day}:{_context_key(ev)}'
+    cached = _DAILY_CONTEXT_CACHE.get(cache_key)
+    if cached is not None and cached[0] == day:
+        return cached[1]
+    task = _DAILY_CONTEXT_INFLIGHT.get(cache_key)
+    if task is None:
+        async def hydrate() -> dict[str, Any]:
+            bot_id, _, group_id = _context_key(ev).partition(':')
+            context = await DailyWifeRecord.get_context(day, bot_id, group_id or 'direct')
+            data = {'days': {day: {_context_key(ev): context}}}
+            result = _get_today_context(data, ev)
+            _DAILY_CONTEXT_CACHE[cache_key] = (day, result)
+            return result
+        task = asyncio.create_task(hydrate())
+        _DAILY_CONTEXT_INFLIGHT[cache_key] = task
+    try:
+        return await task
+    finally:
+        if task.done() and _DAILY_CONTEXT_INFLIGHT.get(cache_key) is task:
+            _DAILY_CONTEXT_INFLIGHT.pop(cache_key, None)
+
+
+async def _save_daily_record(
+    ev: Event, bucket: str, user_key: str, value: Any
+) -> None:
+    """提交单条记录，成功后才更新内存快照。"""
+    day = _today_key()
+    bot_id, _, group_id = _context_key(ev).partition(':')
+    await DailyWifeRecord.upsert_record(
+        day, bot_id, group_id or 'direct', bucket, user_key, value
+    )
+    context = await _load_daily_context(ev)
+    context.setdefault(bucket, {})[user_key] = value
+
+
+async def _save_daily_context(ev: Event, context: dict[str, Any]) -> None:
+    """定向提交一个上下文的快照，成功后更新内存快照。"""
+    day = _today_key()
+    bot_id, _, group_id = _context_key(ev).partition(':')
+    cache_key = f'{day}:{_context_key(ev)}'
+    snapshot = copy.deepcopy(context)
+    # 先摘除旧缓存：写入失败时不会继续复用调用方已经修改的脏快照。
+    _DAILY_CONTEXT_CACHE.pop(cache_key, None)
+    await DailyWifeRecord.upsert_context(
+        day, bot_id, group_id or 'direct', snapshot
+    )
+    _DAILY_CONTEXT_CACHE[cache_key] = (day, snapshot)
 
 async def _load_wife_data() -> dict[str, Any]:
     """从数据库加载今天的全部记录，返回与旧 JSON 相同的 {'days': {today: {context: ...}}} 结构。"""
     today = _today_key()
-    try:
-        contexts = await DailyWifeRecord.load_day(today)
-    except Exception as exc:
-        logger.error(f'{LOG_PREFIX} 从数据库读取每日记录失败: {exc}')
-        contexts = {}
+    contexts = await DailyWifeRecord.load_day(today)
     return {'days': {today: contexts}}
 
 
@@ -1649,8 +1769,7 @@ async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | No
     """返回用户今天在其他老婆池已有的角色名。"""
     if requested_kind not in DAILY_WIFE_KINDS:
         return None
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
+    context = await _load_daily_context(ev)
     user_key = _user_key(ev)
     for kind in DAILY_WIFE_KINDS:
         if kind == requested_kind:
@@ -1881,8 +2000,7 @@ def _get_event_target_user_id(ev: Event) -> str | None:
 
 
 async def _get_existing_daily_record(ev: Event, user_id: str | int, kind: str = 'wife') -> WifeRecord | None:
-    data = await _load_wife_data()
-    context = _get_today_context(data, ev)
+    context = await _load_daily_context(ev)
     current = context[_daily_bucket_name(kind)].get(_user_key(ev, user_id))
     if isinstance(current, dict):
         return _record_from_dict(current)
