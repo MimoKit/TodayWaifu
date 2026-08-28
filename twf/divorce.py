@@ -1,14 +1,14 @@
-"""TodayWaifu unified divorce command."""
+"""TodayWaifu divorce commands."""
 from __future__ import annotations
 
 from .shared import (
     Bot,
     Event,
     LOG_PREFIX,
+    _daily_bucket_name,
     _daily_context_lock,
     _load_daily_context,
     _save_daily_context,
-    _mark_all_daily_records_divorced,
     _safe_send,
     _user_key,
     divorce_sv,
@@ -19,24 +19,25 @@ from .shared import (
 
 DIVORCE_COMMANDS = (
     '离婚',
-    '全部离婚',
     '老婆离婚',
     '离婚老婆',
     '今日老婆离婚',
     '和老婆离婚',
+)
+HUSBAND_DIVORCE_COMMANDS = (
     '老公离婚',
     '离婚老公',
     '今日老公离婚',
     '和老公离婚',
+)
+LOLI_DIVORCE_COMMANDS = (
     '萝莉离婚',
     '离婚萝莉',
     '今日萝莉离婚',
     '和萝莉离婚',
-    '异环老婆离婚',
-    '离婚异环老婆',
-    '战双老婆离婚',
-    '离婚战双老婆',
 )
+NTE_DIVORCE_COMMANDS = ('异环老婆离婚', '离婚异环老婆')
+PGR_DIVORCE_COMMANDS = ('战双老婆离婚', '离婚战双老婆')
 
 
 def _divorce_result_name(kind: str, name: str) -> str:
@@ -46,40 +47,63 @@ def _divorce_result_name(kind: str, name: str) -> str:
     return name
 
 
-async def _send_divorce_all(bot: Bot, ev: Event) -> None:
+async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
     user_key = _user_key(ev)
+    title = {
+        'wife': '老婆',
+        'husband': '老公',
+        'loli': '萝莉',
+        'nte': '异环老婆',
+        'pgr': '战双老婆',
+    }[kind]
     logger.info(
         f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} '
-        '发起统一离婚'
+        f'发起{title}离婚'
     )
 
-    # 读-改-写持有锁，与其它写入串行（0 点并发安全）
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
-        divorced = _mark_all_daily_records_divorced(context, user_key, int(time.time()))
-
-        from .gift import clear_pending_gifts_for_user
-
-        clear_pending_gifts_for_user(ev, user_key)
-        if not divorced:
-            return await _safe_send(bot, '你今天没有可以离婚的对象。')
-
+        bucket = context[_daily_bucket_name(kind)]
+        record = bucket.get(user_key)
+        if not isinstance(record, dict) or not str(record.get('name') or '').strip():
+            return await _safe_send(bot, f'你今天没有可以离婚的{title}。')
+        if record.get('divorced'):
+            return await _safe_send(bot, f'你今天已经和{title}离婚了。')
+        record['divorced'] = True
+        record['divorced_at'] = int(time.time())
         await _save_daily_context(ev, context)
-    names = '、'.join(
-        dict.fromkeys(_divorce_result_name(kind, name) for kind, name in divorced)
-    )
-    await _safe_send(bot, f'已经全部离婚：{names}。')
+
+    await _safe_send(bot, f'已经和今天的{title}离婚：{record["name"]}。')
 
 
 @divorce_sv.on_fullmatch(
     DIVORCE_COMMANDS,
     block=True,
-    to_ai="""一次性结束当前用户今天的全部婚姻关系。
-    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。
-    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。
+    to_ai="""结束当前用户今天的老婆婚姻关系。
+    “离婚”默认表示离婚老婆，也可以使用老婆离婚等同义命令。
     Args:
         text: 无需参数，留空。
     """,
 )
-async def divorce_all(bot: Bot, ev: Event) -> None:
-    await _send_divorce_all(bot, ev)
+async def divorce_wife(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'wife')
+
+
+@divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True)
+async def divorce_husband(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'husband')
+
+
+@divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True)
+async def divorce_loli(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'loli')
+
+
+@divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)
+async def divorce_nte(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'nte')
+
+
+@divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True)
+async def divorce_pgr(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'pgr')

@@ -335,8 +335,28 @@
     },
     {
       "file": "twf/divorce.py",
-      "function": "divorce_all",
-      "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='一次性结束当前用户今天的全部婚姻关系。\\n    会同时处理今日老婆、异环老婆、战双老婆、今日老公、今日萝莉和补偿老婆。\\n    当用户说“离婚”“全部离婚”或要结束今天的任意婚姻关系时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+      "function": "divorce_wife",
+      "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的老婆婚姻关系。\\n    “离婚”默认表示离婚老婆，也可以使用老婆离婚等同义命令。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_husband",
+      "decorator": "divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True)"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_loli",
+      "decorator": "divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True)"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_nte",
+      "decorator": "divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)"
+    },
+    {
+      "file": "twf/divorce.py",
+      "function": "divorce_pgr",
+      "decorator": "divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True)"
     },
     {
       "file": "twf/gift.py",

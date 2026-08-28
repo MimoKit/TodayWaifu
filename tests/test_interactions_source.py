@@ -81,18 +81,17 @@ class InteractionSourceTests(unittest.TestCase):
         self.assertIn("divorce_sv = SV('今日老婆-离婚'", shared_source)
         for word in (
             '离婚',
-            '全部离婚',
             '老婆离婚',
+            '离婚老婆',
             '离婚老公',
             '离婚萝莉',
             '异环老婆离婚',
             '战双老婆离婚',
         ):
             self.assertIn(word, divorce_source)
-        self.assertIn('async def divorce_all(', divorce_source)
-        self.assertNotIn('async def divorce_wife(', divorce_source)
-        self.assertNotIn('async def divorce_husband(', divorce_source)
-        self.assertNotIn('async def divorce_loli(', divorce_source)
+        self.assertIn('async def divorce_wife(', divorce_source)
+        self.assertIn('async def divorce_husband(', divorce_source)
+        self.assertIn('async def divorce_loli(', divorce_source)
 
     def test_natural_command_aliases_are_registered(self) -> None:
         custom_source = (ROOT / 'twf' / 'custom_role.py').read_text(encoding='utf-8')
@@ -104,15 +103,14 @@ class InteractionSourceTests(unittest.TestCase):
             self.assertIn(word, loli_source)
         self.assertIn('老婆帮助', help_source)
 
-    def test_divorce_marks_all_daily_records_with_divorced_state(self) -> None:
+    def test_divorce_marks_selected_daily_record_with_divorced_state(self) -> None:
         shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
         divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8')
         self.assertIn("raw.get('divorced')", shared_source)
         self.assertIn("return 'divorced'", shared_source)
         self.assertIn('ALL_DAILY_RECORD_KINDS', shared_source)
         self.assertIn("context['safe_wives']", shared_source)
-        self.assertIn('_mark_all_daily_records_divorced(', divorce_source)
-        self.assertIn('clear_pending_gifts_for_user(', divorce_source)
+        self.assertIn("record['divorced'] = True", divorce_source)
 
 
     def test_rob_rejects_when_robber_already_has_active_item(self) -> None:
