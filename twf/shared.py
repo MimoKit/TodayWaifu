@@ -1718,16 +1718,6 @@ async def _start_cache_maintenance_on_startup() -> None:
     if _CACHE_MAINTENANCE_TASK is None or _CACHE_MAINTENANCE_TASK.done():
         _CACHE_MAINTENANCE_TASK = asyncio.create_task(_cache_maintenance_loop())
 
-    return _daily_kind_metadata(kind).bucket
-
-
-def _daily_item_title(kind: str) -> str:
-    return _daily_kind_metadata(kind).title
-
-
-def _daily_kind_metadata(kind: str) -> DailyKindMetadata:
-    return daily_kind_metadata(kind)
-
 
 def _daily_bucket_name(kind: str) -> str:
     return _daily_kind_metadata(kind).bucket
