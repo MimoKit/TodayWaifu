@@ -25,7 +25,7 @@ from .shared import (
     _save_daily_context,
     _record_to_dict,
     _send_daily_result_image,
-    _send_prefixed,
+    _safe_send,
     _user_display_name,
     _user_key,
     _wife_state,
@@ -83,15 +83,15 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _send_prefixed(bot, f'要抢谁的{title}？请艾特对方或在命令后面写对方 QQ。', kind=kind)
+        return await _safe_send(bot, f'要抢谁的{title}？请艾特对方或在命令后面写对方 QQ。')
 
     robber_id = _user_key(ev)
     if target_user_id == robber_id:
-        return await _send_prefixed(bot, f'自己抢自己的{title}也太奇怪了吧！', kind=kind)
+        return await _safe_send(bot, f'自己抢自己的{title}也太奇怪了吧！')
 
     target_record = await _get_existing_daily_record(ev, target_user_id, kind)
     if target_record is None:
-        return await _send_prefixed(bot, f'对方今天还没有{title}呢~', kind=kind)
+        return await _safe_send(bot, f'对方今天还没有{title}呢~')
 
     # 读-改-写全程持锁：校验、记次数、转移归属、落库串行执行，替代旧的"无 await"原子段
     refusal: str | None = None
@@ -142,9 +142,9 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
                 await _save_daily_context(ev, context)
 
     if refusal is not None:
-        return await _send_prefixed(bot, refusal, kind=kind)
+        return await _safe_send(bot, refusal)
     if rob_failed:
-        return await _send_prefixed(bot, f'这次没抢到{title}，下次再试试吧~', kind=kind)
+        return await _safe_send(bot, f'这次没抢到{title}，下次再试试吧~')
 
     role = target_record.to_role()
     await _send_rob_result_image(

@@ -251,29 +251,29 @@ async def _send_create_custom_wife_role(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     role_id, created, error = _create_or_get_custom_role(role_name)
     if error:
-        return await _send_prefixed(bot,error)
+        return await _safe_send(bot,error)
 
     if created:
-        await _send_prefixed(bot,f'自定义老婆创建成功\n角色ID：{role_id}')
+        await _safe_send(bot,f'自定义老婆创建成功\n角色ID：{role_id}')
     else:
-        await _send_prefixed(bot,f'自定义老婆已存在\n角色ID：{role_id}')
+        await _safe_send(bot,f'自定义老婆已存在\n角色ID：{role_id}')
 
 
 async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
     if not _can_upload_images(ev):
-        return await _send_prefixed(bot, '你不在图片上传白名单中。')
+        return await _safe_send(bot, '你不在图片上传白名单中。')
 
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     if not role_name:
-        return await _send_prefixed(bot, '请输入角色名，例如：上传老婆图片 达妮娅，并附带图片。')
+        return await _safe_send(bot, '请输入角色名，例如：上传老婆图片 达妮娅，并附带图片。')
 
     image_refs = _upload_image_refs(ev)
     if not image_refs:
-        return await _send_prefixed(bot, f'请同时发送图片和命令，例如：上传老婆图片 {role_name}')
+        return await _safe_send(bot, f'请同时发送图片和命令，例如：上传老婆图片 {role_name}')
 
     role_id, created, error = _create_or_get_custom_role(role_name)
     if error:
-        return await _send_prefixed(bot,error)
+        return await _safe_send(bot,error)
 
     role_dir = _writable_role_pile_root() / role_id
     saved: list[Path] = []
@@ -286,7 +286,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
             saved.append(path)
 
     if not saved:
-        return await _send_prefixed(bot,f'【{role_name}】上传图片失败，请确认消息里附带的是图片。')
+        return await _safe_send(bot,f'【{role_name}】上传图片失败，请确认消息里附带的是图片。')
 
     _invalidate_candidate_cache()
     created_text = '（已自动创建角色）' if created else ''
@@ -299,34 +299,34 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
     ]
     if failed:
         msg.append(f'失败：{failed} 张')
-    await _send_prefixed(bot,'\n'.join(msg))
+    await _safe_send(bot,'\n'.join(msg))
 
 
 async def _send_custom_wife_image_list(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     entries = _custom_role_image_entries(role_name)
     if entries is None:
-        return await _send_prefixed(bot, '未找到这个自定义老婆，请先使用：创建老婆 角色名')
+        return await _safe_send(bot, '未找到这个自定义老婆，请先使用：创建老婆 角色名')
 
     role_id, role_name, images = entries
     if not images:
-        return await _send_prefixed(bot,f'自定义老婆【{role_name}】暂未上传过图片。')
+        return await _safe_send(bot,f'自定义老婆【{role_name}】暂未上传过图片。')
 
     nodes: list[Any] = []
     for hash_id, path in images:
         nodes.append(f'{role_name} 老婆图片ID：{hash_id}')
         nodes.append(MessageSegment.image(path))
-    await _send_prefixed(bot, MessageSegment.node(nodes))
+    await _safe_send(bot, MessageSegment.node(nodes))
 
 
 async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.regex_dict.get('role') or ev.text, strip_wife_suffix=True)
     role_id, role_name, images, error = _resolve_custom_role_for_delete(role_name)
     if error:
-        return await _send_prefixed(bot, error)
+        return await _safe_send(bot, error)
 
     _set_pending_custom_role_delete(ev, role_id, role_name, len(images))
-    await _send_prefixed(
+    await _safe_send(
         bot,
         f'将删除自定义老婆【{role_name}】\n'
         f'角色ID：{role_id}\n'
@@ -339,42 +339,42 @@ async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event):
 async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event):
     pending = _get_pending_custom_role_delete(ev)
     if pending is None:
-        return await _send_prefixed(bot, '没有待确认删除的自定义老婆。')
+        return await _safe_send(bot, '没有待确认删除的自定义老婆。')
 
     role_id = str(pending.get('role_id') or '')
     role_name = str(pending.get('role_name') or role_id)
     if not role_id:
         _clear_pending_custom_role_delete(ev)
-        return await _send_prefixed(bot, '待删除记录无效，请重新发起删除。')
+        return await _safe_send(bot, '待删除记录无效，请重新发起删除。')
 
     deleted_count = _delete_custom_role(role_id)
     _clear_pending_custom_role_delete(ev)
-    await _send_prefixed(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
+    await _safe_send(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
 
 
 async def _send_cancel_delete_custom_wife_role(bot: Bot, ev: Event):
     if _get_pending_custom_role_delete(ev) is None:
-        return await _send_prefixed(bot, '没有待取消的自定义老婆删除。')
+        return await _safe_send(bot, '没有待取消的自定义老婆删除。')
     _clear_pending_custom_role_delete(ev)
-    await _send_prefixed(bot, '已取消删除自定义老婆。')
+    await _safe_send(bot, '已取消删除自定义老婆。')
 
 
 async def _send_delete_custom_wife_image(bot: Bot, ev: Event):
     role_name, hash_id = _parse_delete_custom_image_text(ev.text)
     role_id, role_name, image_path, error = _resolve_custom_image_for_delete(role_name, hash_id)
     if error:
-        return await _send_prefixed(bot,error)
+        return await _safe_send(bot,error)
     if image_path is None:
-        return await _send_prefixed(bot,f'【{role_name}】未找到图片ID：{hash_id}')
+        return await _safe_send(bot,f'【{role_name}】未找到图片ID：{hash_id}')
 
     try:
         image_path.unlink()
     except Exception as exc:
         logger.warning(f'{LOG_PREFIX} 删除自定义老婆图片失败: {image_path} -> {exc}')
-        return await _send_prefixed(bot,f'【{role_name}】图片删除失败：{hash_id}')
+        return await _safe_send(bot,f'【{role_name}】图片删除失败：{hash_id}')
 
     _invalidate_candidate_cache()
-    await _send_prefixed(bot,f'已删除【{role_name}】老婆图片：{hash_id}')
+    await _safe_send(bot,f'已删除【{role_name}】老婆图片：{hash_id}')
 
 
 @custom_role_sv.on_prefix(('创建老婆', '老婆创建'), block=True)

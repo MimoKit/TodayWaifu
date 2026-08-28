@@ -26,7 +26,7 @@ class ResultImageSenderTests(unittest.TestCase):
                 ]
                 self.assertEqual([call.func.id for call in calls], ["_send_daily_result_image"])
 
-    def test_shared_sender_keeps_kind_specific_prefix_behavior(self) -> None:
+    def test_shared_sender_keeps_kind_specific_result_selection(self) -> None:
         source = (ROOT / "twf" / "shared.py").read_text(encoding="utf-8")
         self.assertIn("async def _send_daily_result_image(", source)
         self.assertIn("if kind != 'loli':", source)

@@ -107,11 +107,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后图片前附带"你今天的老婆是xxx"',
         True,
     ),
-    'DailyWifeReplyPrefixEnabled': GsBoolConfig(
-        '启用回复前缀',
-        '开启后插件回复会自动添加"[今日老婆]"前缀',
-        True,
-    ),
     'DailyWifeAtUser': GsBoolConfig(
         '发送时艾特触发者',
         '开启后发送今日老婆结果时会艾特触发者',

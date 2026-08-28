@@ -31,6 +31,10 @@
         "expr": "GsStrConfig('战双图库接口地址', 'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。', 'https://pgr.mimokit.dpdns.org/api/xwuid/roles')"
       },
       {
+        "key": "DailyWifeGalleryToken",
+        "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取；留空则不携带令牌', '')"
+      },
+      {
         "key": "DailyWifeImageUploadWhitelist",
         "expr": "GsListStrConfig('图片上传白名单', '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单', [])"
       },
@@ -81,10 +85,6 @@
       {
         "key": "DailyWifeSendText",
         "expr": "GsBoolConfig('发送文字说明', '开启后图片前附带\"你今天的老婆是xxx\"', True)"
-      },
-      {
-        "key": "DailyWifeReplyPrefixEnabled",
-        "expr": "GsBoolConfig('启用回复前缀', '开启后插件回复会自动添加\"[今日老婆]\"前缀', True)"
       },
       {
         "key": "DailyWifeAtUser",
@@ -149,6 +149,14 @@
       {
         "key": "DailyHusbandTextTemplate",
         "expr": "GsStrConfig('今日老公文字模板', '今日老公的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID', '你今天的老公是{name}')"
+      },
+      {
+        "key": "_DividerDailyLoli",
+        "expr": "GsDivider('今日萝莉', '')"
+      },
+      {
+        "key": "DailyLoliEnabled",
+        "expr": "GsBoolConfig('启用今日萝莉', '开启后可使用「今日萝莉」命令；关闭后命令不生效。图片内容风险请自行承担', False)"
       },
       {
         "key": "_DividerRob",

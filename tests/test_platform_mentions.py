@@ -31,7 +31,6 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
         're': __import__('re'),
         '_cfg': lambda key: values.get(key, ''),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
-        '_reply_text': lambda text, kind='wife': f'[{kind}]{text}',
     }
     exec(compile(ast.Module(body=body, type_ignores=[]), 'mentions', 'exec'), namespace)
     return namespace
@@ -129,7 +128,6 @@ class PlatformMentionTests(unittest.TestCase):
     def test_daily_loli_results_use_the_shared_sender(self) -> None:
         source = (ROOT / 'twf' / 'loli.py').read_text(encoding='utf-8')
         self.assertIn('_send_loli_result_image(', source)
-        self.assertNotIn('_with_loli_reply_prefix(', source)
 
     def test_assignment_has_no_platform_specific_branch(self) -> None:
         source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')

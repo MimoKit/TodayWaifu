@@ -29,30 +29,27 @@ def _save_pgr_image(role_dir: Path, source: str, index: int) -> Path | None:
 
 async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
     if not _can_upload_images(ev):
-        return await _send_prefixed(bot, '你不在图片上传白名单中。', kind='pgr')
+        return await _safe_send(bot, '你不在图片上传白名单中。')
 
     role_name = str(ev.text or '').strip().strip('"“”‘’')
     if not role_name:
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             '请输入已有角色文件夹名称，例如：上传战双老婆图片 露西亚，并附带图片。',
-            kind='pgr',
         )
 
     role_dir = find_named_role_directory(_pgr_wife_root(), role_name)
     if role_dir is None:
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             f'战双图库中不存在角色文件夹【{role_name}】，请先由主人创建对应文件夹。',
-            kind='pgr',
         )
 
     image_refs = collect_image_refs(ev)
     if not image_refs:
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             f'请同时发送图片和命令，例如：上传战双老婆图片 {role_dir.name}',
-            kind='pgr',
         )
 
     saved: list[Path] = []
@@ -65,10 +62,9 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
             saved.append(path)
 
     if not saved:
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             f'【{role_dir.name}】上传图片失败，请确认消息里附带的是图片。',
-            kind='pgr',
         )
 
     _invalidate_candidate_cache()
@@ -80,7 +76,7 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
     ]
     if failed:
         lines.append(f'失败：{failed} 张')
-    await _send_prefixed(bot, '\n'.join(lines), kind='pgr')
+    await _safe_send(bot, '\n'.join(lines))
 
 
 def _pgr_candidates_by_name(
@@ -168,10 +164,9 @@ async def _send_daily_pgr_wife(
     is_transient_draw = is_debug_active or bool(specified_name)
 
     if specified_name and not can_specify_role:
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             '只有机器人主人或指定老婆白名单用户才能指定战双老婆。',
-            kind='pgr',
         )
 
     if not is_transient_draw:
@@ -179,22 +174,20 @@ async def _send_daily_pgr_wife(
         current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
         state = _wife_state(current)
         if state == 'divorced':
-            return await _send_prefixed(
+            return await _safe_send(
                 bot,
                 '你今天已经和战双老婆离婚了，明天再来吧~',
-                kind='pgr',
             )
         if state == 'lost_stolen':
-            return await _send_prefixed(bot, '你的战双老婆已经被抢走了。', kind='pgr')
+            return await _safe_send(bot, '你的战双老婆已经被抢走了。')
         if state == 'lost_gifted':
-            return await _send_prefixed(bot, '你的战双老婆已经送出去了。', kind='pgr')
+            return await _safe_send(bot, '你的战双老婆已经送出去了。')
 
         other_wife_name = await _get_other_daily_wife_name(ev, 'pgr')
         if other_wife_name:
-            return await _send_prefixed(
+            return await _safe_send(
                 bot,
                 f'你今天已经有{other_wife_name}了，不要贪心！',
-                kind='pgr',
             )
 
     if is_transient_draw:
@@ -202,21 +195,19 @@ async def _send_daily_pgr_wife(
         if specified_name:
             candidates = _pgr_candidates_by_name(candidates, specified_name)
             if not candidates:
-                return await _send_prefixed(
+                return await _safe_send(
                     bot,
                     f'战双老婆图库中没有角色【{specified_name}】。',
-                    kind='pgr',
                 )
         record = _pick_role_record(candidates, random)
     else:
         record = await _ensure_daily_pgr_wife_record(ev)
     if record is None:
         root = _pgr_wife_root()
-        return await _send_prefixed(
+        return await _safe_send(
             bot,
             '战双老婆图库里还没有可用图片。\n'
             f'把图片放成“{root}\\角色名\\图片文件”即可。',
-            kind='pgr',
         )
 
     if record.image.startswith(('http://', 'https://')):

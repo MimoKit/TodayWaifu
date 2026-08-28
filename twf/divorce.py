@@ -9,7 +9,7 @@ from .shared import (
     _load_daily_context,
     _save_daily_context,
     _mark_all_daily_records_divorced,
-    _send_prefixed,
+    _safe_send,
     _user_key,
     divorce_sv,
     logger,
@@ -62,13 +62,13 @@ async def _send_divorce_all(bot: Bot, ev: Event) -> None:
 
         clear_pending_gifts_for_user(ev, user_key)
         if not divorced:
-            return await _send_prefixed(bot, '你今天没有可以离婚的对象。')
+            return await _safe_send(bot, '你今天没有可以离婚的对象。')
 
         await _save_daily_context(ev, context)
     names = '、'.join(
         dict.fromkeys(_divorce_result_name(kind, name) for kind, name in divorced)
     )
-    await _send_prefixed(bot, f'已经全部离婚：{names}。')
+    await _safe_send(bot, f'已经全部离婚：{names}。')
 
 
 @divorce_sv.on_fullmatch(
