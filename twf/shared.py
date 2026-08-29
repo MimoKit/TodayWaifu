@@ -57,10 +57,11 @@ from .daily_state_helpers import (
     is_secondhand_wife as _is_secondhand_wife,
     has_active_wife as _has_active_wife,
 )
-from .target_parser import (
-    normalise_target_user_id as _normalise_target_user_id,
-    target_user_id_from_text as _target_user_id_from_text,
-    iter_event_messages as _iter_event_messages,
+from .member_helpers import (
+    valid_display_name as _valid_display_name,
+    valid_member_text as _valid_member_text,
+    member_probability as _member_probability,
+    qq_avatar_url as _qq_avatar_url,
 )
 
 
