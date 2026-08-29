@@ -14,12 +14,8 @@ class FakeMessage:
         self.data = data
 
 
-def _load_functions(
-    names: set[str],
-    config: dict[str, Any] | None = None,
-    module_name: str = 'shared',
-) -> dict[str, Any]:
-    source = (ROOT / 'twf' / f'{module_name}.py').read_text(encoding='utf-8')
+def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> dict[str, Any]:
+    source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
     tree = ast.parse(source)
     body = [
         node
@@ -91,8 +87,7 @@ class PlatformMentionTests(unittest.TestCase):
 
     def test_generic_send_boundary_only_removes_private_mentions(self) -> None:
         functions = _load_functions(
-            {'_is_at_message', '_remove_private_mentions', '_adapt_mentions_for_platform'},
-            module_name='messaging',
+            {'_is_at_message', '_remove_private_mentions', '_adapt_mentions_for_platform'}
         )
         adapt = functions['_adapt_mentions_for_platform']
         outgoing = [FakeMessage('at', '123456789'), '\n', '结果文字', FakeMessage('image', 'x')]
