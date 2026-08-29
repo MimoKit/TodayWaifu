@@ -47,14 +47,7 @@ from .messaging import (
     _remove_private_mentions, _safe_send, _send_loli_text,
     _target_send_without_bot_hooks,
 )
-from .role_filter import (
-    EXCLUDED_ROLE_NAMES, EXCLUDED_ROLE_KEYWORDS, NTE_EXCLUDED_ROLE_NAMES,
-    NTE_EXCLUDED_ROLE_KEYWORDS, _MALE_ROLE_NAMES_NORM,
-    _normalize_role_name as _normalize_role_name,
-    _is_male_role as _is_male_role,
-    _is_excluded_role as _is_excluded_role,
-    _is_excluded_nte_role as _is_excluded_nte_role,
-)
+from .types import MemberCandidate, RoleCandidate, WifeRecord
 from .upload_access import can_upload_images, normalized_user_ids
 
 
