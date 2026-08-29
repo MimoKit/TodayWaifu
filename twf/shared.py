@@ -57,7 +57,12 @@ from .daily_state_helpers import (
     is_secondhand_wife as _is_secondhand_wife,
     has_active_wife as _has_active_wife,
 )
-from .upload_access import can_upload_images, normalized_user_ids
+from .member_helpers import (
+    valid_display_name as _valid_display_name,
+    valid_member_text as _valid_member_text,
+    member_probability as _member_probability,
+    qq_avatar_url as _qq_avatar_url,
+)
 
 
 Plugins(
@@ -1171,15 +1176,6 @@ def _user_key(ev: Event, user_id: str | int | None = None) -> str:
     return str(ev.user_id if user_id is None else user_id)
 
 
-def _valid_display_name(value: Any, user_id: str | int | None = None) -> str:
-    text = str(value or '').strip()
-    if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
-        return ''
-    if user_id is not None and text == str(user_id):
-        return ''
-    return text
-
-
 def _display_name_from_mapping(data: Any, user_id: str | int | None = None) -> str:
     if not isinstance(data, dict):
         return ''
@@ -1231,21 +1227,6 @@ def _member_feature_enabled() -> bool:
 
 def _marry_member_enabled() -> bool:
     return _cfg_bool('DailyWifeMarryGroupMemberEnabled', False)
-
-
-def _member_probability() -> float:
-    return _cfg_probability('DailyWifeGroupMemberProbability', 0.1)
-
-
-def _valid_member_text(value: Any) -> str:
-    text = str(value or '').strip()
-    if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
-        return ''
-    return text
-
-
-def _qq_avatar_url(user_id: str) -> str:
-    return f'https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640'
 
 
 def _member_avatar_cache_path(user_id: str) -> Path:
