@@ -60,6 +60,7 @@ loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
 wife_list_sv = SV('今日老婆-老婆列表', priority=3)
+random_wife_sv = SV('今日老婆-来点老婆', priority=3)
 husband_list_sv = SV('今日老婆-老公列表', priority=3)
 marry_member_sv = SV('今日老婆-娶群友', priority=3)
 rob_sv = SV('今日老婆-抢老婆', priority=3)
@@ -96,6 +97,9 @@ LOLI_MOBILE_UA = (
     'AppleWebKit/537.36 (KHTML, like Gecko) '
     'Chrome/124.0.6367.82 Mobile Safari/537.36'
 )
+# 「来点老婆」每日次数桶：只存计数，不参与抢 / 送 / 离婚等每日婚姻记录
+RANDOM_WIFE_QUOTA_BUCKET = 'random_wife_quota'
+RANDOM_WIFE_DEFAULT_DAILY_LIMIT = 3
 # --- 日志前缀 ---
 LOG_PREFIX = '[鸣潮今日老婆]'
 LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
@@ -110,6 +114,7 @@ __all__ = [
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins',
+    'RANDOM_WIFE_DEFAULT_DAILY_LIMIT', 'RANDOM_WIFE_QUOTA_BUCKET',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
     'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
@@ -132,11 +137,13 @@ __all__ = [
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
     '_daily_context_lock',
     '_load_daily_context', '_save_daily_context',
-    '_save_daily_record',
+    '_save_daily_record', '_delete_daily_record',
     '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
     '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_role_record',
+    '_consume_random_wife_quota', '_random_wife_daily_limit',
+    '_random_wife_used_count', '_refund_random_wife_quota',
     '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
@@ -153,7 +160,7 @@ __all__ = [
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
-    'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
+    'marry_member_sv', 'pgr_wife_sv', 'random_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'urlopen', 'urlparse',
 ]
@@ -976,14 +983,14 @@ def _http_get_with_retry(
 ) -> bytes:
     """请求远程图库接口，失败或超时时重试 `retries` 次，每次间隔 `delay` 秒。
 
-    401 属于认证错误，重试无意义，直接抛出。
+    401/403 属于认证或授权错误，重试无意义，直接抛出。
     """
     last_exc: Exception | None = None
     for attempt in range(retries + 1):
         try:
             return _http_get(url, timeout=timeout)
         except HTTPError as exc:
-            if exc.code == 401:
+            if exc.code in {401, 403}:
                 raise
             last_exc = exc
         except (URLError, TimeoutError, OSError) as exc:
@@ -1579,6 +1586,19 @@ async def _save_daily_record(
     context.setdefault(bucket, {})[user_key] = value
 
 
+async def _delete_daily_record(ev: Event, bucket: str, user_key: str) -> None:
+    """删除单条记录，成功后才同步内存快照。"""
+    day = _today_key()
+    bot_id, _, group_id = _context_key(ev).partition(':')
+    await DailyWifeRecord.delete_record(
+        day, bot_id, group_id or 'direct', bucket, user_key
+    )
+    context = await _load_daily_context(ev)
+    bucket_data = context.get(bucket)
+    if isinstance(bucket_data, dict):
+        bucket_data.pop(user_key, None)
+
+
 async def _save_daily_context(ev: Event, context: dict[str, Any]) -> None:
     """定向提交一个上下文的快照，成功后更新内存快照。"""
     day = _today_key()
@@ -1628,7 +1648,68 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
+    context.setdefault(RANDOM_WIFE_QUOTA_BUCKET, {})
     return context
+
+
+def _random_wife_daily_limit() -> int:
+    """「来点老婆」每人每天次数上限，<=0 表示不限制。"""
+    try:
+        limit = int(_cfg('DailyWifeRandomDailyLimit'))
+    except (TypeError, ValueError):
+        limit = RANDOM_WIFE_DEFAULT_DAILY_LIMIT
+    return max(0, limit)
+
+
+def _random_wife_used_count(context: dict[str, Any], user_key: str) -> int:
+    bucket = context.get(RANDOM_WIFE_QUOTA_BUCKET)
+    raw = bucket.get(user_key) if isinstance(bucket, dict) else None
+    try:
+        return max(0, int(raw))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _consume_random_wife_quota(ev: Event) -> tuple[bool, int, int]:
+    """占用一次「来点老婆」额度，返回 (是否放行, 占用后已用次数, 上限)。
+
+    计数落在当天 + `bot_id:group_id` 上下文里：同一个人在不同群各自独立，
+    私聊统一算作 `direct`，跨天由 day 主键自动重置。主人和上限 0 都不受限制。
+    """
+    limit = _random_wife_daily_limit()
+    if limit <= 0 or _is_master(ev):
+        return True, 0, limit
+
+    user_key = _user_key(ev)
+    # 先占额度再请求图库：避免并发连点绕过限制，也顺带保护上游接口。
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
+        used = _random_wife_used_count(context, user_key)
+        if used >= limit:
+            return False, used, limit
+        await _save_daily_record(
+            ev, RANDOM_WIFE_QUOTA_BUCKET, user_key, used + 1
+        )
+    return True, used + 1, limit
+
+
+async def _refund_random_wife_quota(ev: Event) -> None:
+    """取图失败时退还一次额度，不让接口故障白吃用户次数。"""
+    if _random_wife_daily_limit() <= 0 or _is_master(ev):
+        return
+
+    user_key = _user_key(ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
+        used = _random_wife_used_count(context, user_key)
+        if used <= 0:
+            return
+        if used > 1:
+            await _save_daily_record(
+                ev, RANDOM_WIFE_QUOTA_BUCKET, user_key, used - 1
+            )
+        else:
+            await _delete_daily_record(ev, RANDOM_WIFE_QUOTA_BUCKET, user_key)
 
 
 async def _migrate_legacy_wife_data() -> int:

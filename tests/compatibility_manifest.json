@@ -23,6 +23,14 @@
         "expr": "GsStrConfig('图库接口地址', '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担', 'https://img.mimokit.dpdns.org/api/xwuid/roles')"
       },
       {
+        "key": "DailyWifeRandomGalleryApiUrl",
+        "expr": "GsStrConfig('来点老婆图库接口', '独立命令“来点老婆”使用的图库接口，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌', 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')"
+      },
+      {
+        "key": "DailyWifeRandomDailyLimit",
+        "expr": "GsIntConfig('来点老婆每日次数', '每人每天在同一个群（私聊单独计算）可用“来点老婆”的次数，0 表示不限制；机器人主人不受限制', 3, 100)"
+      },
+      {
         "key": "DailyWifeLoliApiUrl",
         "expr": "GsStrConfig('今日萝莉接口地址', 'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库', 'https://loli.mimokit.dpdns.org')"
       },
@@ -457,6 +465,11 @@
       "file": "twf/pgr.py",
       "function": "upload_pgr_wife",
       "decorator": "image_upload_sv.on_command(('上传战双老婆图片', '战双老婆上传图片'), block=True)"
+    },
+    {
+      "file": "twf/random_wife.py",
+      "function": "random_wife",
+      "decorator": "random_wife_sv.on_fullmatch('来点老婆', block=True)"
     },
     {
       "file": "twf/rob.py",

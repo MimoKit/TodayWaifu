@@ -14,6 +14,7 @@ Plugins(
 # 导入顺序即为命令加载顺序（shared 须最先，help 须在 daily 之前避免"今日老婆帮助"被 prefix 拦截）
 from .twf import shared       # 公共层：SV 实例、数据模型、工具函数
 from .twf import help         # 帮助命令 + register_help（须在 daily 之前）  # noqa: F811
+from .twf import random_wife  # 独立远程图库随机抽图
 from .twf import daily        # 每日抽取 / 列表 / 娶群友 / 老公
 from .twf import pgr          # 战双本地图库抽取
 from .twf import rob          # 抢老婆
