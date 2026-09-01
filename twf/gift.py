@@ -23,7 +23,7 @@ from .shared import (
     _husband_available,
     _is_secondhand_wife,
     _load_daily_context,
-    _save_daily_context,
+    _save_daily_records,
     _record_from_dict,
     _record_to_dict,
     _send_daily_result_image,
@@ -37,6 +37,7 @@ from .shared import (
 
 
 GIFT_CONFIRM_TIMEOUT_SECONDS = 60
+GIFT_PENDING_MAX_ENTRIES = 4096
 _GIFT_PENDING: dict[str, dict[str, Any]] = {}
 
 
@@ -90,6 +91,13 @@ def _get_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> dic
 
 
 def _set_pending_gift(ev: Event, target_user_id: str, giver_id: str, kind: str = 'wife') -> None:
+    clear_expired_pending_gifts()
+    if len(_GIFT_PENDING) >= GIFT_PENDING_MAX_ENTRIES:
+        oldest_key = min(
+            _GIFT_PENDING,
+            key=lambda key: float(_GIFT_PENDING[key].get('created_at') or 0),
+        )
+        _GIFT_PENDING.pop(oldest_key, None)
     _GIFT_PENDING[_gift_pending_key(ev, target_user_id, kind)] = {
         'giver_id': giver_id,
         'kind': kind,
@@ -99,6 +107,20 @@ def _set_pending_gift(ev: Event, target_user_id: str, giver_id: str, kind: str =
 
 def _clear_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> None:
     _GIFT_PENDING.pop(_gift_pending_key(ev, target_user_id, kind), None)
+
+
+def clear_expired_pending_gifts() -> None:
+    now = time.time()
+    for key, pending in tuple(_GIFT_PENDING.items()):
+        if not isinstance(pending, dict):
+            _GIFT_PENDING.pop(key, None)
+            continue
+        try:
+            created_at = float(pending.get('created_at') or 0)
+        except (TypeError, ValueError):
+            created_at = 0
+        if now - created_at > GIFT_CONFIRM_TIMEOUT_SECONDS:
+            _GIFT_PENDING.pop(key, None)
 
 
 def clear_pending_gifts_for_user(ev: Event, user_id: str) -> None:
@@ -194,7 +216,8 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
             f'对方现在已经没有{title}可以送给你了，赠送已失效~',
         )
 
-    # 读-改-写持有锁，防止与抢老婆/离婚等并发写入互相覆盖
+    response: str | None = None
+    confirmed_giver_record: WifeRecord | None = None
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
         bucket = _daily_bucket_name(kind)
@@ -202,42 +225,41 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
         state = _wife_state(giver_data)
         if state == 'lost_stolen':
-            return await _safe_send(bot, f'对方的{title}已经被抢走了，赠送已失效~')
-        if state == 'lost_gifted':
-            return await _safe_send(bot, f'对方已经把{title}送给别人了，赠送已失效~')
-        if state == 'divorced':
-            return await _safe_send(bot, f'对方已经和{title}离婚了，赠送已失效~')
-        if _is_secondhand_wife(giver_data):
-            return await _safe_send(
-                bot,
-                f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~',
-            )
+            response = f'对方的{title}已经被抢走了，赠送已失效~'
+        elif state == 'lost_gifted':
+            response = f'对方已经把{title}送给别人了，赠送已失效~'
+        elif state == 'divorced':
+            response = f'对方已经和{title}离婚了，赠送已失效~'
+        elif _is_secondhand_wife(giver_data):
+            response = f'这个{title}是抢来或别人送的，不能再送出去，赠送已失效~'
+        elif _has_active_wife(context[bucket].get(target_user_id)):
+            response = f'你现在已经有{title}了，不需要接受赠送啦~'
+        else:
+            confirmed_giver_record = _record_from_dict(giver_data)
+            if confirmed_giver_record is None:
+                response = f'对方现在已经没有{title}可以送给你了，赠送已失效~'
+            else:
+                receiver_record = _record_to_dict(confirmed_giver_record, ev, target_user_id)
+                receiver_record['gifted_from'] = giver_id
+                giver_update = context[bucket].get(giver_id)
+                updates = [(bucket, target_user_id, receiver_record)]
+                if isinstance(giver_update, dict):
+                    giver_update = dict(giver_update)
+                    giver_update['gifted_to'] = target_user_id
+                    giver_update['gifted_to_name'] = _user_display_name(ev, target_user_id)
+                    updates.append((bucket, giver_id, giver_update))
+                await _save_daily_records(ev, updates)
 
-        if _has_active_wife(context[bucket].get(target_user_id)):
-            return await _safe_send(bot, f'你现在已经有{title}了，不需要接受赠送啦~')
+    if response is not None:
+        return await _safe_send(bot, response)
+    if confirmed_giver_record is None:
+        return await _safe_send(bot, f'对方现在已经没有{title}可以送给你了，赠送已失效~')
 
-        # 以锁内重新读到的记录为准，避免锁外快照过期
-        giver_record = _record_from_dict(giver_data)
-        if giver_record is None:
-            return await _safe_send(
-                bot,
-                f'对方现在已经没有{title}可以送给你了，赠送已失效~',
-            )
-
-        context[bucket][target_user_id] = _record_to_dict(giver_record, ev, target_user_id)
-        context[bucket][target_user_id]['gifted_from'] = giver_id
-
-        if isinstance(context[bucket].get(giver_id), dict):
-            context[bucket][giver_id]['gifted_to'] = target_user_id
-            context[bucket][giver_id]['gifted_to_name'] = _user_display_name(ev, target_user_id)
-
-        await _save_daily_context(ev, context)
-
-    role = giver_record.to_role()
+    role = confirmed_giver_record.to_role()
     await _send_gift_result_image(
         bot,
         role,
-        giver_record.image,
+        confirmed_giver_record.image,
         _build_gift_success_text(role, target_user_id, kind),
         giver_id,
         ev.group_id is not None,

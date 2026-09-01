@@ -99,6 +99,7 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             wives = {}
 
         data_changed = False
+        changed_records: list[tuple[str, str, dict[str, Any]]] = []
         items: list[tuple[int, str, str]] = []
         seen_users: set[str] = set()
         for user_id, raw_record in wives.items():
@@ -112,10 +113,13 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             if not display_name:
                 display_name = group_display_names.get(str(user_id), '')
                 if display_name:
-                    raw_record['display_name'] = display_name
-                    raw_record['display_name_source'] = 'coreuser'
-                    raw_record['display_name_updated_at'] = int(time.time())
+                    updated_record = dict(raw_record)
+                    updated_record['display_name'] = display_name
+                    updated_record['display_name_source'] = 'coreuser'
+                    updated_record['display_name_updated_at'] = int(time.time())
                     data_changed = True
+                    changed_records.append((bucket, str(user_id), updated_record))
+                    raw_record = updated_record
             if not display_name:
                 display_name = str(user_id)
             updated_at = raw_record.get('updated_at')
@@ -153,10 +157,13 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
                     if not display_name:
                         display_name = group_display_names.get(str(user_id), '')
                         if display_name:
-                            raw_record['display_name'] = display_name
-                            raw_record['display_name_source'] = 'coreuser'
-                            raw_record['display_name_updated_at'] = int(time.time())
+                            updated_record = dict(raw_record)
+                            updated_record['display_name'] = display_name
+                            updated_record['display_name_source'] = 'coreuser'
+                            updated_record['display_name_updated_at'] = int(time.time())
                             data_changed = True
+                            changed_records.append(('safe_wives', str(user_id), updated_record))
+                            raw_record = updated_record
                     if not display_name:
                         display_name = str(user_id)
                     updated_at = raw_record.get('updated_at')
@@ -174,7 +181,7 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             return f'今天本群还没有可用的{title}记录。', []
 
         if data_changed:
-            await _save_daily_context(ev, context)
+            await _save_daily_records(ev, changed_records)
 
     items.sort(key=lambda item: (item[0], item[1]))
     return f'今日{title}列表：', items
@@ -292,9 +299,12 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                     if isinstance(latest_safe, dict):
                         reused_safe_wife = _record_from_dict(latest_safe)
                     if reused_safe_wife is None:
-                        context['safe_wives'][user_key] = _record_to_dict(safe_wife, ev, user_key)
-                        context['safe_wives'][user_key]['safe'] = True
-                        await _save_daily_context(ev, context)
+                        new_safe_record = _record_to_dict(safe_wife, ev, user_key)
+                        new_safe_record['safe'] = True
+                        await _save_daily_records(
+                            ev,
+                            [('safe_wives', user_key, new_safe_record)],
+                        )
 
             if state_changed:
                 # 状态已变化（离婚/赠送等），重走标准流程给出对应提示
@@ -448,14 +458,12 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     image = record.image
     target_key = str(target_user_id)
 
+    assigned_record = _record_to_dict(record, ev, target_key)
+    assigned_record['assigned_by'] = _user_key(ev)
+    assigned_record['assigned_by_name'] = _user_display_name(ev)
+    deletes = [('safe_wives', target_key)]
     async with _daily_context_lock(ev):
-        context = await _load_daily_context(ev)
-        context['wives'][target_key] = _record_to_dict(record, ev, target_key)
-        context['wives'][target_key]['assigned_by'] = _user_key(ev)
-        context['wives'][target_key]['assigned_by_name'] = _user_display_name(ev)
-        if isinstance(context.get('safe_wives'), dict):
-            context['safe_wives'].pop(target_key, None)
-        await _save_daily_context(ev, context)
+        await _save_daily_records(ev, [('wives', target_key, assigned_record)], deletes)
 
     logger.info(
         f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, '

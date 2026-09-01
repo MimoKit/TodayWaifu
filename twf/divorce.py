@@ -8,7 +8,7 @@ from .shared import (
     _daily_bucket_name,
     _daily_context_lock,
     _load_daily_context,
-    _save_daily_context,
+    _save_daily_records,
     _safe_send,
     _user_key,
     divorce_sv,
@@ -61,19 +61,27 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
         f'发起{title}离婚'
     )
 
+    response: str | None = None
+    result_name = ''
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
-        bucket = context[_daily_bucket_name(kind)]
+        bucket_name = _daily_bucket_name(kind)
+        bucket = context[bucket_name]
         record = bucket.get(user_key)
         if not isinstance(record, dict) or not str(record.get('name') or '').strip():
-            return await _safe_send(bot, f'你今天没有可以离婚的{title}。')
-        if record.get('divorced'):
-            return await _safe_send(bot, f'你今天已经和{title}离婚了。')
-        record['divorced'] = True
-        record['divorced_at'] = int(time.time())
-        await _save_daily_context(ev, context)
+            response = f'你今天没有可以离婚的{title}。'
+        elif record.get('divorced'):
+            response = f'你今天已经和{title}离婚了。'
+        else:
+            updated_record = dict(record)
+            updated_record['divorced'] = True
+            updated_record['divorced_at'] = int(time.time())
+            await _save_daily_records(ev, [(bucket_name, user_key, updated_record)])
+            result_name = str(record['name'])
 
-    await _safe_send(bot, f'已经和今天的{title}离婚：{record["name"]}。')
+    if response is not None:
+        return await _safe_send(bot, response)
+    await _safe_send(bot, f'已经和今天的{title}离婚：{result_name}。')
 
 
 @divorce_sv.on_fullmatch(

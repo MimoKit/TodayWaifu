@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+from typing import Any
 
 from .shared import (
     Bot,
@@ -22,7 +23,7 @@ from .shared import (
     _is_master,
     _is_secondhand_wife,
     _load_daily_context,
-    _save_daily_context,
+    _save_daily_records,
     _record_to_dict,
     _send_daily_result_image,
     _safe_send,
@@ -96,6 +97,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     # 读-改-写全程持锁：校验、记次数、转移归属、落库串行执行，替代旧的"无 await"原子段
     refusal: str | None = None
     rob_failed = False
+    updates: list[tuple[str, str, Any]] = []
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
         bucket = _daily_bucket_name(kind)
@@ -124,22 +126,23 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
         if refusal is None:
             if not is_master:
-                attempts[attempt_key] = True
-
+                updates.append(('rob_attempts', attempt_key, True))
             if random.random() >= _rob_success_rate(kind):
                 logger.info(f'{LOG_PREFIX} 用户 {robber_id} 抢 {target_user_id} 的{title}失败')
                 rob_failed = True
-                await _save_daily_context(ev, context)
             else:
                 logger.info(f'{LOG_PREFIX} 用户 {robber_id} 成功抢走 {target_user_id} 的{title}')
-                context[bucket][robber_id] = _record_to_dict(target_record, ev, robber_id)
-                context[bucket][robber_id]['stolen_from'] = target_user_id
+                robbed_record = _record_to_dict(target_record, ev, robber_id)
+                robbed_record['stolen_from'] = target_user_id
+                updates.append((bucket, robber_id, robbed_record))
+                target_update = context[bucket].get(target_key)
+                if isinstance(target_update, dict):
+                    target_update = dict(target_update)
+                    target_update['stolen_by'] = robber_id
+                    target_update['stolen_by_name'] = _user_display_name(ev, robber_id)
+                    updates.append((bucket, target_key, target_update))
 
-                if isinstance(context[bucket].get(target_key), dict):
-                    context[bucket][target_key]['stolen_by'] = robber_id
-                    context[bucket][target_key]['stolen_by_name'] = _user_display_name(ev, robber_id)
-
-                await _save_daily_context(ev, context)
+            await _save_daily_records(ev, updates)
 
     if refusal is not None:
         return await _safe_send(bot, refusal)
