@@ -16,25 +16,36 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Optional
 
-# 本地文件字节缓存上限（条目数），超出后淘汰最久未使用的条目
+# 本地文件字节缓存上限：同时限制条目数和总字节数，避免大图把核心进程内存吃满
 LOCAL_BYTES_CACHE_MAX_ENTRIES = 128
+LOCAL_BYTES_CACHE_MAX_BYTES = 128 * 1024 * 1024
 
 _LOCAL_BYTES_CACHE: 'OrderedDict[str, tuple[int, int, bytes]]' = OrderedDict()
+_LOCAL_BYTES_CACHE_TOTAL_BYTES = 0
 
 
 def read_file_bytes_cached(path: Path) -> bytes:
     """按 (路径, mtime_ns, 大小) 缓存文件字节；文件变更后自动重新读取。"""
     stat = path.stat()
     key = str(path)
+    global _LOCAL_BYTES_CACHE_TOTAL_BYTES
     cached = _LOCAL_BYTES_CACHE.get(key)
     if cached is not None and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
         _LOCAL_BYTES_CACHE.move_to_end(key)
         return cached[2]
     data = path.read_bytes()
+    previous = _LOCAL_BYTES_CACHE.pop(key, None)
+    if previous is not None:
+        _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(previous[2])
     _LOCAL_BYTES_CACHE[key] = (stat.st_mtime_ns, stat.st_size, data)
     _LOCAL_BYTES_CACHE.move_to_end(key)
-    while len(_LOCAL_BYTES_CACHE) > LOCAL_BYTES_CACHE_MAX_ENTRIES:
-        _LOCAL_BYTES_CACHE.popitem(last=False)
+    _LOCAL_BYTES_CACHE_TOTAL_BYTES += len(data)
+    while (
+        len(_LOCAL_BYTES_CACHE) > LOCAL_BYTES_CACHE_MAX_ENTRIES
+        or _LOCAL_BYTES_CACHE_TOTAL_BYTES > LOCAL_BYTES_CACHE_MAX_BYTES
+    ):
+        _, removed = _LOCAL_BYTES_CACHE.popitem(last=False)
+        _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(removed[2])
     return data
 
 
@@ -45,7 +56,9 @@ def read_file_text_cached(path: Path, encoding: str = 'utf-8') -> str:
 
 def clear_file_caches() -> None:
     """清空全部内存文件缓存（测试与调试用）。"""
+    global _LOCAL_BYTES_CACHE_TOTAL_BYTES
     _LOCAL_BYTES_CACHE.clear()
+    _LOCAL_BYTES_CACHE_TOTAL_BYTES = 0
 
 
 def url_hash_cache_path(cache_root: Path, url: str) -> Path:
