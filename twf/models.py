@@ -12,7 +12,7 @@ import json
 from typing import Any, Dict, List
 
 from sqlmodel import Field, delete, select
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, tuple_
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -205,6 +205,68 @@ class DailyWifeRecord(BaseModel, table=True):
 
     @classmethod
     @with_session
+    async def upsert_records(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bot_id: str,
+        group_id: str,
+        records: list[tuple[str, str, Any]],
+        deletes: list[tuple[str, str]] | None = None,
+    ) -> None:
+        """在一个事务中定向更新或删除少量业务记录。"""
+        if deletes:
+            for bucket, user_key in deletes:
+                await session.execute(
+                    delete(cls)
+                    .where(cls.day == day)
+                    .where(cls.bot_id == bot_id)
+                    .where(cls.group_id == group_id)
+                    .where(cls.bucket == bucket)
+                    .where(cls.user_id == str(user_key))
+                )
+
+        values = []
+        for bucket, user_key, value in records:
+            user_key = str(user_key)
+            row = cls._row_from_value(day, bot_id, group_id, bucket, user_key, value)
+            values.append(
+                {
+                    'day': day,
+                    'bot_id': bot_id,
+                    'group_id': group_id,
+                    'bucket': bucket,
+                    'user_id': user_key,
+                    'name': row.name,
+                    'display_name': row.display_name,
+                    'image': row.image,
+                    'record_type': row.record_type,
+                    'state': row.state,
+                    'origin': row.origin,
+                    'updated_at': row.updated_at,
+                    'payload': row.payload,
+                }
+            )
+
+        if not values:
+            return
+        statement = sqlite_insert(cls).values(values)
+        update_columns = {
+            key: getattr(statement.excluded, key)
+            for key in (
+                'name', 'display_name', 'image', 'record_type', 'state',
+                'origin', 'updated_at', 'payload',
+            )
+        }
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
+
+    @classmethod
+    @with_session
     async def upsert_context(
         cls,
         session: AsyncSession,
@@ -251,16 +313,19 @@ class DailyWifeRecord(BaseModel, table=True):
             .where(cls.bot_id == bot_id)
             .where(cls.group_id == group_id)
         )
-        for bucket, user_key in existing.all():
-            if (bucket, user_key) not in desired_keys:
-                await session.execute(
-                    delete(cls)
-                    .where(cls.day == day)
-                    .where(cls.bot_id == bot_id)
-                    .where(cls.group_id == group_id)
-                    .where(cls.bucket == bucket)
-                    .where(cls.user_id == user_key)
-                )
+        stale_keys = [
+            (bucket, user_key)
+            for bucket, user_key in existing.all()
+            if (bucket, user_key) not in desired_keys
+        ]
+        if stale_keys:
+            await session.execute(
+                delete(cls)
+                .where(cls.day == day)
+                .where(cls.bot_id == bot_id)
+                .where(cls.group_id == group_id)
+                .where(tuple_(cls.bucket, cls.user_id).in_(stale_keys))
+            )
 
         if not values:
             return
@@ -322,6 +387,41 @@ class DailyWifeRecord(BaseModel, table=True):
         )
         row = result.scalar_one_or_none()
         return row.to_record_value() if row is not None else None
+
+    @classmethod
+    @with_read_session
+    async def count_daily_records(
+        cls,
+        session: AsyncSession,
+        day: str,
+        bucket_names: tuple[str, ...],
+    ) -> dict[str, int]:
+        """一次读取指定日期各桶的可计数原始记录数量。"""
+        if not bucket_names:
+            return {}
+        result = await session.execute(
+            select(cls.bucket, cls.payload, cls.record_type)
+            .where(cls.day == day)
+            .where(cls.bucket.in_(bucket_names))
+        )
+        counts = {bucket: 0 for bucket in bucket_names}
+        for bucket, payload, record_type in result.all():
+            try:
+                value = json.loads(payload)
+            except (TypeError, ValueError):
+                value = True if record_type == MARKER_RECORD_TYPE else None
+            if not isinstance(value, dict):
+                continue
+            name = value.get('name')
+            if (
+                isinstance(name, str)
+                and name.strip()
+                and not value.get('stolen_from')
+                and not value.get('gifted_from')
+                and not value.get('safe')
+            ):
+                counts[bucket] = counts.get(bucket, 0) + 1
+        return counts
 
     @classmethod
     @with_read_session
@@ -413,6 +513,27 @@ class DailyWifeRecord(BaseModel, table=True):
                     imported += len(rows)
         logger.info(f'{LOG_PREFIX} 旧 JSON 数据迁移完成，共导入 {imported} 条记录')
         return imported
+
+
+# importlib / GsCore 热加载可能在同一个 SQLModel.metadata 中再次声明本表。
+# SQLModel 对 ``Field(index=True)`` 的重复声明会挂上同名 Index，随后
+# create_all 会尝试执行两次 CREATE INDEX。只保留同一表上的一个等价索引，
+# 不改变现有表名、索引名或业务键。
+def _deduplicate_table_indexes(table: Any) -> None:
+    seen: set[tuple[str | None, tuple[str, ...], bool | None]] = set()
+    for index in tuple(table.indexes):
+        signature = (
+            index.name,
+            tuple(column.key for column in index.columns),
+            index.unique,
+        )
+        if signature in seen:
+            table.indexes.discard(index)
+        else:
+            seen.add(signature)
+
+
+_deduplicate_table_indexes(DailyWifeRecord.__table__)
 
 
 # 为已有数据库补充业务键唯一约束，供 SQLite upsert 使用。
