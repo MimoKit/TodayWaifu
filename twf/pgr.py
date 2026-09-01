@@ -135,8 +135,8 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
         existing = _stored_pgr_record(existing_raw)
         if existing is not None:
             return existing
-        context[bucket][key] = _record_to_dict(chosen, ev, key)
-        await _save_daily_context(ev, context)
+        value = _record_to_dict(chosen, ev, key)
+        await _save_daily_records(ev, [(bucket, key, value)])
     logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的战双老婆: {chosen.name}')
     return chosen
 

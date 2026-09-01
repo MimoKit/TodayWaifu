@@ -9,6 +9,10 @@ from .image_input import (
     image_suffix_from_source,
     read_image_bytes,
 )
+from .source_cache import AsyncSourceCache
+
+
+_LOLI_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 
 
 # ── 本地图片目录读取 ─────────────────────────────────────────────────────────
@@ -52,6 +56,7 @@ def _delete_loli_images() -> int:
     if root.exists():
         shutil.rmtree(root) if root.is_dir() else root.unlink()
     _invalidate_loli_paths_cache()
+    _LOLI_SOURCE_CACHE.invalidate()
     return count
 
 
@@ -204,7 +209,10 @@ async def _roll_loli_record(
     if custom_url:
         logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉列表，接口: {custom_url}')
         try:
-            image_urls = await asyncio.to_thread(_fetch_loli_image_urls_sync, custom_url)
+            image_urls = await _LOLI_SOURCE_CACHE.get(
+                custom_url,
+                lambda: asyncio.to_thread(_fetch_loli_image_urls_sync, custom_url),
+            )
         except RuntimeError as exc:
             remote_error = str(exc)
             logger.warning(f'{LOG_PREFIX} 远程萝莉接口失败，回退本地图片: {exc}')
@@ -220,7 +228,7 @@ async def _roll_loli_record(
                 None,
             )
 
-    images = _loli_image_paths()
+    images = await asyncio.to_thread(_loli_image_paths)
     if not images:
         return None, remote_error or '暂无图片'
     image = _daily_rng(ev, user_key, 'loli').choice(images)
@@ -273,6 +281,8 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         return await _send_loli_text(bot, error or '暂无图片')
 
     # 网络请求期间可能有其它协程完成写入，因此保存前持锁重新加载并复用最新记录。
+    response_text: str | None = None
+    selected_record = record
     async with _daily_context_lock(ev):
         save_context = await _load_daily_context(ev)
         existing = (
@@ -283,24 +293,31 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
         if isinstance(existing, dict):
             unavailable_text = _loli_unavailable_text(existing)
             if unavailable_text is not None:
-                return await _send_loli_text(bot, unavailable_text)
-            existing_record = _record_from_dict(existing)
-            if (
-                existing_record is not None
-                and not _is_legacy_remote_loli_record(existing_record)
-            ):
-                return await _send_loli_record(bot, ev, existing_record)
-            if existing_record is not None:
-                # 仅更新记录本体，保留 stolen_from / gifted_from 等来源状态。
-                replacement = _record_to_dict(record, ev, user_key)
-                for key in ('name', 'role_ids', 'image', 'record_type', 'updated_at'):
-                    existing[key] = replacement[key]
+                response_text = unavailable_text
             else:
-                save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-        else:
-            save_context['lolis'][user_key] = _record_to_dict(record, ev, user_key)
-        await _save_daily_context(ev, save_context)
-    await _send_loli_record(bot, ev, record)
+                existing_record = _record_from_dict(existing)
+                if (
+                    existing_record is not None
+                    and not _is_legacy_remote_loli_record(existing_record)
+                ):
+                    selected_record = existing_record
+                else:
+                    if existing_record is not None:
+                        # 仅更新记录本体，保留 stolen_from / gifted_from 等来源状态。
+                        replacement = _record_to_dict(record, ev, user_key)
+                        updated_existing = dict(existing)
+                        for key in ('name', 'role_ids', 'image', 'record_type', 'updated_at'):
+                            updated_existing[key] = replacement[key]
+                        await _save_daily_records(ev, [('lolis', user_key, updated_existing)])
+                    else:
+                        await _save_daily_records(
+                            ev,
+                            [('lolis', user_key, _record_to_dict(record, ev, user_key))],
+                        )
+
+    if response_text is not None:
+        return await _send_loli_text(bot, response_text)
+    await _send_loli_record(bot, ev, selected_record)
 
 
 async def _send_upload_loli(bot: Bot, ev: Event) -> None:
@@ -331,7 +348,7 @@ async def _send_upload_loli(bot: Bot, ev: Event) -> None:
 
 
 async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
-    image_map = _loli_image_map()
+    image_map = await asyncio.to_thread(_loli_image_map)
     if not image_map:
         return await _send_loli_text(bot, '本地还没有萝莉图片，使用「上传萝莉图片」添加图片。')
     nodes: list[Any] = []
@@ -349,15 +366,17 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
         return await _send_loli_text(bot, f'已删除全部萝莉图片，共 {count} 张。')
     if not re.fullmatch(r'[0-9a-f]{8}', hash_id):
         return await _send_loli_text(bot, '请提供 8 位图片ID，例如：删除萝莉图片 abcd1234\n不加ID则删除全部')
-    image_map = _loli_image_map()
+    image_map = await asyncio.to_thread(_loli_image_map)
     path = image_map.get(hash_id)
     if path is None:
         return await _send_loli_text(bot, f'未找到图片ID：{hash_id}')
     try:
-        path.unlink()
+        await asyncio.to_thread(path.unlink)
     except Exception as exc:
         logger.warning(f'{LOG_PREFIX} 删除萝莉图片失败: {path} -> {exc}')
         return await _send_loli_text(bot, f'删除失败：{hash_id}')
+    _invalidate_loli_paths_cache()
+    _LOLI_SOURCE_CACHE.invalidate()
     await _send_loli_text(bot, f'已删除萝莉图片：{hash_id}')
 
 

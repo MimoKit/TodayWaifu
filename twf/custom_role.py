@@ -1,6 +1,8 @@
 """TodayWaifu - custom_role module."""
 from __future__ import annotations
 
+import asyncio
+
 from .shared import *  # noqa: F403
 from .image_input import (
     collect_image_refs,
@@ -163,6 +165,12 @@ def _get_pending_custom_role_delete(ev: Event) -> dict[str, Any] | None:
 
 
 def _set_pending_custom_role_delete(ev: Event, role_id: str, role_name: str, image_count: int) -> None:
+    if len(CUSTOM_ROLE_DELETE_PENDING) >= 1024:
+        oldest_key = min(
+            CUSTOM_ROLE_DELETE_PENDING,
+            key=lambda key: float(CUSTOM_ROLE_DELETE_PENDING[key].get('created_at') or 0),
+        )
+        CUSTOM_ROLE_DELETE_PENDING.pop(oldest_key, None)
     CUSTOM_ROLE_DELETE_PENDING[_custom_role_delete_confirm_key(ev)] = {
         'role_id': role_id,
         'role_name': role_name,
@@ -249,7 +257,10 @@ def _save_upload_image_ref(role_dir: Path, role_id: str, source: str, index: int
 
 async def _send_create_custom_wife_role(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
-    role_id, created, error = _create_or_get_custom_role(role_name)
+    role_id, created, error = await asyncio.to_thread(
+        _create_or_get_custom_role,
+        role_name,
+    )
     if error:
         return await _safe_send(bot,error)
 
@@ -271,7 +282,10 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
     if not image_refs:
         return await _safe_send(bot, f'请同时发送图片和命令，例如：上传老婆图片 {role_name}')
 
-    role_id, created, error = _create_or_get_custom_role(role_name)
+    role_id, created, error = await asyncio.to_thread(
+        _create_or_get_custom_role,
+        role_name,
+    )
     if error:
         return await _safe_send(bot,error)
 
@@ -304,7 +318,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
 
 async def _send_custom_wife_image_list(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
-    entries = _custom_role_image_entries(role_name)
+    entries = await asyncio.to_thread(_custom_role_image_entries, role_name)
     if entries is None:
         return await _safe_send(bot, '未找到这个自定义老婆，请先使用：创建老婆 角色名')
 
@@ -321,7 +335,10 @@ async def _send_custom_wife_image_list(bot: Bot, ev: Event):
 
 async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event):
     role_name = _clean_upload_role_name(ev.regex_dict.get('role') or ev.text, strip_wife_suffix=True)
-    role_id, role_name, images, error = _resolve_custom_role_for_delete(role_name)
+    role_id, role_name, images, error = await asyncio.to_thread(
+        _resolve_custom_role_for_delete,
+        role_name,
+    )
     if error:
         return await _safe_send(bot, error)
 
@@ -347,7 +364,7 @@ async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event):
         _clear_pending_custom_role_delete(ev)
         return await _safe_send(bot, '待删除记录无效，请重新发起删除。')
 
-    deleted_count = _delete_custom_role(role_id)
+    deleted_count = await asyncio.to_thread(_delete_custom_role, role_id)
     _clear_pending_custom_role_delete(ev)
     await _safe_send(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
 
@@ -361,14 +378,18 @@ async def _send_cancel_delete_custom_wife_role(bot: Bot, ev: Event):
 
 async def _send_delete_custom_wife_image(bot: Bot, ev: Event):
     role_name, hash_id = _parse_delete_custom_image_text(ev.text)
-    role_id, role_name, image_path, error = _resolve_custom_image_for_delete(role_name, hash_id)
+    role_id, role_name, image_path, error = await asyncio.to_thread(
+        _resolve_custom_image_for_delete,
+        role_name,
+        hash_id,
+    )
     if error:
         return await _safe_send(bot,error)
     if image_path is None:
         return await _safe_send(bot,f'【{role_name}】未找到图片ID：{hash_id}')
 
     try:
-        image_path.unlink()
+        await asyncio.to_thread(image_path.unlink)
     except Exception as exc:
         logger.warning(f'{LOG_PREFIX} 删除自定义老婆图片失败: {image_path} -> {exc}')
         return await _safe_send(bot,f'【{role_name}】图片删除失败：{hash_id}')

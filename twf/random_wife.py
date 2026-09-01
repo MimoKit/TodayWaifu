@@ -2,6 +2,18 @@
 from __future__ import annotations
 
 from .shared import *
+from .source_cache import AsyncSourceCache
+
+
+_RANDOM_GALLERY_CACHE = AsyncSourceCache[dict[str, Any]](CACHE_TTL_SECONDS, max_entries=4)
+
+
+def prune_random_gallery_cache() -> None:
+    _RANDOM_GALLERY_CACHE.prune()
+
+
+def invalidate_random_gallery_cache() -> None:
+    _RANDOM_GALLERY_CACHE.invalidate()
 
 
 def _random_gallery_api_url() -> str:
@@ -66,9 +78,9 @@ async def _send_random_wife(bot: Bot, ev: Event) -> None:
         return
 
     try:
-        payload = await asyncio.to_thread(
-            _fetch_gallery_payload_from_url_sync,
+        payload = await _RANDOM_GALLERY_CACHE.get(
             api_url,
+            lambda: asyncio.to_thread(_fetch_gallery_payload_from_url_sync, api_url),
         )
         candidates = _parse_random_gallery_candidates(payload)
         role = random.choice(candidates)
