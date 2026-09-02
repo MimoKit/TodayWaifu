@@ -17,8 +17,14 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gsuid_core.logger import logger
+from gsuid_core.server import on_core_start_before
 from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
-from gsuid_core.utils.database.base_models import BaseModel, with_read_session, with_session
+from gsuid_core.utils.database.base_models import (
+    BaseModel,
+    engine,
+    with_read_session,
+    with_session,
+)
 from gsuid_core.utils.database.startup import exec_list
 
 LOG_PREFIX = '[鸣潮今日老婆]'
@@ -534,6 +540,17 @@ def _deduplicate_table_indexes(table: Any) -> None:
 
 
 _deduplicate_table_indexes(DailyWifeRecord.__table__)
+
+
+@on_core_start_before(priority=-70)
+async def _ensure_daily_wife_record_table() -> None:
+    """插件模型晚于 Core 全局建表时，补建本插件数据表。"""
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            DailyWifeRecord.metadata.create_all,
+            tables=[DailyWifeRecord.metadata.tables['dailywiferecord']],
+            checkfirst=True,
+        )
 
 
 # 为已有数据库补充业务键唯一约束，供 SQLite upsert 使用。
