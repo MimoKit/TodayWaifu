@@ -17,10 +17,6 @@
   <a href="https://count.getloli.com/"><img src="https://count.getloli.com/get/@TodayWaifu?theme=moebooru" alt="TodayWaifu 访问计数"></a>
 </div>
 
-<p align="center">
-  <img src="./preview.gif" alt="TodayWaifu Preview" width="300">
-</p>
-
 <br/>
 
 ## 丨安装提醒
