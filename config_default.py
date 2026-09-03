@@ -306,8 +306,8 @@ APPEARANCE_CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeHelpColumn': GsIntConfig(
         '帮助展示行数',
-        '控制帮助图每组展示数量，默认 3，可按需要改成 4、5 等',
-        3,
+        '控制帮助图每组展示数量，默认 4，可按需要调整',
+        4,
         10,
     ),
 }

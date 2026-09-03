@@ -23,6 +23,10 @@ DIVORCE_COMMANDS = (
     '离婚老婆',
     '今日老婆离婚',
     '和老婆离婚',
+    '离婚群友',
+    '群友离婚',
+    '今日群友离婚',
+    '和群友离婚',
 )
 HUSBAND_DIVORCE_COMMANDS = (
     '老公离婚',
@@ -68,10 +72,11 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
         bucket_name = _daily_bucket_name(kind)
         bucket = context[bucket_name]
         record = bucket.get(user_key)
+        item_title = '群友' if isinstance(record, dict) and record.get('record_type') == 'member' else title
         if not isinstance(record, dict) or not str(record.get('name') or '').strip():
-            response = f'你今天没有可以离婚的{title}。'
+            response = f'你今天没有可以离婚的{item_title}。'
         elif record.get('divorced'):
-            response = f'你今天已经和{title}离婚了。'
+            response = f'你今天已经和{item_title}离婚了。'
         else:
             updated_record = dict(record)
             updated_record['divorced'] = True
@@ -81,7 +86,7 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
 
     if response is not None:
         return await _safe_send(bot, response)
-    await _safe_send(bot, f'已经和今天的{title}离婚：{result_name}。')
+    await _safe_send(bot, f'已经和今天的{item_title}离婚：{result_name}。')
 
 
 @divorce_sv.on_fullmatch(

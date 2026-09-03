@@ -34,6 +34,11 @@ class CommandPriorityTests(unittest.TestCase):
         self.assertIn('return await daily_wife_help(bot, ev)', source)
 
 
+    def test_help_passes_command_icon_directory_to_renderer(self) -> None:
+        source = (ROOT / 'twf' / 'help.py').read_text(encoding='utf-8-sig')
+        self.assertIn("extra['icon_path'] = _ICON_PATH", source)
+        self.assertIn("'icon_path'", source)
+
     def test_help_imports_pil_image(self) -> None:
         source = (ROOT / 'twf' / 'help.py').read_text(encoding='utf-8-sig')
         self.assertIn('from PIL import Image', source)

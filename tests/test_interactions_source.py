@@ -85,6 +85,8 @@ class InteractionSourceTests(unittest.TestCase):
             '离婚老婆',
             '离婚老公',
             '离婚萝莉',
+            '离婚群友',
+            '群友离婚',
             '异环老婆离婚',
             '战双老婆离婚',
         ):

@@ -104,6 +104,9 @@ def _build_help_inputs(
             else:
                 extra['help_bg'] = background.copy()
 
+    if _ICON_PATH.is_dir():
+        extra['icon_path'] = _ICON_PATH
+
     return icon, _load_help_data(), extra
 
 
