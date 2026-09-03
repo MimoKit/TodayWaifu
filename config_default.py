@@ -33,6 +33,16 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '留空时使用插件内置 wife_role_id_map.txt',
         '',
     ),
+    'DailyWifeWifeRoleMapPath': GsStrConfig(
+        '老婆角色 ID 对照表路径',
+        '留空时回退旧配置项「角色 ID 对照表路径」，再回退插件内置 wife_role_id_map.txt',
+        '',
+    ),
+    'DailyWifeHusbandRoleMapPath': GsStrConfig(
+        '老公角色 ID 对照表路径',
+        '留空时使用插件内置 husband_role_id_map.txt',
+        '',
+    ),
     'DailyWifeGalleryApiUrl': GsStrConfig(
         '图库接口地址',
         '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
