@@ -314,6 +314,12 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
                             ev,
                             [('lolis', user_key, _record_to_dict(record, ev, user_key))],
                         )
+        else:
+            # 首抽当天还没有萝莉记录，必须落库，否则离婚/被抢/赠送流程读不到记录。
+            await _save_daily_records(
+                ev,
+                [('lolis', user_key, _record_to_dict(record, ev, user_key))],
+            )
 
     if response_text is not None:
         return await _send_loli_text(bot, response_text)

@@ -77,7 +77,7 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
             updated_record['divorced'] = True
             updated_record['divorced_at'] = int(time.time())
             await _save_daily_records(ev, [(bucket_name, user_key, updated_record)])
-            result_name = str(record['name'])
+            result_name = _divorce_result_name(kind, str(record['name']))
 
     if response is not None:
         return await _safe_send(bot, response)
