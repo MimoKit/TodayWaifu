@@ -104,7 +104,9 @@ def _stored_pgr_record(raw: Any) -> WifeRecord | None:
     return record
 
 
-async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
+async def _ensure_daily_pgr_wife_record(
+    ev: Event, specified_role: 'RoleCandidate | None' = None
+) -> WifeRecord | None:
     key = _user_key(ev)
     bucket = _daily_bucket_name('pgr')
     context = await _load_daily_context(ev)
@@ -115,13 +117,17 @@ async def _ensure_daily_pgr_wife_record(ev: Event) -> WifeRecord | None:
     if current is not None:
         return current
 
-    candidates = await _load_pgr_wife_candidates()
-    if not candidates:
-        return None
-    chosen = _pick_role_record(
-        candidates,
-        _daily_rng(ev, key, 'pgr_wife'),
-    )
+    if specified_role is not None:
+        # 主人指定：跳过随机池，直接锁定指定角色
+        chosen = _pick_role_record((specified_role,), random)
+    else:
+        candidates = await _load_pgr_wife_candidates()
+        if not candidates:
+            return None
+        chosen = _pick_role_record(
+            candidates,
+            _daily_rng(ev, key, 'pgr_wife'),
+        )
     if chosen is None:
         return None
 
@@ -161,18 +167,38 @@ async def _send_daily_pgr_wife(
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
     can_specify_role = _can_specify_wife(ev)
     specified_name = _normalize_role_name(specified_name)
-    is_transient_draw = is_debug_active or bool(specified_name)
+    # 仅 Debug 模式保持临时预览不落库；主人指定同样写入每日记录，0 点随记录重置
+    is_transient_draw = is_debug_active
 
+    specified_role: RoleCandidate | None = None
     if specified_name and not can_specify_role:
         return await _safe_send(
             bot,
             '只有机器人主人或指定老婆白名单用户才能指定战双老婆。',
         )
 
+    if specified_name and not is_transient_draw:
+        matched = _pgr_candidates_by_name(
+            await _load_pgr_wife_candidates(), specified_name
+        )
+        if not matched:
+            return await _safe_send(
+                bot,
+                f'战双老婆图库中没有角色【{specified_name}】。',
+            )
+        specified_role = matched[0]
+
     if not is_transient_draw:
         context = await _load_daily_context(ev)
-        current = context[_daily_bucket_name('pgr')].get(_user_key(ev))
-        state = _wife_state(current)
+        current_raw = context[_daily_bucket_name('pgr')].get(_user_key(ev))
+        if specified_role is not None:
+            owned = _stored_pgr_record(current_raw)
+            if owned is not None:
+                return await _safe_send(
+                    bot,
+                    f'你今天已经有{owned.name}了，不要贪心！',
+                )
+        state = _wife_state(current_raw)
         if state == 'divorced':
             return await _safe_send(
                 bot,
@@ -201,7 +227,7 @@ async def _send_daily_pgr_wife(
                 )
         record = _pick_role_record(candidates, random)
     else:
-        record = await _ensure_daily_pgr_wife_record(ev)
+        record = await _ensure_daily_pgr_wife_record(ev, specified_role=specified_role)
     if record is None:
         root = _pgr_wife_root()
         return await _safe_send(

@@ -130,7 +130,9 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('def _can_specify_wife(ev: Event) -> bool:', shared)
         for source in (daily, pgr):
             self.assertIn('can_specify_role = _can_specify_wife(ev)', source)
-            self.assertIn('is_transient_draw = is_debug_active or bool(specified_name)', source)
+            # 主人指定不再走临时预览：与普通抽取一样写入每日记录，0 点随记录重置
+            self.assertIn('is_transient_draw = is_debug_active', source)
+            self.assertIn('specified_role=specified_role', source)
         self.assertIn('@specify_wife_sv.on_prefix(', daily)
         self.assertIn('@specify_wife_sv.on_prefix(', pgr)
 
@@ -152,7 +154,10 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('只有机器人主人或指定老婆白名单用户', function)
         self.assertIn('战双老婆图库中没有角色', function)
         self.assertIn('_pick_role_record(candidates, random)', function)
-        self.assertIn('else:\n        record = await _ensure_daily_pgr_wife_record(ev)', function)
+        self.assertIn(
+            'else:\n        record = await _ensure_daily_pgr_wife_record(ev, specified_role=specified_role)',
+            function,
+        )
 
     def test_pgr_prefix_passes_specified_name(self) -> None:
         source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')

@@ -33,7 +33,10 @@ def _record_text(record: WifeRecord, mode: str = 'wife') -> str:
 
 
 async def _ensure_daily_wife_record(
-    ev: Event, user_id: str | int | None = None, mode: str = 'wife'
+    ev: Event,
+    user_id: str | int | None = None,
+    mode: str = 'wife',
+    specified_role: 'RoleCandidate | None' = None,
 ) -> WifeRecord | None:
     bucket = _daily_bucket_name(mode)
     salt = mode if mode != 'wife' else ''
@@ -52,9 +55,12 @@ async def _ensure_daily_wife_record(
                 return record
 
     chosen: WifeRecord | None = None
-    if mode == 'wife':
+    if specified_role is not None:
+        # 主人指定：跳过群友老婆与随机池，直接锁定指定角色
+        chosen = _pick_role_record((specified_role,), random)
+    elif mode == 'wife':
         chosen = await _roll_group_member_wife(ev, key)
-    if chosen is None:
+    if chosen is None and specified_role is None:
         rng = _daily_rng(ev, key, salt)
         candidates, error = await _load_candidates(mode)
         if error or not candidates:
@@ -68,6 +74,8 @@ async def _ensure_daily_wife_record(
         if chosen is None:
             logger.warning(f'{LOG_PREFIX} 没有可用的 {mode} 角色图片')
             return None
+    if chosen is None:
+        return None
 
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
@@ -235,8 +243,10 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
     can_specify_role = _can_specify_wife(ev)
     specified_name = _normalize_role_name(specified_name)
-    is_transient_draw = is_debug_active or bool(specified_name)
+    # 仅 Debug 模式保持临时预览不落库；主人指定同样写入每日记录，0 点随记录重置
+    is_transient_draw = is_debug_active
 
+    specified_role: RoleCandidate | None = None
     if specified_name and not can_specify_role:
         logger.warning(
             f'{LOG_PREFIX} 用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝'
@@ -245,6 +255,18 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             bot,
             f'只有机器人主人或指定老婆白名单用户才能指定{title}哦。',
         )
+
+    if specified_name and not is_transient_draw:
+        candidates, error = await _load_candidates(mode)
+        if error or not candidates:
+            return await _safe_send(bot, error or '没有找到可用角色。')
+        target_candidates = [c for c in candidates if c.name == specified_name]
+        if not target_candidates:
+            return await _safe_send(
+                bot,
+                f'未找到名为“{specified_name}”的{title}角色。',
+            )
+        specified_role = target_candidates[0]
 
     if not is_transient_draw:
         other_wife_name = await _get_other_daily_wife_name(ev, mode)
@@ -262,6 +284,13 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
         # 离手即结算：老婆被抢走后可补偿重抽一次（safe_wife），送出/离婚仍锁死；老公离手后也锁死。
         state = _wife_state(current_record)
+        if state == 'owned' and specified_role is not None and isinstance(current_record, dict):
+            existing = _record_from_dict(current_record)
+            if existing is not None:
+                return await _safe_send(
+                    bot,
+                    f'你今天已经有{existing.name}了，不要贪心！',
+                )
         if state == 'lost_stolen' and mode == 'wife':
             # 已有补偿老婆的直接展示
             safe_record = context['safe_wives'].get(user_key)
@@ -271,17 +300,20 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
                     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {safe_wife.name}')
                     return await _send_record_image(bot, safe_wife, mode, ev.user_id, ev.group_id is not None)
 
-            # 未抽过补偿老婆：抽一个，写入 safe_wives
+            # 未抽过补偿老婆：抽一个，写入 safe_wives；主人指定时直接用指定角色
             wife_name = current_record.get('name', '老婆')
             stolen_by_name = current_record.get('stolen_by_name') or current_record.get('stolen_by')
-            candidates, error = await _load_candidates(mode)
-            if error or not candidates:
-                return await _safe_send(bot, error or '没有找到可用角色。')
-            if not candidates:
-                return await _safe_send(bot, f'没有找到可用的{title}角色。')
-            rng = _daily_rng(ev, user_key, f'{mode}_safe')
-            candidates = _filter_by_mode(candidates, mode)
-            safe_wife = _pick_role_record(candidates, rng)
+            if specified_role is not None:
+                safe_wife = _pick_role_record((specified_role,), random)
+            else:
+                candidates, error = await _load_candidates(mode)
+                if error or not candidates:
+                    return await _safe_send(bot, error or '没有找到可用角色。')
+                if not candidates:
+                    return await _safe_send(bot, f'没有找到可用的{title}角色。')
+                rng = _daily_rng(ev, user_key, f'{mode}_safe')
+                candidates = _filter_by_mode(candidates, mode)
+                safe_wife = _pick_role_record(candidates, rng)
             if safe_wife is None:
                 logger.warning(f'{LOG_PREFIX} 补偿抽取没有可用图片')
                 return await _safe_send(bot, f'没有找到可用的{title}角色。')
@@ -376,8 +408,13 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
             logger.warning(f'{LOG_PREFIX} Debug 抽取没有可用图片')
             return await _safe_send(bot, f'没有找到可用的{title}角色。')
     else:
-        record = await _ensure_daily_wife_record(ev, mode=mode)
+        record = await _ensure_daily_wife_record(ev, mode=mode, specified_role=specified_role)
         if record is None:
+            if specified_role is not None:
+                return await _safe_send(
+                    bot,
+                    f'未找到“{specified_role.name}”可用的{title}图片。',
+                )
             return await _safe_send(bot, f'没有找到可用的{title}角色。')
 
     if record.record_type == 'member':
