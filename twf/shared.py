@@ -1189,6 +1189,26 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
         if role_map:
             payload = await asyncio.to_thread(_fetch_gallery_payload_sync)
             candidates = _parse_role_candidates(payload, role_mode, role_map)
+            gallery_role_names = {_normalize_role_name(c.name) for c in candidates}
+            gallery_role_ids = {rid for c in candidates for rid in c.role_ids}
+            missing_in_gallery = any(
+                rid not in gallery_role_ids and _normalize_role_name(rname) not in gallery_role_names
+                for rid, rname in role_map.items()
+            )
+            if missing_in_gallery:
+                local_candidates, _ = await asyncio.to_thread(_load_local_candidates, role_mode)
+                if local_candidates:
+                    supplement_candidates: list[RoleCandidate] = []
+                    for lc in local_candidates:
+                        norm_name = _normalize_role_name(lc.name)
+                        if norm_name not in gallery_role_names and not (set(lc.role_ids) & gallery_role_ids):
+                            supplement_candidates.append(lc)
+                    if supplement_candidates:
+                        logger.info(
+                            f'{LOG_PREFIX} 图库模式下为 {len(supplement_candidates)} 名对照表无图角色读取本地图片: '
+                            f'{", ".join(c.name for c in supplement_candidates)}'
+                        )
+                        candidates = tuple(sorted((*candidates, *supplement_candidates), key=lambda r: r.name))
         candidates = _merge_role_candidates(candidates, custom_candidates)
     except RuntimeError as exc:
         logger.warning(f'{LOG_PREFIX} 读取图库接口失败: {exc}')
