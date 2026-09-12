@@ -7,8 +7,6 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "ICON.png": ((1024, 1024), "RGBA"),
-    "fb93f5370f556a51db172863420aa50e.png": ((1440, 730), "RGB"),
-    "texture2d/bj.jpg": ((885, 1919), "RGB"),
 }
 
 

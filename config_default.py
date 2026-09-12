@@ -48,16 +48,15 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
         'https://img.mimokit.dpdns.org/api/xwuid/roles',
     ),
-    'DailyWifeRandomGalleryApiUrl': GsStrConfig(
-        '来点老婆图库接口',
-        '独立命令“来点老婆”使用的图库接口，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌',
-        'https://ceshi.mimokit.dpdns.org/api/ceshi/roles',
+    'DailyWifeNormalEnabled': GsBoolConfig(
+        '启用普通老婆',
+        '开启后“今日老婆”指令使用普通老婆远程图库，文案使用“你的老婆来啦！”，并遵循今日老婆限制',
+        False,
     ),
-    'DailyWifeRandomDailyLimit': GsIntConfig(
-        '来点老婆每日次数',
-        '每人每天在同一个群（私聊单独计算）可用“来点老婆”的次数，0 表示不限制；机器人主人不受限制',
-        3,
-        100,
+    'DailyWifeNormalGalleryApiUrl': GsStrConfig(
+        '普通老婆图库地址',
+        '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌',
+        'https://ceshi.mimokit.dpdns.org/api/ceshi/roles',
     ),
     'DailyWifeLoliApiUrl': GsStrConfig(
         '今日萝莉接口地址',

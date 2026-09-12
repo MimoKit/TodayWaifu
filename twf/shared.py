@@ -87,7 +87,6 @@ loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
 wife_list_sv = SV('今日老婆-老婆列表', priority=3)
-random_wife_sv = SV('今日老婆-来点老婆', priority=3)
 husband_list_sv = SV('今日老婆-老公列表', priority=3)
 marry_member_sv = SV('今日老婆-娶群友', priority=3)
 rob_sv = SV('今日老婆-抢老婆', priority=3)
@@ -126,9 +125,6 @@ LOLI_MOBILE_UA = (
     'AppleWebKit/537.36 (KHTML, like Gecko) '
     'Chrome/124.0.6367.82 Mobile Safari/537.36'
 )
-# 「来点老婆」每日次数桶：只存计数，不参与抢 / 送 / 离婚等每日婚姻记录
-RANDOM_WIFE_QUOTA_BUCKET = 'random_wife_quota'
-RANDOM_WIFE_DEFAULT_DAILY_LIMIT = 3
 # --- 日志前缀 ---
 LOG_PREFIX = '[鸣潮今日老婆]'
 LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
@@ -145,7 +141,6 @@ __all__ = [
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins',
-    'RANDOM_WIFE_DEFAULT_DAILY_LIMIT', 'RANDOM_WIFE_QUOTA_BUCKET',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
     'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
@@ -175,8 +170,6 @@ __all__ = [
     '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_role_record',
-    '_consume_random_wife_quota', '_random_wife_daily_limit',
-    '_random_wife_used_count', '_refund_random_wife_quota',
     '_qq_avatar_url', '_record_from_dict', '_record_to_dict',
     '_request_headers', '_resolve_default_role_pile_root',
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
@@ -193,7 +186,7 @@ __all__ = [
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
-    'marry_member_sv', 'pgr_wife_sv', 'random_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
+    'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'urlopen', 'urlparse',
 ]
@@ -623,10 +616,10 @@ def _invalidate_candidate_cache() -> None:
     _SOURCE_CACHE.invalidate()
     _PGR_CANDIDATE_CACHE.invalidate()
     _invalidate_status_cache()
-    random_module = sys.modules.get(f'{__package__}.random_wife')
-    invalidate_random = getattr(random_module, 'invalidate_random_gallery_cache', None) if random_module else None
-    if callable(invalidate_random):
-        invalidate_random()
+    normal_module = sys.modules.get(f'{__package__}.normal_wife')
+    invalidate_normal = getattr(normal_module, 'invalidate_normal_gallery_cache', None) if normal_module else None
+    if callable(invalidate_normal):
+        invalidate_normal()
 
 
 
@@ -959,8 +952,10 @@ def _filter_by_mode(
     candidates: tuple['RoleCandidate', ...],
     mode: str,
 ) -> tuple['RoleCandidate', ...]:
-    role_map = _load_mode_role_map(mode)
     role_mode = _role_mode(mode)
+    if role_mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
+        return candidates
+    role_map = _load_mode_role_map(mode)
     if role_mode == 'wife':
         role_map.update(_load_custom_upload_role_map())
     allowed_ids = set(role_map)
@@ -1266,6 +1261,9 @@ async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
 
 async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
+    if role_mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
+        from .normal_wife import _load_normal_wife_candidates
+        return await _load_normal_wife_candidates()
     if role_mode == 'nte':
         return await _load_nte_candidates()
 
@@ -1726,68 +1724,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
-    context.setdefault(RANDOM_WIFE_QUOTA_BUCKET, {})
     return context
-
-
-def _random_wife_daily_limit() -> int:
-    """「来点老婆」每人每天次数上限，<=0 表示不限制。"""
-    try:
-        limit = int(_cfg('DailyWifeRandomDailyLimit'))
-    except (TypeError, ValueError):
-        limit = RANDOM_WIFE_DEFAULT_DAILY_LIMIT
-    return max(0, limit)
-
-
-def _random_wife_used_count(context: dict[str, Any], user_key: str) -> int:
-    bucket = context.get(RANDOM_WIFE_QUOTA_BUCKET)
-    raw = bucket.get(user_key) if isinstance(bucket, dict) else None
-    try:
-        return max(0, int(raw))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
-
-
-async def _consume_random_wife_quota(ev: Event) -> tuple[bool, int, int]:
-    """占用一次「来点老婆」额度，返回 (是否放行, 占用后已用次数, 上限)。
-
-    计数落在当天 + `bot_id:group_id` 上下文里：同一个人在不同群各自独立，
-    私聊统一算作 `direct`，跨天由 day 主键自动重置。主人和上限 0 都不受限制。
-    """
-    limit = _random_wife_daily_limit()
-    if limit <= 0 or _is_master(ev):
-        return True, 0, limit
-
-    user_key = _user_key(ev)
-    # 先占额度再请求图库：避免并发连点绕过限制，也顺带保护上游接口。
-    async with _daily_context_lock(ev):
-        context = await _load_daily_context(ev)
-        used = _random_wife_used_count(context, user_key)
-        if used >= limit:
-            return False, used, limit
-        await _save_daily_record(
-            ev, RANDOM_WIFE_QUOTA_BUCKET, user_key, used + 1
-        )
-    return True, used + 1, limit
-
-
-async def _refund_random_wife_quota(ev: Event) -> None:
-    """取图失败时退还一次额度，不让接口故障白吃用户次数。"""
-    if _random_wife_daily_limit() <= 0 or _is_master(ev):
-        return
-
-    user_key = _user_key(ev)
-    async with _daily_context_lock(ev):
-        context = await _load_daily_context(ev)
-        used = _random_wife_used_count(context, user_key)
-        if used <= 0:
-            return
-        if used > 1:
-            await _save_daily_record(
-                ev, RANDOM_WIFE_QUOTA_BUCKET, user_key, used - 1
-            )
-        else:
-            await _delete_daily_record(ev, RANDOM_WIFE_QUOTA_BUCKET, user_key)
 
 
 async def _migrate_legacy_wife_data() -> int:
@@ -1858,10 +1795,10 @@ def _prune_pending_state() -> None:
     clear_expired = getattr(gift_module, 'clear_expired_pending_gifts', None) if gift_module else None
     if callable(clear_expired):
         clear_expired()
-    random_module = sys.modules.get(f'{__package__}.random_wife')
-    prune_random = getattr(random_module, 'prune_random_gallery_cache', None) if random_module else None
-    if callable(prune_random):
-        prune_random()
+    normal_module = sys.modules.get(f'{__package__}.normal_wife')
+    prune_normal = getattr(normal_module, 'prune_normal_gallery_cache', None) if normal_module else None
+    if callable(prune_normal):
+        prune_normal()
 
 
 async def _cache_maintenance_once() -> None:
@@ -1875,10 +1812,10 @@ async def _cache_maintenance_once() -> None:
     _PGR_CANDIDATE_CACHE.prune()
     _MEMBER_CACHE.prune()
     _GROUP_DISPLAY_NAME_CACHE.prune()
-    random_module = sys.modules.get(f'{__package__}.random_wife')
-    prune_random = getattr(random_module, 'prune_random_gallery_cache', None) if random_module else None
-    if callable(prune_random):
-        prune_random()
+    normal_module = sys.modules.get(f'{__package__}.normal_wife')
+    prune_normal = getattr(normal_module, 'prune_normal_gallery_cache', None) if normal_module else None
+    if callable(prune_normal):
+        prune_normal()
     for registry in (_CONTEXT_REGISTRY,):
         registry.prune(_today_key())
     for mapping in (_CANDIDATE_INFLIGHT, _IMAGE_INFLIGHT, _MEMBER_AVATAR_INFLIGHT):

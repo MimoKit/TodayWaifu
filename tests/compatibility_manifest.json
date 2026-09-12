@@ -31,12 +31,12 @@
         "expr": "GsStrConfig('图库接口地址', '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担', 'https://img.mimokit.dpdns.org/api/xwuid/roles')"
       },
       {
-        "key": "DailyWifeRandomGalleryApiUrl",
-        "expr": "GsStrConfig('来点老婆图库接口', '独立命令“来点老婆”使用的图库接口，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌', 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')"
+        "key": "DailyWifeNormalEnabled",
+        "expr": "GsBoolConfig('启用普通老婆', '开启后“今日老婆”指令使用普通老婆远程图库，文案使用“你的老婆来啦！”，并遵循今日老婆限制', False)"
       },
       {
-        "key": "DailyWifeRandomDailyLimit",
-        "expr": "GsIntConfig('来点老婆每日次数', '每人每天在同一个群（私聊单独计算）可用“来点老婆”的次数，0 表示不限制；机器人主人不受限制', 3, 100)"
+        "key": "DailyWifeNormalGalleryApiUrl",
+        "expr": "GsStrConfig('普通老婆图库地址', '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌', 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')"
       },
       {
         "key": "DailyWifeLoliApiUrl",
@@ -475,11 +475,6 @@
       "decorator": "image_upload_sv.on_command(('上传战双老婆图片', '战双老婆上传图片'), block=True)"
     },
     {
-      "file": "twf/random_wife.py",
-      "function": "random_wife",
-      "decorator": "random_wife_sv.on_fullmatch('来点老婆', block=True)"
-    },
-    {
       "file": "twf/rob.py",
       "function": "rob_wife",
       "decorator": "rob_sv.on_prefix(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='抢夺指定用户今天的老婆。\\n    当用户说“抢某人的老婆”“抢老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
@@ -515,8 +510,6 @@
     "husband_role_id_map.txt",
     "help.json",
     "ICON.png",
-    "fb93f5370f556a51db172863420aa50e.png",
-    "texture2d/bj.jpg",
     "texture2d/icons"
   ]
 }

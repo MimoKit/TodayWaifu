@@ -5,6 +5,8 @@ from .shared import *  # noqa: F403
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
+    if mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
+        return '你的老婆来啦！'
     metadata = _daily_kind_metadata(mode)
     template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
     lines = [
@@ -58,7 +60,7 @@ async def _ensure_daily_wife_record(
     if specified_role is not None:
         # 主人指定：跳过群友老婆与随机池，直接锁定指定角色
         chosen = _pick_role_record((specified_role,), random)
-    elif mode == 'wife':
+    elif mode == 'wife' and not _cfg_bool('DailyWifeNormalEnabled', False):
         chosen = await _roll_group_member_wife(ev, key)
     if chosen is None and specified_role is None:
         rng = _daily_rng(ev, key, salt)

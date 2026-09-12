@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = ROOT / 'twf' / 'random_wife.py'
+MODULE = ROOT / 'twf' / 'normal_wife.py'
 
 
 def _load_parser():
@@ -14,7 +14,7 @@ def _load_parser():
         node
         for node in tree.body
         if isinstance(node, ast.FunctionDef)
-        and node.name == '_parse_random_gallery_candidates'
+        and node.name == '_parse_normal_gallery_candidates'
     )
     module = ast.Module(
         body=[
@@ -34,10 +34,10 @@ def _load_parser():
     )
     namespace = {}
     exec(compile(ast.fix_missing_locations(module), str(MODULE), 'exec'), namespace)
-    return namespace['_parse_random_gallery_candidates']
+    return namespace['_parse_normal_gallery_candidates']
 
 
-class RandomWifeGalleryTests(unittest.TestCase):
+class NormalWifeGalleryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.parse = _load_parser()
 
@@ -86,16 +86,11 @@ class RandomWifeGalleryTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     self.parse(payload)
 
-    def test_command_is_exact_and_does_not_use_daily_state(self) -> None:
+    def test_normal_wife_has_no_standalone_command(self) -> None:
         source = MODULE.read_text(encoding='utf-8')
-        self.assertIn("random_wife_sv.on_fullmatch('来点老婆', block=True)", source)
-        for forbidden in (
-            '_load_wife_data',
-            '_save_wife_data',
-            '_get_today_context',
-            '_daily_rng',
-        ):
-            self.assertNotIn(forbidden, source)
+        self.assertNotIn("on_fullmatch", source)
+        self.assertNotIn("on_command", source)
+        self.assertNotIn("on_prefix", source)
 
 
 if __name__ == '__main__':
