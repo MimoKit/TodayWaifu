@@ -28,6 +28,18 @@
 
 <br/>
 
+## 丨我该如何安装该插件？
+
+- 前提：你已经部署好 [gsuid_core](https://github.com/Genshin-bots/gsuid_core)。
+- 将本仓库克隆到 GsCore 插件目录并重启：
+
+```bash
+cd gsuid_core/gsuid_core/plugins
+git clone https://github.com/MimoKit/TodayWaifu
+
+或向bot发送：core安装插件TodayWaifu
+```
+
 ## 丨快速上手
 
 安装完成后，在聊天窗口发送以下指令即可获取完整的可视化帮助图：
