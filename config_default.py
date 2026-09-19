@@ -58,6 +58,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌',
         'https://ceshi.mimokit.dpdns.org/api/ceshi/roles',
     ),
+    'DailyWifeNormalTextTemplate': GsStrConfig(
+        '今日普通老婆文字模板',
+        '可用变量：{name} 角色名，{role_id} 作品名',
+        '你今天的老婆是来自{role_id}的{name}！',
+    ),
     'DailyWifeLoliApiUrl': GsStrConfig(
         '今日萝莉接口地址',
         'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库',

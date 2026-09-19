@@ -90,6 +90,20 @@ DAILY_KIND_METADATA = {
         gift_success_key="DailyLoliGiftSuccessTemplate",
         gift_success_default="你把今天的萝莉送给了对方！",
     ),
+    "normal": DailyKindMetadata(
+        bucket="normal_wives",
+        title="普通老婆",
+        role_mode="normal",
+        text_template_key="DailyWifeNormalTextTemplate",
+        text_template_default="你今天的老婆是来自{role_id}的{name}！",
+        rob_enabled_key="DailyWifeNormalRobEnabled",
+        rob_success_rate_key="DailyWifeRobSuccessRate",
+        rob_success_key="DailyWifeNormalRobSuccessTemplate",
+        rob_success_default="抢老婆成功！你把对方今天的老婆{name}抢过来了！",
+        gift_enabled_key="DailyWifeNormalGiftEnabled",
+        gift_success_key="DailyWifeNormalGiftSuccessTemplate",
+        gift_success_default="你把今天的老婆{name}送给了对方！",
+    ),
 }
 
 

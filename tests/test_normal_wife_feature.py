@@ -71,6 +71,36 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
         text = build_text(role, mode='wife')
         self.assertEqual(text, '你的老婆来啦！')
 
+    def test_build_text_normal_mode_with_work(self) -> None:
+        globals_dict = {
+            'RoleCandidate': _FakeRoleCandidate,
+            '_cfg_bool': lambda key, default=False: False,
+            '_daily_kind_metadata': lambda mode: _FakeKindMetadata(
+                text_template_key='DailyWifeNormalTextTemplate',
+                text_template_default='你今天的老婆是来自{role_id}的{name}！',
+            ),
+            '_cfg': lambda key: None,
+        }
+        build_text = _extract_function(DAILY_PATH, '_build_text', globals_dict)
+        role = _FakeRoleCandidate('雷电将军', ('原神', '原神!雷电将军'), ('https://example.test/raiden.png',))
+        text = build_text(role, mode='normal')
+        self.assertEqual(text, '你今天的老婆是来自原神的雷电将军！')
+
+    def test_build_text_normal_mode_without_work(self) -> None:
+        globals_dict = {
+            'RoleCandidate': _FakeRoleCandidate,
+            '_cfg_bool': lambda key, default=False: False,
+            '_daily_kind_metadata': lambda mode: _FakeKindMetadata(
+                text_template_key='DailyWifeNormalTextTemplate',
+                text_template_default='你今天的老婆是来自{role_id}的{name}！',
+            ),
+            '_cfg': lambda key: None,
+        }
+        build_text = _extract_function(DAILY_PATH, '_build_text', globals_dict)
+        role = _FakeRoleCandidate('初音未来', ('初音未来',), ('https://example.test/miku.png',))
+        text = build_text(role, mode='normal')
+        self.assertEqual(text, '你今天的老婆是初音未来！')
+
     def test_filter_by_mode_preserves_candidates_when_normal_wife_enabled(self) -> None:
         globals_dict = {
             'RoleCandidate': _FakeRoleCandidate,

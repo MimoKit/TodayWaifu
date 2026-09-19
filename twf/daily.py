@@ -6,16 +6,21 @@ from .shared import *  # noqa: F403
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
     if mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
-        return '你的老婆来啦！'
+        template = str(_cfg('DailyWifeNormalTextTemplate') or '').strip()
+        if not template:
+            return '你的老婆来啦！'
     metadata = _daily_kind_metadata(mode)
     template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
+    work = role.role_ids[0] if (role.role_ids and role.role_ids[0] != role.name) else ''
+    if mode == 'normal' and not work:
+        template = '你今天的老婆是{name}！'
     lines = [
         template.format(
             name=role.name,
-            role_id='/'.join(role.role_ids),
+            role_id=work or ('/'.join(role.role_ids) if role.role_ids else ''),
         )
     ]
-    if bool(_cfg('DailyWifeShowRoleId')):
+    if bool(_cfg('DailyWifeShowRoleId')) and mode != 'normal':
         lines.append(f'角色ID：{"/".join(role.role_ids)}')
     return '\n'.join(lines)
 
@@ -262,7 +267,14 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
         candidates, error = await _load_candidates(mode)
         if error or not candidates:
             return await _safe_send(bot, error or '没有找到可用角色。')
-        target_candidates = [c for c in candidates if c.name == specified_name]
+        target_candidates = [
+            c for c in candidates
+            if c.name == specified_name
+            or (mode == 'normal' and (
+                specified_name.casefold() in c.name.casefold()
+                or any(specified_name.casefold() in str(r_id).casefold() for r_id in c.role_ids)
+            ))
+        ]
         if not target_candidates:
             return await _safe_send(
                 bot,
@@ -614,6 +626,49 @@ async def daily_nte_wife_full(bot: Bot, ev: Event):
     if not _cfg_bool('DailyWifeNteEnabled', False):
         return
     await _send_daily_wife(bot, ev, mode='nte', specified_name='')
+
+
+@specify_wife_sv.on_prefix(
+    ('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'),
+    block=True,
+    to_ai="""抽取当前用户今天的普通老婆（二次元作品角色）。
+    当用户说“今日普通老婆”“普通老婆”时调用。
+    如果用户指定了角色名或作品名，把角色名或作品名放在 text 里；如果用户要看列表，text 填“列表”。
+    Args:
+        text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。
+    """,
+)
+async def daily_normal_wife_prefix(bot: Bot, ev: Event):
+    specified_name = str(ev.text or '').strip()
+    if specified_name == '列表':
+        return await _send_wife_list(bot, ev, mode='normal')
+    await _send_daily_wife(bot, ev, mode='normal', specified_name=specified_name)
+
+
+@daily_normal_wife_sv.on_fullmatch(
+    ('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'),
+    block=True,
+    to_ai="""随机抽取当前用户今天的普通老婆（二次元作品角色）。
+    当用户说“今日普通老婆”“普通老婆”且没有指定角色名时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def daily_normal_wife_full(bot: Bot, ev: Event):
+    await _send_daily_wife(bot, ev, mode='normal', specified_name='')
+
+
+@wife_list_sv.on_fullmatch(
+    ('普通老婆列表', '查看普通老婆列表'),
+    block=True,
+    to_ai="""查看今日已抽取的普通老婆记录列表。
+    当用户询问“普通老婆列表”时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def daily_normal_wife_list(bot: Bot, ev: Event):
+    await _send_wife_list(bot, ev, mode='normal')
 
 
 @wife_list_sv.on_fullmatch(

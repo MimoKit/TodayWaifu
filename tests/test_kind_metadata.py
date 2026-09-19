@@ -21,7 +21,7 @@ def _load_module():
 class DailyKindMetadataTests(unittest.TestCase):
     def test_known_kinds_have_centralized_metadata(self) -> None:
         kinds = _load_module()
-        self.assertEqual(set(kinds.DAILY_KIND_METADATA), {"wife", "husband", "loli", "nte", "pgr"})
+        self.assertEqual(set(kinds.DAILY_KIND_METADATA), {"wife", "husband", "loli", "nte", "pgr", "normal"})
         self.assertEqual(kinds.daily_kind_metadata("wife").bucket, "wives")
         self.assertEqual(kinds.daily_kind_metadata("husband").title, "老公")
         self.assertEqual(kinds.daily_kind_metadata("loli").rob_enabled_key, "DailyLoliRobEnabled")
@@ -29,6 +29,9 @@ class DailyKindMetadataTests(unittest.TestCase):
         self.assertEqual(kinds.daily_kind_metadata("nte").role_mode, "nte")
         self.assertEqual(kinds.daily_kind_metadata("pgr").bucket, "pgr_wives")
         self.assertEqual(kinds.daily_kind_metadata("pgr").text_template_key, "DailyWifePgrTextTemplate")
+        self.assertEqual(kinds.daily_kind_metadata("normal").bucket, "normal_wives")
+        self.assertEqual(kinds.daily_kind_metadata("normal").role_mode, "normal")
+        self.assertEqual(kinds.daily_kind_metadata("normal").text_template_key, "DailyWifeNormalTextTemplate")
         self.assertEqual(
             kinds.daily_kind_metadata("husband").gift_success_default,
             "你把今天的老公{name}送给了对方！",

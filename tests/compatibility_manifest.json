@@ -39,6 +39,10 @@
         "expr": "GsStrConfig('普通老婆图库地址', '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌', 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')"
       },
       {
+        "key": "DailyWifeNormalTextTemplate",
+        "expr": "GsStrConfig('今日普通老婆文字模板', '可用变量：{name} 角色名，{role_id} 作品名', '你今天的老婆是来自{role_id}的{name}！')"
+      },
+      {
         "key": "DailyWifeLoliApiUrl",
         "expr": "GsStrConfig('今日萝莉接口地址', 'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库', 'https://loli.mimokit.dpdns.org')"
       },
@@ -313,6 +317,21 @@
       "file": "twf/daily.py",
       "function": "daily_nte_wife_full",
       "decorator": "daily_nte_wife_sv.on_fullmatch('今日异环老婆', block=True, to_ai='随机抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_normal_wife_prefix",
+      "decorator": "specify_wife_sv.on_prefix(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='抽取当前用户今天的普通老婆（二次元作品角色）。\\n    当用户说“今日普通老婆”“普通老婆”时调用。\\n    如果用户指定了角色名或作品名，把角色名或作品名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_normal_wife_full",
+      "decorator": "daily_normal_wife_sv.on_fullmatch(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='随机抽取当前用户今天的普通老婆（二次元作品角色）。\\n    当用户说“今日普通老婆”“普通老婆”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
+    },
+    {
+      "file": "twf/daily.py",
+      "function": "daily_normal_wife_list",
+      "decorator": "wife_list_sv.on_fullmatch(('普通老婆列表', '查看普通老婆列表'), block=True, to_ai='查看今日已抽取的普通老婆记录列表。\\n    当用户询问“普通老婆列表”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/daily.py",

@@ -97,6 +97,7 @@ daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
 daily_nte_wife_sv = SV('今日老婆-异环老婆', priority=10)
 pgr_wife_sv = SV('今日老婆-战双老婆', priority=10)
+daily_normal_wife_sv = SV('今日老婆-普通老婆', priority=10)
 BASE_DIR = Path(__file__).parent.parent
 WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
 HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
@@ -953,6 +954,8 @@ def _filter_by_mode(
     mode: str,
 ) -> tuple['RoleCandidate', ...]:
     role_mode = _role_mode(mode)
+    if role_mode == 'normal':
+        return candidates
     if role_mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
         return candidates
     role_map = _load_mode_role_map(mode)
@@ -1281,6 +1284,9 @@ async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
 
 async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
+    if role_mode == 'normal':
+        from .normal_wife import _load_normal_wife_candidates
+        return await _load_normal_wife_candidates()
     if role_mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
         from .normal_wife import _load_normal_wife_candidates
         return await _load_normal_wife_candidates()
@@ -1899,7 +1905,7 @@ def _daily_bucket_name(kind: str) -> str:
 
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
-ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'normal')
 
 
 async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
