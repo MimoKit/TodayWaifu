@@ -47,10 +47,6 @@
         "expr": "GsStrConfig('今日萝莉接口地址', 'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库', 'https://loli.mimokit.dpdns.org')"
       },
       {
-        "key": "DailyWifeShotaApiUrl",
-        "expr": "GsStrConfig('今日正太接口地址', 'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地正太图库', 'https://zt.mimokit.dpdns.org')"
-      },
-      {
         "key": "DailyWifePgrGalleryApiUrl",
         "expr": "GsStrConfig('战双图库接口地址', 'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。', 'https://pgr.mimokit.dpdns.org/api/xwuid/roles')"
       },
@@ -183,14 +179,6 @@
         "expr": "GsBoolConfig('启用今日萝莉', '开启后可使用「今日萝莉」命令；关闭后命令不生效。图片内容风险请自行承担', True)"
       },
       {
-        "key": "_DividerDailyShota",
-        "expr": "GsDivider('今日正太', '')"
-      },
-      {
-        "key": "DailyShotaEnabled",
-        "expr": "GsBoolConfig('启用今日正太', '开启后可使用「今日正太」命令；关闭后命令不生效。图片内容风险请自行承担', True)"
-      },
-      {
         "key": "_DividerRob",
         "expr": "GsDivider('抢夺设置', '')"
       },
@@ -227,18 +215,6 @@
         "expr": "GsStrConfig('抢萝莉成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID', '抢萝莉成功！你把对方今天的萝莉抢过来了！')"
       },
       {
-        "key": "DailyShotaRobEnabled",
-        "expr": "GsBoolConfig('启用抢正太', '开启后可以使用\"抢正太 @对方\"抢对方当天正太', True)"
-      },
-      {
-        "key": "DailyShotaRobSuccessRate",
-        "expr": "GsStrConfig('抢正太成功率', '0 到 1 之间的小数，例如 0.5 表示 50%', '0.5')"
-      },
-      {
-        "key": "DailyShotaRobSuccessTemplate",
-        "expr": "GsStrConfig('抢正太成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID', '抢正太成功！你把对方今天的正太抢过来了！')"
-      },
-      {
         "key": "_DividerGift",
         "expr": "GsDivider('赠送设置', '')"
       },
@@ -265,14 +241,6 @@
       {
         "key": "DailyLoliGiftSuccessTemplate",
         "expr": "GsStrConfig('送萝莉成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID', '你把今天的萝莉送给了对方！')"
-      },
-      {
-        "key": "DailyShotaGiftEnabled",
-        "expr": "GsBoolConfig('启用送正太', '开启后可以使用“送正太 @对方”，对方发送“接受正太赠送”后完成赠送', True)"
-      },
-      {
-        "key": "DailyShotaGiftSuccessTemplate",
-        "expr": "GsStrConfig('送正太成功文案', '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID', '你把今天的正太送给了对方！')"
       }
     ],
     "APPEARANCE_CONFIG_DEFAULT": [
@@ -417,11 +385,6 @@
     },
     {
       "file": "twf/divorce.py",
-      "function": "divorce_shota",
-      "decorator": "divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True)"
-    },
-    {
-      "file": "twf/divorce.py",
       "function": "divorce_nte",
       "decorator": "divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)"
     },
@@ -489,26 +452,6 @@
       "file": "twf/gift.py",
       "function": "gift_loli_reject",
       "decorator": "gift_sv.on_fullmatch(('拒绝萝莉赠送', '拒绝送萝莉'), block=True, to_ai='拒绝接收别人赠送的今日萝莉。\\n    当用户说“拒绝萝莉赠送”“拒绝送萝莉”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/gift.py",
-      "function": "gift_shota",
-      "decorator": "gift_sv.on_prefix(('送正太', '送今日正太'), block=True, to_ai='把当前用户今天的正太送给指定用户。\\n    当用户说“把我的正太送给某人”“送正太 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
-    },
-    {
-      "file": "twf/gift.py",
-      "function": "gift_shota_at",
-      "decorator": "gift_sv.on_fullmatch(('送正太', '送今日正太'), block=True, to_ai='显示送正太的用法。\\n    当用户只说“送正太”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/gift.py",
-      "function": "gift_shota_accept",
-      "decorator": "gift_sv.on_fullmatch(('接受正太赠送', '同意送正太'), block=True, to_ai='同意接收别人赠送的今日正太。\\n    当用户说“接受正太赠送”“同意送正太”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/gift.py",
-      "function": "gift_shota_reject",
-      "decorator": "gift_sv.on_fullmatch(('拒绝正太赠送', '拒绝送正太'), block=True, to_ai='拒绝接收别人赠送的今日正太。\\n    当用户说“拒绝正太赠送”“拒绝送正太”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
     },
     {
       "file": "twf/help.py",
@@ -579,36 +522,6 @@
       "file": "twf/rob.py",
       "function": "rob_loli_at",
       "decorator": "rob_sv.on_fullmatch(('抢萝莉', '抢今日萝莉'), block=True, to_ai='显示抢萝莉的用法。\\n    当用户只说“抢萝莉”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/rob.py",
-      "function": "rob_shota",
-      "decorator": "rob_sv.on_prefix(('抢正太', '抢今日正太'), block=True, to_ai='抢夺指定用户今天的正太。\\n    当用户说“抢某人的正太”“抢正太 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ')"
-    },
-    {
-      "file": "twf/rob.py",
-      "function": "rob_shota_at",
-      "decorator": "rob_sv.on_fullmatch(('抢正太', '抢今日正太'), block=True, to_ai='显示抢正太的用法。\\n    当用户只说“抢正太”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/shota.py",
-      "function": "daily_shota",
-      "decorator": "shota_sv.on_fullmatch('今日正太', block=True, to_ai='随机抽取当前用户今天的正太图片。\\n    当用户说“今日正太”“抽一张正太”“我今天的正太是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/shota.py",
-      "function": "upload_shota",
-      "decorator": "image_upload_sv.on_command(('上传正太图片', '今日正太上传', '正太上传图片'), block=True)"
-    },
-    {
-      "file": "twf/shota.py",
-      "function": "list_shota",
-      "decorator": "shota_manage_sv.on_fullmatch(('查看正太图片', '今日正太列表', '正太图片列表'), block=True, to_ai='查看今日正太图库列表。\\n    当用户说“查看正太图片”“正太图片列表”“有哪些正太图”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ')"
-    },
-    {
-      "file": "twf/shota.py",
-      "function": "delete_shota",
-      "decorator": "shota_manage_sv.on_command('删除正太图片', block=True)"
     }
   ],
   "resources": [

@@ -60,7 +60,6 @@ async def _today_record_counts() -> dict[str, int]:
         bucket_names = (
             _daily_bucket_name('wife'),
             _daily_bucket_name('loli'),
-            _daily_bucket_name('shota'),
             _daily_bucket_name('husband'),
         )
 
@@ -97,10 +96,6 @@ async def get_today_loli_count() -> int:
     return await _today_record_count('loli')
 
 
-async def get_today_shota_count() -> int:
-    return await _today_record_count('shota')
-
-
 async def get_today_husband_count() -> int:
     return await _today_record_count('husband')
 
@@ -111,7 +106,6 @@ register_status(
     {
         '今日老婆': get_today_wife_count,
         '今日萝莉': get_today_loli_count,
-        '今日正太': get_today_shota_count,
         '今日老公': get_today_husband_count,
     },
 )

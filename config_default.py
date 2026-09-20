@@ -68,11 +68,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库',
         'https://loli.mimokit.dpdns.org',
     ),
-    'DailyWifeShotaApiUrl': GsStrConfig(
-        '今日正太接口地址',
-        'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地正太图库',
-        'https://zt.mimokit.dpdns.org',
-    ),
     'DailyWifePgrGalleryApiUrl': GsStrConfig(
         '战双图库接口地址',
         'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。',
@@ -213,13 +208,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         True,
     ),
 
-    '_DividerDailyShota': GsDivider('今日正太', ''),
-    'DailyShotaEnabled': GsBoolConfig(
-        '启用今日正太',
-        '开启后可使用「今日正太」命令；关闭后命令不生效。图片内容风险请自行承担',
-        True,
-    ),
-
     '_DividerRob': GsDivider('抢夺设置', ''),
     'DailyWifeRobEnabled': GsBoolConfig(
         '启用抢老婆',
@@ -261,21 +249,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID',
         '抢萝莉成功！你把对方今天的萝莉抢过来了！',
     ),
-    'DailyShotaRobEnabled': GsBoolConfig(
-        '启用抢正太',
-        '开启后可以使用"抢正太 @对方"抢对方当天正太',
-        True,
-    ),
-    'DailyShotaRobSuccessRate': GsStrConfig(
-        '抢正太成功率',
-        '0 到 1 之间的小数，例如 0.5 表示 50%',
-        '0.5',
-    ),
-    'DailyShotaRobSuccessTemplate': GsStrConfig(
-        '抢正太成功文案',
-        '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID',
-        '抢正太成功！你把对方今天的正太抢过来了！',
-    ),
 
     '_DividerGift': GsDivider('赠送设置', ''),
     'DailyWifeGiftEnabled': GsBoolConfig(
@@ -307,16 +280,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '送萝莉成功文案',
         '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID',
         '你把今天的萝莉送给了对方！',
-    ),
-    'DailyShotaGiftEnabled': GsBoolConfig(
-        '启用送正太',
-        '开启后可以使用“送正太 @对方”，对方发送“接受正太赠送”后完成赠送',
-        True,
-    ),
-    'DailyShotaGiftSuccessTemplate': GsStrConfig(
-        '送正太成功文案',
-        '可用变量：{name} 名称，{role_id} 图片标识，{target} 接收用户 ID',
-        '你把今天的正太送给了对方！',
     ),
 }
 
