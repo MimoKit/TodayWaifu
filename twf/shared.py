@@ -84,6 +84,7 @@ help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
 assign_wife_sv = SV('今日老婆-主人分配', pm=1, priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
+shota_manage_sv = SV('今日老婆-正太图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
 wife_list_sv = SV('今日老婆-老婆列表', priority=3)
@@ -93,6 +94,7 @@ rob_sv = SV('今日老婆-抢老婆', priority=3)
 gift_sv = SV('今日老婆-送老婆', priority=3)
 divorce_sv = SV('今日老婆-离婚', priority=3)
 loli_sv = SV('今日老婆-今日萝莉', priority=3)
+shota_sv = SV('今日老婆-今日正太', priority=3)
 daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
 daily_nte_wife_sv = SV('今日老婆-异环老婆', priority=10)
@@ -119,6 +121,7 @@ CUSTOM_ROLE_ID_START = 900001
 UPLOAD_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 CUSTOM_ROLE_DELETE_CONFIRM_SECONDS = 120
 LOLI_IMAGE_DIR_NAME = 'loli_images'
+SHOTA_IMAGE_DIR_NAME = 'shota_images'
 LOLICONAPP_API_URL = 'https://api.lolicon.app/setu/v2'
 LOLICONAPP_TAGS = '萝莉|ロリ|loli|rori,-hololive'
 LOLI_MOBILE_UA = (
@@ -140,6 +143,7 @@ __all__ = [
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
     'HTTPError', 'IMAGE_EXTENSIONS', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
+    'SHOTA_IMAGE_DIR_NAME',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
@@ -157,12 +161,12 @@ __all__ = [
     '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
-    '_image_source', '_invalidate_candidate_cache', '_loli_enabled',
+    '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
-    '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
+    '_load_wife_data', '_loli_image_root', '_shota_image_root', '_marry_member_enabled',
     '_daily_context_lock',
     '_load_daily_context', '_save_daily_context',
     '_save_daily_records',
@@ -187,6 +191,7 @@ __all__ = [
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
+    'shota_manage_sv', 'shota_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'urlopen', 'urlparse',
@@ -442,6 +447,10 @@ def _custom_upload_role_pile_root() -> Path:
 
 def _loli_image_root() -> Path:
     return _custom_upload_data_root() / LOLI_IMAGE_DIR_NAME
+
+
+def _shota_image_root() -> Path:
+    return _custom_upload_data_root() / SHOTA_IMAGE_DIR_NAME
 
 
 def _writable_role_map_path() -> Path:
@@ -939,6 +948,10 @@ def _husband_enabled() -> bool:
 
 def _loli_enabled() -> bool:
     return _cfg_bool('DailyLoliEnabled', True)
+
+
+def _shota_enabled() -> bool:
+    return _cfg_bool('DailyShotaEnabled', True)
 
 
 def _gallery_mode_enabled() -> bool:
@@ -1762,6 +1775,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('nte_wives', {})
     context.setdefault('pgr_wives', {})
     context.setdefault('lolis', {})
+    context.setdefault('shotas', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
@@ -1920,7 +1934,7 @@ def _daily_bucket_name(kind: str) -> str:
 
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
-ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'normal')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'normal', 'shota')
 
 
 async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
@@ -2237,6 +2251,9 @@ async def _send_daily_result_image(
     is_group: bool,
     kind: str,
 ) -> None:
+    if kind == 'shota':
+        await _send_loli_result_image(bot, image, text, user_id, is_group)
+        return
     if kind != 'loli':
         await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return

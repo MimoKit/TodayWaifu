@@ -21,5 +21,6 @@ from .twf import rob          # 抢老婆
 from .twf import gift         # 送老婆
 from .twf import divorce      # 离婚
 from .twf import loli         # 萝莉 / 下载
+from .twf import shota        # 正太 / 下载
 from .twf import custom_role  # 自定义老婆
 from .twf import status       # core状态统计

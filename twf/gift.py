@@ -182,7 +182,10 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _set_pending_gift(ev, target_user_id, giver_id, kind)
     giver_name = _user_display_name(ev, giver_id)
     role = giver_record.to_role()
-    item_text = title if kind == 'loli' else f'{title}{role.name}'
+    if kind == 'shota':
+        item_text = title
+    else:
+        item_text = title if kind == 'loli' else f'{title}{role.name}'
     text = (
         f'{giver_name} 想把今天的{item_text}送给你！\n'
         f'请在 {GIFT_CONFIRM_TIMEOUT_SECONDS} 秒内发送「接受{title}赠送」，'
@@ -310,6 +313,18 @@ async def _accept_gift_loli(bot: Bot, ev: Event) -> None:
 
 async def _reject_gift_loli(bot: Bot, ev: Event) -> None:
     await _reject_gift_daily(bot, ev, 'loli')
+
+
+async def _send_gift_shota(bot: Bot, ev: Event) -> None:
+    await _send_gift_daily(bot, ev, 'shota')
+
+
+async def _accept_gift_shota(bot: Bot, ev: Event) -> None:
+    await _accept_gift_daily(bot, ev, 'shota')
+
+
+async def _reject_gift_shota(bot: Bot, ev: Event) -> None:
+    await _reject_gift_daily(bot, ev, 'shota')
 
 
 @gift_sv.on_prefix(
@@ -466,3 +481,55 @@ async def gift_loli_accept(bot: Bot, ev: Event):
 )
 async def gift_loli_reject(bot: Bot, ev: Event):
     await _reject_gift_loli(bot, ev)
+
+
+@gift_sv.on_prefix(
+    ('送正太', '送今日正太'),
+    block=True,
+    to_ai="""把当前用户今天的正太送给指定用户。
+    当用户说“把我的正太送给某人”“送正太 @某人”时调用。
+    Args:
+        text: 目标用户，通常是 @用户 或用户 ID。
+    """,
+)
+async def gift_shota(bot: Bot, ev: Event):
+    await _send_gift_shota(bot, ev)
+
+
+@gift_sv.on_fullmatch(
+    ('送正太', '送今日正太'),
+    block=True,
+    to_ai="""显示送正太的用法。
+    当用户只说“送正太”但没有指定目标用户时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def gift_shota_at(bot: Bot, ev: Event):
+    await _send_gift_shota(bot, ev)
+
+
+@gift_sv.on_fullmatch(
+    ('接受正太赠送', '同意送正太'),
+    block=True,
+    to_ai="""同意接收别人赠送的今日正太。
+    当用户说“接受正太赠送”“同意送正太”时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def gift_shota_accept(bot: Bot, ev: Event):
+    await _accept_gift_shota(bot, ev)
+
+
+@gift_sv.on_fullmatch(
+    ('拒绝正太赠送', '拒绝送正太'),
+    block=True,
+    to_ai="""拒绝接收别人赠送的今日正太。
+    当用户说“拒绝正太赠送”“拒绝送正太”时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def gift_shota_reject(bot: Bot, ev: Event):
+    await _reject_gift_shota(bot, ev)
