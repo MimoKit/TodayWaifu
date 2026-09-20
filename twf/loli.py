@@ -162,6 +162,8 @@ def _fetch_loli_image_urls_sync(api_url: str) -> tuple[str, ...]:
     try:
         body = _http_get_with_retry(api_url, timeout=15)
     except HTTPError as exc:
+        if exc.code == 403:
+            raise RuntimeError('请求萝莉图库接口失败(403)：图库接口需要访问令牌，请在控制台配置「图库访问令牌」(DailyWifeGalleryToken)。') from exc
         raise RuntimeError(f'请求萝莉图库接口失败，HTTP {exc.code}。') from exc
     except URLError as exc:
         raise RuntimeError(f'请求萝莉图库接口失败：{exc.reason}') from exc

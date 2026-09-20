@@ -185,7 +185,7 @@ __all__ = [
     'DailyWifeRecord', '_daily_data_lock', '_migrate_legacy_wife_data',
     'read_file_bytes_cached',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
-    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
+    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
@@ -938,7 +938,7 @@ def _husband_enabled() -> bool:
 
 
 def _loli_enabled() -> bool:
-    return _cfg_bool('DailyLoliEnabled', False)
+    return _cfg_bool('DailyLoliEnabled', True)
 
 
 def _gallery_mode_enabled() -> bool:
@@ -1563,9 +1563,24 @@ async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCan
     return MemberCandidate(member.name, member.user_id, avatar)
 
 
-async def _pick_group_member(ev: Event, rng: random.Random) -> MemberCandidate | None:
+async def _pick_group_member(
+    ev: Event,
+    rng: random.Random,
+    exclude_user_id: str | int | None = None,
+) -> MemberCandidate | None:
     candidates = list(await _load_group_member_candidates(ev))
     if not candidates:
+        return None
+
+    target_user_id = str(exclude_user_id if exclude_user_id is not None else ev.user_id).strip()
+    exclude_ids = {target_user_id}
+    bot_self_id = str(getattr(ev, 'bot_self_id', '') or '').strip()
+    if bot_self_id:
+        exclude_ids.add(bot_self_id)
+
+    candidates = [c for c in candidates if str(c.user_id) not in exclude_ids]
+    if not candidates:
+        logger.warning(f'{LOG_PREFIX} 过滤自身及Bot后无可用群友候选')
         return None
 
     rng.shuffle(candidates)
@@ -1596,7 +1611,7 @@ async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, r
 
     logger.debug(f'{LOG_PREFIX} 触发抽群友逻辑')
     pick_rng = rng or _daily_rng(ev, key, 'group_member_pick')
-    member = await _pick_group_member(ev, pick_rng)
+    member = await _pick_group_member(ev, pick_rng, exclude_user_id=user_id)
     if member is None:
         return None
     return WifeRecord.from_member(member)
