@@ -7,7 +7,7 @@ from .domain import WifeRecord
 from .kind_metadata import DailyKindMetadata, daily_kind_metadata
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
-ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'shota')
 
 
 def daily_item_title(kind: str) -> str:

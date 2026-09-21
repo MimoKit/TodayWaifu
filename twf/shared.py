@@ -93,6 +93,7 @@ rob_sv = SV('今日老婆-抢老婆', priority=3)
 gift_sv = SV('今日老婆-送老婆', priority=3)
 divorce_sv = SV('今日老婆-离婚', priority=3)
 loli_sv = SV('今日老婆-今日萝莉', priority=3)
+shota_sv = SV('今日老婆-今日正太', priority=3)
 daily_wife_sv = SV('今日老婆-每日抽取', priority=10)
 daily_husband_sv = SV('今日老婆-今日老公', priority=10)
 daily_nte_wife_sv = SV('今日老婆-异环老婆', priority=10)
@@ -157,7 +158,7 @@ __all__ = [
     '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
-    '_image_source', '_invalidate_candidate_cache', '_loli_enabled',
+    '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
@@ -176,8 +177,8 @@ __all__ = [
     '_resolve_member_avatar', '_resolve_member_candidate_avatar',
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
-    '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text',
-    '_safe_send', '_send_daily_result_image', '_send_loli_result_image',
+    '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text', '_send_shota_text',
+    '_safe_send', '_send_daily_result_image', '_send_loli_result_image', '_send_shota_result_image',
     '_send_role_image',
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
@@ -186,7 +187,7 @@ __all__ = [
     'read_file_bytes_cached',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
-    'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv',
+    'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv', 'shota_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
     'urlopen', 'urlparse',
@@ -291,6 +292,10 @@ async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
 
 
 async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
+    return await _safe_send(bot, text, *args, **kwargs)
+
+
+async def _send_shota_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
     return await _safe_send(bot, text, *args, **kwargs)
 
 # 本地图片读取相关常量
@@ -939,6 +944,10 @@ def _husband_enabled() -> bool:
 
 def _loli_enabled() -> bool:
     return _cfg_bool('DailyLoliEnabled', True)
+
+
+def _shota_enabled() -> bool:
+    return _cfg_bool('DailyShotaEnabled', True)
 
 
 def _gallery_mode_enabled() -> bool:
@@ -1762,6 +1771,7 @@ def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
     context.setdefault('nte_wives', {})
     context.setdefault('pgr_wives', {})
     context.setdefault('lolis', {})
+    context.setdefault('shotas', {})
     context.setdefault('marry_members', {})
     context.setdefault('rob_attempts', {})
     context.setdefault('safe_wives', {})
@@ -1920,7 +1930,7 @@ def _daily_bucket_name(kind: str) -> str:
 
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
-ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'normal')
+ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'shota', 'normal')
 
 
 async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | None:
@@ -2237,6 +2247,9 @@ async def _send_daily_result_image(
     is_group: bool,
     kind: str,
 ) -> None:
+    if kind == 'shota':
+        await _send_shota_result_image(bot, image, text, user_id, is_group)
+        return
     if kind != 'loli':
         await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return
@@ -2272,6 +2285,9 @@ async def _send_loli_result_image(
         image_ref = image
     messages.append(MessageSegment.image(image_ref))
     await _safe_send(bot, messages)
+
+
+_send_shota_result_image = _send_loli_result_image
 
 
 async def _send_local_image(

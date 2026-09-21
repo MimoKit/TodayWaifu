@@ -173,6 +173,10 @@ async def _send_rob_loli(bot: Bot, ev: Event) -> None:
     await _send_rob_daily(bot, ev, 'loli')
 
 
+async def _send_rob_shota(bot: Bot, ev: Event) -> None:
+    await _send_rob_daily(bot, ev, 'shota')
+
+
 @rob_sv.on_prefix(
     ('抢老婆', '抢今日老婆', '抢婆娘'),
     block=True,
@@ -249,3 +253,29 @@ async def rob_loli(bot: Bot, ev: Event):
 )
 async def rob_loli_at(bot: Bot, ev: Event):
     await _send_rob_loli(bot, ev)
+
+
+@rob_sv.on_prefix(
+    ('抢正太', '抢今日正太'),
+    block=True,
+    to_ai="""抢夺指定用户今天的正太。
+    当用户说“抢某人的正太”“抢正太 @某人”时调用。
+    Args:
+        text: 目标用户，通常是 @用户 或用户 ID。
+    """,
+)
+async def rob_shota(bot: Bot, ev: Event):
+    await _send_rob_shota(bot, ev)
+
+
+@rob_sv.on_fullmatch(
+    ('抢正太', '抢今日正太'),
+    block=True,
+    to_ai="""显示抢正太的用法。
+    当用户只说“抢正太”但没有指定目标用户时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+)
+async def rob_shota_at(bot: Bot, ev: Event):
+    await _send_rob_shota(bot, ev)

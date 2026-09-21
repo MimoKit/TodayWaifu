@@ -40,6 +40,12 @@ LOLI_DIVORCE_COMMANDS = (
     '今日萝莉离婚',
     '和萝莉离婚',
 )
+SHOTA_DIVORCE_COMMANDS = (
+    '正太离婚',
+    '离婚正太',
+    '今日正太离婚',
+    '和正太离婚',
+)
 NTE_DIVORCE_COMMANDS = ('异环老婆离婚', '离婚异环老婆')
 PGR_DIVORCE_COMMANDS = ('战双老婆离婚', '离婚战双老婆')
 
@@ -48,6 +54,8 @@ def _divorce_result_name(kind: str, name: str) -> str:
     """把内部记录名称转换为适合用户阅读的离婚结果。"""
     if kind == 'loli':
         return '今日萝莉'
+    if kind == 'shota':
+        return '今日正太'
     return name
 
 
@@ -57,6 +65,7 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
         'wife': '老婆',
         'husband': '老公',
         'loli': '萝莉',
+        'shota': '正太',
         'nte': '异环老婆',
         'pgr': '战双老婆',
     }[kind]
@@ -110,6 +119,11 @@ async def divorce_husband(bot: Bot, ev: Event) -> None:
 @divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True)
 async def divorce_loli(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'loli')
+
+
+@divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True)
+async def divorce_shota(bot: Bot, ev: Event) -> None:
+    await _send_divorce(bot, ev, 'shota')
 
 
 @divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)
