@@ -4,17 +4,40 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from gsuid_core.ai_core.trigger_bridge import ai_return
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Message
 from gsuid_core.segment import MessageSegment
 
-from .constants import LOG_PREFIX, _cfg
+from .constants import LOG_PREFIX, _cfg, _daily_item_title
 from .delivery import _safe_send, _send_loli_text
 from .domain import RoleCandidate
 from .file_cache import read_file_bytes_cached
 from .gallery import _download_image
 from .roles import _load_local_candidates
+
+
+def _ai_return_draw(kind: str, name: str, text: str | None) -> None:
+    """把本次抽取/流转结果作为 AI 可读摘要注入。
+
+    用户直接触发时 `ai_return` 是空操作；AI 调用时这段文字会成为工具返回值，
+    让 AI 知道"抽到了谁"。按 skill §17.3，观测性代码允许 try/except：提取失败
+    绝不能影响图片生成与发送。
+    """
+    try:
+        title = _daily_item_title(kind)
+        summary = (text or '').strip()
+        if name and summary:
+            ai_return(f'【今日{title}】{name}\n{summary}')
+        elif name:
+            ai_return(f'【今日{title}】{name}')
+        elif summary:
+            ai_return(f'【今日{title}】{summary}')
+        else:
+            ai_return(f'【今日{title}】')
+    except Exception as exc:
+        logger.warning(f'{LOG_PREFIX} ai_return 数据提取失败: {exc}')
 
 def _is_valid_image_ref(image: str) -> bool:
     if not image:
@@ -76,6 +99,9 @@ async def _send_role_image(
         # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
         image = await asyncio.to_thread(read_file_bytes_cached, Path(image_url))
 
+    # 数据已就绪、图片尚未发送：此处注入 AI 可读摘要
+    _ai_return_draw(kind, role.name, text)
+
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -96,13 +122,13 @@ async def _send_daily_result_image(
     kind: str,
 ) -> None:
     if kind == 'shota':
-        await _send_shota_result_image(bot, image, text, user_id, is_group)
+        await _send_shota_result_image(bot, image, text, user_id, is_group, kind)
         return
     if kind != 'loli':
         await _send_role_image(bot, role, image, text, user_id, is_group, kind)
         return
 
-    await _send_loli_result_image(bot, image, text, user_id, is_group)
+    await _send_loli_result_image(bot, image, text, user_id, is_group, kind)
 
 
 async def _send_loli_result_image(
@@ -111,7 +137,10 @@ async def _send_loli_result_image(
     text: str,
     user_id: str | int | None,
     is_group: bool,
+    kind: str = 'loli',
 ) -> None:
+    # 数据已就绪、图片尚未发送：此处注入 AI 可读摘要（loli 与 shota 共用本函数）
+    _ai_return_draw(kind, '', text)
 
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):

@@ -31,7 +31,18 @@ class ResultImageSenderTests(unittest.TestCase):
         self.assertIn("async def _send_daily_result_image(", source)
         self.assertIn("if kind != 'loli':", source)
         self.assertIn("_send_role_image(bot, role, image, text, user_id, is_group, kind)", source)
-        self.assertIn("_send_loli_result_image(bot, image, text, user_id, is_group)", source)
+        self.assertIn("_send_loli_result_image(bot, image, text, user_id, is_group, kind)", source)
+
+    def test_result_senders_inject_ai_readable_summary(self) -> None:
+        """AI 调用工具时需拿到文字摘要，否则只能看到图片资源 ID、答不出"抽到了谁"。"""
+        source = (ROOT / "twf" / "senders.py").read_text(encoding="utf-8")
+        self.assertIn("def _ai_return_draw(", source)
+
+        role_fn = source[source.index("async def _send_role_image("):source.index("async def _send_daily_result_image(")]
+        self.assertIn("_ai_return_draw(kind, role.name, text)", role_fn)
+
+        loli_fn = source[source.index("async def _send_loli_result_image("):source.index("_send_shota_result_image = ")]
+        self.assertIn("_ai_return_draw(kind, '', text)", loli_fn)
 
     def test_loli_sender_downloads_remote_images_before_building_segment(self) -> None:
         source = (ROOT / "twf" / "senders.py").read_text(encoding="utf-8")

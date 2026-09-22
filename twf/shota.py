@@ -159,6 +159,7 @@ async def _send_shota_record(
         message_text,
         ev.user_id,
         ev.group_id is not None,
+        kind='shota',
     )
 
 
