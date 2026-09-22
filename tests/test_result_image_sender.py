@@ -27,14 +27,14 @@ class ResultImageSenderTests(unittest.TestCase):
                 self.assertEqual([call.func.id for call in calls], ["_send_daily_result_image"])
 
     def test_shared_sender_keeps_kind_specific_result_selection(self) -> None:
-        source = (ROOT / "twf" / "shared.py").read_text(encoding="utf-8")
+        source = (ROOT / "twf" / "senders.py").read_text(encoding="utf-8")
         self.assertIn("async def _send_daily_result_image(", source)
         self.assertIn("if kind != 'loli':", source)
         self.assertIn("_send_role_image(bot, role, image, text, user_id, is_group, kind)", source)
         self.assertIn("_send_loli_result_image(bot, image, text, user_id, is_group)", source)
 
     def test_loli_sender_downloads_remote_images_before_building_segment(self) -> None:
-        source = (ROOT / "twf" / "shared.py").read_text(encoding="utf-8")
+        source = (ROOT / "twf" / "senders.py").read_text(encoding="utf-8")
         function_start = source.index("async def _send_loli_result_image(")
         function_end = source.index("async def _send_local_image(", function_start)
         function = source[function_start:function_end]

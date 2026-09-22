@@ -1,4 +1,4 @@
-﻿import ast
+import ast
 import unittest
 from pathlib import Path
 
@@ -106,12 +106,14 @@ class InteractionSourceTests(unittest.TestCase):
         self.assertIn('老婆帮助', help_source)
 
     def test_divorce_marks_selected_daily_record_with_divorced_state(self) -> None:
-        shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        # 离婚状态判定与整批标记随 shared 拆分迁至 daily_store / daily_state
+        daily_store_source = (ROOT / 'twf' / 'daily_store.py').read_text(encoding='utf-8')
+        daily_state_source = (ROOT / 'twf' / 'daily_state.py').read_text(encoding='utf-8')
         divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8')
-        self.assertIn("raw.get('divorced')", shared_source)
-        self.assertIn("return 'divorced'", shared_source)
-        self.assertIn('ALL_DAILY_RECORD_KINDS', shared_source)
-        self.assertIn("context['safe_wives']", shared_source)
+        self.assertIn("raw.get('divorced')", daily_store_source)
+        self.assertIn("return 'divorced'", daily_store_source)
+        self.assertIn('ALL_DAILY_RECORD_KINDS', daily_state_source + daily_store_source)
+        self.assertIn("context['safe_wives']", daily_store_source)
         self.assertIn("record['divorced'] = True", divorce_source)
 
 

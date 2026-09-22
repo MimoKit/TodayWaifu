@@ -9,8 +9,17 @@ from unittest.mock import AsyncMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / 'twf' / 'daily.py'
-SHARED_PATH = ROOT / 'twf' / 'shared.py'
 NORMAL_WIFE_PATH = ROOT / 'twf' / 'normal_wife.py'
+
+
+def _module_defining(name: str) -> Path:
+    """定位定义 name 的 twf 模块（shared 已按职责拆分）。"""
+    for path in sorted((ROOT / 'twf').glob('*.py')):
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                return path
+    raise AssertionError(f'{name} 未在任何 twf 模块中定义')
 
 
 def _extract_function(path: Path, name: str, globals_dict: dict[str, Any]):
@@ -110,7 +119,7 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             '_load_custom_upload_role_map': lambda: {},
             '_normalize_role_name': lambda name: name,
         }
-        filter_by_mode = _extract_function(SHARED_PATH, '_filter_by_mode', globals_dict)
+        filter_by_mode = _extract_function(_module_defining('_filter_by_mode'), '_filter_by_mode', globals_dict)
         role = _FakeRoleCandidate('未知角色', ('unknown_id',), ('https://example.test/pic.png',))
         candidates = (role,)
         filtered = filter_by_mode(candidates, mode='wife')
@@ -125,7 +134,7 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             '_load_custom_upload_role_map': lambda: {},
             '_normalize_role_name': lambda name: name,
         }
-        filter_by_mode = _extract_function(SHARED_PATH, '_filter_by_mode', globals_dict)
+        filter_by_mode = _extract_function(_module_defining('_filter_by_mode'), '_filter_by_mode', globals_dict)
         role1 = _FakeRoleCandidate('秧秧', ('1201',), ('https://example.test/1.png',))
         role2 = _FakeRoleCandidate('未知角色', ('9999',), ('https://example.test/2.png',))
         filtered = filter_by_mode((role1, role2), mode='wife')
@@ -175,7 +184,7 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             '_merge_role_candidates': lambda base, extra: base,
             '_normalize_role_name': lambda name: name,
         }
-        load_uncached = _extract_function(SHARED_PATH, '_load_wuwa_candidates_uncached', globals_dict)
+        load_uncached = _extract_function(_module_defining('_load_wuwa_candidates_uncached'), '_load_wuwa_candidates_uncached', globals_dict)
         candidates, err = await load_uncached('wife')
         self.assertIsNone(err)
         self.assertIsNotNone(candidates)

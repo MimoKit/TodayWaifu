@@ -42,9 +42,19 @@ def _bool_default(call: ast.Call) -> bool | None:
     return None
 
 
+def _module_defining(name: str) -> Path:
+    """定位定义 name 的 twf 模块（shared 已按职责拆分）。"""
+    for path in sorted((ROOT / 'twf').glob('*.py')):
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                return path
+    raise AssertionError(f'{name} 未在任何 twf 模块中定义')
+
+
 def _extract_function(name: str, globals_dict: dict[str, Any]):
-    source_path = ROOT / 'twf' / 'shared.py'
-    tree = ast.parse(source_path.read_text(encoding='utf-8'))
+    source_path = _module_defining(name)
+    tree = ast.parse(source_path.read_text(encoding='utf-8-sig'))
     function = next(
         node
         for node in tree.body
@@ -97,20 +107,23 @@ class NteConfigAndCommandTests(unittest.TestCase):
         self.assertIn('今日异环老婆', registered_words)
 
     def test_nte_candidate_loader_is_wired_to_local_and_default_piles(self) -> None:
-        shared_source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
-        tree = ast.parse(shared_source)
-        nte_functions = [
-            ast.get_source_segment(shared_source, node) or ''
-            for node in tree.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and (
-                node.name.lower().startswith('nte')
-                or node.name.lower().startswith('_nte')
-                or '_nte_' in node.name.lower()
+        # shared 已按职责拆分，NTE 加载器现位于 roles / paths 等模块，故扫描整个 twf 包。
+        nte_functions: list[str] = []
+        for path in sorted((ROOT / 'twf').glob('*.py')):
+            module_source = path.read_text(encoding='utf-8')
+            tree = ast.parse(module_source)
+            nte_functions.extend(
+                ast.get_source_segment(module_source, node) or ''
+                for node in tree.body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and (
+                    node.name.lower().startswith('nte')
+                    or node.name.lower().startswith('_nte')
+                    or '_nte_' in node.name.lower()
+                )
             )
-        ]
         nte_source = '\n'.join(nte_functions).lower()
-        self.assertTrue(nte_functions, 'shared.py 应提供 NTE 候选加载函数')
+        self.assertTrue(nte_functions, 'twf 包应提供 NTE 候选加载函数')
         self.assertIn('_collect_role_candidates', nte_source)
         self.assertIn('custom', nte_source, 'NTE 加载器应传入本地自定义立绘目录')
         self.assertIn('default', nte_source, 'NTE 加载器应传入默认立绘目录作为兜底')

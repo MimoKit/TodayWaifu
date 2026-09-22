@@ -35,13 +35,13 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn("('上传战双老婆图片', '战双老婆上传图片')", source)
 
     def test_pgr_remote_gallery_is_used_with_local_fallback(self) -> None:
-        shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        gallery = (ROOT / 'twf' / 'gallery.py').read_text(encoding='utf-8-sig')
         source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
 
-        self.assertIn('async def _load_pgr_wife_candidates()', shared)
-        self.assertIn("_cfg('DailyWifePgrGalleryApiUrl')", shared)
-        self.assertIn('_parse_pgr_gallery_candidates(payload)', shared)
-        self.assertIn('return await asyncio.to_thread(_load_pgr_local_candidates)', shared)
+        self.assertIn('async def _load_pgr_wife_candidates()', gallery)
+        self.assertIn("_cfg('DailyWifePgrGalleryApiUrl')", gallery)
+        self.assertIn('_parse_pgr_gallery_candidates(payload)', gallery)
+        self.assertIn('return await asyncio.to_thread(_load_pgr_local_candidates)', gallery)
         self.assertIn('await _load_pgr_wife_candidates()', source)
         self.assertIn("record.image.startswith(('http://', 'https://'))", source)
         self.assertIn('await _send_role_image(', source)
@@ -66,7 +66,10 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertNotIn('role_dir.mkdir(', source)
 
     def test_pgr_uses_independent_daily_bucket_and_configurable_gallery(self) -> None:
-        shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        # shared 已按职责拆分，故扫描整个 twf 包而非单文件。
+        shared = '\n'.join(
+            path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'twf').glob('*.py'))
+        )
         metadata = (ROOT / 'twf' / 'kind_metadata.py').read_text(encoding='utf-8-sig')
         source = (ROOT / 'twf' / 'pgr.py').read_text(encoding='utf-8-sig')
 
@@ -81,7 +84,9 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('不要贪心！', source)
 
     def test_daily_wife_variants_share_an_exclusive_daily_choice(self) -> None:
-        shared = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        shared = '\n'.join(
+            path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'twf').glob('*.py'))
+        )
         daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
 
         self.assertIn("DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')", shared)

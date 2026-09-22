@@ -14,18 +14,32 @@ class FakeMessage:
         self.data = data
 
 
+def _twf_module_defining(name: str) -> Path:
+    """定位定义 name 的 twf 模块（shared 已按职责拆分，不再固定单文件）。"""
+    for path in sorted((ROOT / 'twf').glob('*.py')):
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                return path
+    raise AssertionError(f'{name} 未在任何 twf 模块中定义')
+
+
+def _twf_source_defining(name: str) -> str:
+    return _twf_module_defining(name).read_text(encoding='utf-8-sig')
+
+
 def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> dict[str, Any]:
-    source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
-    tree = ast.parse(source)
     body: list[ast.stmt] = [
         ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
         ast.ImportFrom(module='typing', names=[ast.alias(name='Any')], level=0),
     ]
-    body.extend(
-        node
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
-    )
+    for path in sorted((ROOT / 'twf').glob('*.py')):
+        tree = ast.parse(path.read_text(encoding='utf-8-sig'))
+        body.extend(
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
+        )
     values = config or {}
     namespace: dict[str, Any] = {
         'Any': Any,
@@ -107,7 +121,7 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertEqual(direct[1].type, 'image')
 
     def test_result_image_senders_keep_personal_message_segments(self) -> None:
-        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
+        source = (ROOT / 'twf' / 'senders.py').read_text(encoding='utf-8')
         for function_name in ('_send_role_image', '_send_loli_result_image', '_send_local_image'):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
@@ -115,13 +129,15 @@ class PlatformMentionTests(unittest.TestCase):
             self.assertIn('MessageSegment.image(', block)
 
     def test_personal_compatibility_is_not_removed(self) -> None:
-        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
-        self.assertIn('_target_user_id_from_text', source)
-        self.assertIn('_qq_avatar_url', source)
-        self.assertIn('CQ:at', source)
-        self.assertNotIn('_try_send_official_qq_image_markdown', source)
-        self.assertNotIn('DailyWifeOfficialImageGalleryUrl', source)
-        self.assertNotIn('DailyWifeOfficialImageGalleryToken', source)
+        combined = '\n'.join(
+            path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'twf').glob('*.py'))
+        )
+        self.assertIn('_target_user_id_from_text', combined)
+        self.assertIn('_qq_avatar_url', combined)
+        self.assertIn('CQ:at', combined)
+        self.assertNotIn('_try_send_official_qq_image_markdown', combined)
+        self.assertNotIn('DailyWifeOfficialImageGalleryUrl', combined)
+        self.assertNotIn('DailyWifeOfficialImageGalleryToken', combined)
 
     def test_private_account_prompts_remain_compatible(self) -> None:
         daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')

@@ -65,7 +65,10 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
 
     def test_runtime_data_paths_remain_compatible(self) -> None:
-        shared = (ROOT / "twf" / "shared.py").read_text(encoding="utf-8-sig")
+        # shared 已按职责拆分，路径常量散落在 paths/constants 等模块，故扫描整个 twf 包。
+        twf_source = "\n".join(
+            path.read_text(encoding="utf-8-sig") for path in sorted((ROOT / "twf").glob("*.py"))
+        )
         config = (ROOT / "daily_wife_config.py").read_text(encoding="utf-8-sig")
         for text in (
             "get_res_path('TodayWaifu')",
@@ -75,7 +78,7 @@ class CompatibilityContractTests(unittest.TestCase):
             "loli_images",
             "group_member_avatar_cache",
         ):
-            self.assertIn(text, shared + config)
+            self.assertIn(text, twf_source + config)
 
 
 if __name__ == "__main__":
