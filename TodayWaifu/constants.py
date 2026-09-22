@@ -4,10 +4,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ..daily_wife_config import DailyWifeConfig
-
-from .kind_metadata import DailyKindMetadata, daily_kind_metadata
 from .payloads import ConfigValue
+from .kind_metadata import DailyKindMetadata, daily_kind_metadata
+from ..daily_wife_config import DailyWifeConfig
 
 BASE_DIR = Path(__file__).parent.parent
 

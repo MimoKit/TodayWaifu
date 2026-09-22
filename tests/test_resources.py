@@ -3,7 +3,6 @@ from pathlib import Path
 
 from PIL import Image
 
-
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "ICON.png": ((1024, 1024), "RGBA"),

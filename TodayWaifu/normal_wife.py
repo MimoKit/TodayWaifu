@@ -2,18 +2,18 @@
 from __future__ import annotations
 
 import asyncio
-from urllib.error import HTTPError, URLError
+from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 
-from .payloads import GalleryPayload
 from .shared import (
-    CACHE_TTL_SECONDS,
     LOG_PREFIX,
+    CACHE_TTL_SECONDS,
     RoleCandidate,
     _cfg,
-    _fetch_gallery_payload_from_url_sync,
     logger,
+    _fetch_gallery_payload_from_url_sync,
 )
+from .payloads import GalleryPayload
 from .source_cache import AsyncSourceCache
 
 _NORMAL_GALLERY_CACHE = AsyncSourceCache[GalleryPayload](CACHE_TTL_SECONDS, max_entries=4)

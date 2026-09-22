@@ -2,7 +2,6 @@ import ast
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -53,7 +52,10 @@ class InteractionSourceTests(unittest.TestCase):
         gift_source = (ROOT / 'TodayWaifu' / 'gift.py').read_text(encoding='utf-8')
         for word in ('抢老公', '抢今日老公', '抢萝莉', '抢今日萝莉'):
             self.assertIn(word, rob_source)
-        for word in ('送老公', '送今日老公', '同意送老公', '拒绝送老公', '送萝莉', '送今日萝莉', '同意送萝莉', '拒绝送萝莉'):
+        for word in (
+            '送老公', '送今日老公', '同意送老公', '拒绝送老公',
+            '送萝莉', '送今日萝莉', '同意送萝莉', '拒绝送萝莉',
+        ):
             self.assertIn(word, gift_source)
         for word in ('接受老婆赠送', '拒绝老婆赠送', '接受老公赠送', '拒绝老公赠送', '接受萝莉赠送', '拒绝萝莉赠送'):
             self.assertIn(word, gift_source)

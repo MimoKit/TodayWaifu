@@ -8,13 +8,13 @@
 """
 from __future__ import annotations
 
-import hashlib
 import os
-import tempfile
 import time
-from collections import OrderedDict
-from pathlib import Path
+import hashlib
+import tempfile
 from typing import Optional
+from pathlib import Path
+from collections import OrderedDict
 
 # 本地文件字节缓存上限：同时限制条目数和总字节数，避免大图把核心进程内存吃满
 LOCAL_BYTES_CACHE_MAX_ENTRIES = 128

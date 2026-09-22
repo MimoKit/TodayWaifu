@@ -1,9 +1,8 @@
-import asyncio
-import importlib.util
 import sys
+import asyncio
 import unittest
+import importlib.util
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

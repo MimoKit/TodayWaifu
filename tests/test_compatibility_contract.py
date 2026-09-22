@@ -3,7 +3,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = json.loads((ROOT / "tests" / "compatibility_manifest.json").read_text(encoding="utf-8"))
 

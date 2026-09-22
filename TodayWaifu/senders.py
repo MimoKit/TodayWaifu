@@ -4,18 +4,18 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from gsuid_core.ai_core.trigger_bridge import ai_return
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Message
 from gsuid_core.segment import MessageSegment
+from gsuid_core.ai_core.trigger_bridge import ai_return
 
-from .constants import LOG_PREFIX, _cfg, _daily_item_title
-from .delivery import _safe_send, _send_loli_text
-from .domain import RoleCandidate
-from .file_cache import read_file_bytes_cached
-from .gallery import _download_image
 from .roles import _load_local_candidates
+from .domain import RoleCandidate
+from .gallery import _download_image
+from .delivery import _safe_send, _send_loli_text
+from .constants import LOG_PREFIX, _cfg, _daily_item_title
+from .file_cache import read_file_bytes_cached
 
 
 def _ai_return_draw(kind: str, name: str, text: str | None) -> None:

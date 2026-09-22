@@ -2,7 +2,6 @@ import ast
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,7 +37,10 @@ class ResultImageSenderTests(unittest.TestCase):
         source = (ROOT / "TodayWaifu" / "senders.py").read_text(encoding="utf-8")
         self.assertIn("def _ai_return_draw(", source)
 
-        role_fn = source[source.index("async def _send_role_image("):source.index("async def _send_daily_result_image(")]
+        role_fn = source[
+            source.index("async def _send_role_image("):
+            source.index("async def _send_daily_result_image(")
+        ]
         self.assertIn("_ai_return_draw(kind, role.name, text)", role_fn)
 
         loli_fn = source[source.index("async def _send_loli_result_image("):source.index("_send_shota_result_image = ")]

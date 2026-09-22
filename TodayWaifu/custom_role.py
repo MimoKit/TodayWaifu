@@ -3,13 +3,42 @@ from __future__ import annotations
 
 import asyncio
 
-from .shared import *  # noqa: F403
+from .shared import (
+    LOG_PREFIX,
+    ROLE_MAP_RE,
+    IMAGE_EXTENSIONS,
+    CUSTOM_ROLE_ID_START,
+    UPLOAD_IMAGE_MAX_BYTES,
+    CUSTOM_ROLE_DELETE_PENDING,
+    CUSTOM_ROLE_DELETE_CONFIRM_SECONDS,
+    Bot,
+    Path,
+    Event,
+    Message,
+    MessageSegment,
+    PendingCustomRoleDelete,
+    re,
+    time,
+    logger,
+    shutil,
+    _user_key,
+    _safe_send,
+    _context_key,
+    _load_role_map,
+    custom_role_sv,
+    image_upload_sv,
+    _can_upload_images,
+    _normalize_role_name,
+    _writable_role_map_path,
+    _writable_role_pile_root,
+    _invalidate_candidate_cache,
+)
 from .image_input import (
+    image_hash_id,
+    read_image_bytes,
     collect_image_refs,
     detect_image_suffix,
-    image_hash_id,
     image_suffix_from_source,
-    read_image_bytes,
 )
 
 

@@ -1,10 +1,9 @@
 import ast
 import unittest
-from dataclasses import dataclass
+from typing import Any
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
-
+from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 

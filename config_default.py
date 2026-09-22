@@ -5,12 +5,12 @@ from typing import Dict
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.models import (
     GSC,
-    GsBoolConfig,
     GsDivider,
-    GsImageConfig,
     GsIntConfig,
-    GsListStrConfig,
     GsStrConfig,
+    GsBoolConfig,
+    GsImageConfig,
+    GsListStrConfig,
 )
 
 SHOW_CONFIG_PATH = get_res_path(['TodayWaifu', 'show'])
@@ -19,7 +19,9 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     '_DividerImageSource': GsDivider('图片数据源', ''),
     'DailyWifeImageSource': GsStrConfig(
         '图片数据源',
-        '选择 local 使用本地 XWUID 图片目录；选择 gallery 使用远程图库接口。图库图片可能存在内容风险，请自行决定是否启用；使用风险自行承担，插件作者不承担责任',
+        '选择 local 使用本地 XWUID 图片目录；选择 gallery 使用远程图库接口。'
+        '图库图片可能存在内容风险，请自行决定是否启用；'
+        '使用风险自行承担，插件作者不承担责任',
         'local',
         options=['local', 'gallery'],
     ),

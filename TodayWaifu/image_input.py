@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import base64
-import binascii
 import hashlib
-from pathlib import Path
+import binascii
 from typing import Protocol, runtime_checkable
-from urllib.error import HTTPError, URLError
+from pathlib import Path
+from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 

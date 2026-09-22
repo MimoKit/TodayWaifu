@@ -10,8 +10,8 @@ import unittest
 from pathlib import Path
 
 try:
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlmodel import SQLModel
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from gsuid_core.utils.database import base_models
 
@@ -152,7 +152,7 @@ class DailyWifeRecordDbTests(unittest.TestCase):
         asyncio.run(run())
 
         async def count() -> int:
-            from sqlmodel import select, func
+            from sqlmodel import func, select
 
             async with base_models.async_maker() as session:
                 result = await session.execute(

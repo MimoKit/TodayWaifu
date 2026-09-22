@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import asyncio
 
-from .constants import CACHE_TTL_SECONDS
-from .daily_repository import ContextRegistry
-from .domain import MemberCandidate, RoleCandidate
+from .domain import RoleCandidate, MemberCandidate
 from .payloads import DailyContext, GalleryPayload, PendingCustomRoleDelete
+from .constants import CACHE_TTL_SECONDS
 from .source_cache import AsyncSourceCache
+from .daily_repository import ContextRegistry
 
 CANDIDATE_CACHE: dict[str, tuple[float, tuple['RoleCandidate', ...]]] = {}
 

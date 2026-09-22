@@ -2,20 +2,19 @@
 from __future__ import annotations
 
 from .shared import (
+    LOG_PREFIX,
     Bot,
     Event,
-    LOG_PREFIX,
+    time,
+    logger,
+    _user_key,
+    _safe_send,
+    divorce_sv,
     _daily_bucket_name,
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
-    _safe_send,
-    _user_key,
-    divorce_sv,
-    logger,
-    time,
 )
-
 
 DIVORCE_COMMANDS = (
     '离婚',

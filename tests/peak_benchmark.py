@@ -1,12 +1,11 @@
 """本地高峰期状态/缓存基准，不连接网络和生产数据库。"""
 from __future__ import annotations
 
-import asyncio
-import importlib.util
 import sys
 import time
+import asyncio
+import importlib.util
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('todaywaifu_source_cache', ROOT / 'TodayWaifu' / 'source_cache.py')

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import time
-from collections import OrderedDict
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+import asyncio
 from typing import Generic, TypeVar
-
+from collections import OrderedDict
+from dataclasses import dataclass
+from collections.abc import Callable, Awaitable
 
 T = TypeVar('T')
 Loader = Callable[[], Awaitable[T]]

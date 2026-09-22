@@ -1,9 +1,9 @@
 import ast
-import asyncio
 import random
-from pathlib import Path
-from types import SimpleNamespace
+import asyncio
 import unittest
+from types import SimpleNamespace
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 ROOT = Path(__file__).resolve().parents[1]

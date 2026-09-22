@@ -1,24 +1,25 @@
 """TodayWaifu 的每日记录持久化与记录转换。"""
 from __future__ import annotations
 
-import asyncio
 import copy
 import time
+import asyncio
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 
-from .constants import ALL_DAILY_RECORD_KINDS, DAILY_WIFE_KINDS, LOG_PREFIX, _daily_bucket_name
-from .domain import WifeRecord
-from .invalidation import _invalidate_status_cache
-from .members import _user_display_name
-from .models import DailyWifeRecord
-from .paths import _context_key, _daily_context_key, _today_key, _user_key
-from .payloads import DailyContext, RoleRecordValue, WifeData
-from .senders import _is_valid_image_ref
+from .paths import _user_key, _today_key, _context_key, _daily_context_key
 from .state import _CONTEXT_REGISTRY, _DAILY_CONTEXT_CACHE
+from .domain import WifeRecord
+from .models import DailyWifeRecord
+from .members import _user_display_name
+from .senders import _is_valid_image_ref
+from .payloads import WifeData, DailyContext, RoleRecordValue
+from .constants import LOG_PREFIX, DAILY_WIFE_KINDS, ALL_DAILY_RECORD_KINDS, _daily_bucket_name
+from .invalidation import _invalidate_status_cache
+
 
 def _daily_context_lock(ev: Event) -> asyncio.Lock:
     """返回按 bot/group 分片的每日记录锁，避免不同群互相阻塞。"""

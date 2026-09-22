@@ -1,47 +1,48 @@
 """TodayWaifu 的远程图库访问与图片下载。"""
 from __future__ import annotations
 
-import asyncio
 import json
 import time
-from urllib.error import HTTPError, URLError
+import asyncio
+from urllib.error import URLError, HTTPError
 from urllib.request import Request, urlopen
 
 from gsuid_core.logger import logger
 
 from . import state
+from .paths import _role_mode, _role_map_title, _gallery_image_cache_root
+from .roles import (
+    _is_excluded_role,
+    _load_mode_role_map,
+    _normalize_role_name,
+    _load_local_candidates,
+    _merge_role_candidates,
+    _load_nte_local_candidates,
+    _load_pgr_local_candidates,
+    _load_custom_upload_candidates,
+)
+from .state import (
+    _IMAGE_INFLIGHT,
+    CANDIDATE_CACHE,
+    _CANDIDATE_INFLIGHT,
+    _PGR_CANDIDATE_CACHE,
+    _CANDIDATE_LOAD_SEMAPHORE,
+    _IMAGE_DOWNLOAD_SEMAPHORE,
+)
+from .domain import RoleCandidate
+from .payloads import GalleryPayload
 from .constants import (
+    LOG_PREFIX,
     CACHE_TTL_SECONDS,
     DEFAULT_GALLERY_API_URL,
-    LOG_PREFIX,
-    MAX_GALLERY_RESPONSE_BYTES,
     MAX_IMAGE_RESPONSE_BYTES,
+    MAX_GALLERY_RESPONSE_BYTES,
     _cfg,
     _cfg_bool,
     _image_source,
 )
-from .domain import RoleCandidate
 from .file_cache import read_url_cache, write_url_cache
-from .paths import _gallery_image_cache_root, _role_map_title, _role_mode
-from .payloads import GalleryPayload
-from .roles import (
-    _is_excluded_role,
-    _load_custom_upload_candidates,
-    _load_local_candidates,
-    _load_mode_role_map,
-    _load_nte_local_candidates,
-    _load_pgr_local_candidates,
-    _merge_role_candidates,
-    _normalize_role_name,
-)
-from .state import (
-    CANDIDATE_CACHE,
-    _CANDIDATE_INFLIGHT,
-    _CANDIDATE_LOAD_SEMAPHORE,
-    _IMAGE_DOWNLOAD_SEMAPHORE,
-    _IMAGE_INFLIGHT,
-    _PGR_CANDIDATE_CACHE,
-)
+
 
 def _pgr_gallery_api_url() -> str:
     return str(_cfg('DailyWifePgrGalleryApiUrl') or '').strip()

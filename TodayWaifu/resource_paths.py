@@ -4,7 +4,6 @@ from pathlib import Path
 
 from gsuid_core.data_store import get_res_path
 
-
 BASE_DIR = Path(__file__).parent.parent
 WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
 HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'

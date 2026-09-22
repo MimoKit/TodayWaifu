@@ -1,11 +1,9 @@
 import ast
 import asyncio
 import unittest
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, patch
-
+from pathlib import Path
+from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / 'TodayWaifu' / 'daily.py'
@@ -184,7 +182,11 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             '_merge_role_candidates': lambda base, extra: base,
             '_normalize_role_name': lambda name: name,
         }
-        load_uncached = _extract_function(_module_defining('_load_wuwa_candidates_uncached'), '_load_wuwa_candidates_uncached', globals_dict)
+        load_uncached = _extract_function(
+            _module_defining('_load_wuwa_candidates_uncached'),
+            '_load_wuwa_candidates_uncached',
+            globals_dict,
+        )
         candidates, err = await load_uncached('wife')
         self.assertIsNone(err)
         self.assertIsNotNone(candidates)

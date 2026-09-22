@@ -1,43 +1,44 @@
 """TodayWaifu 的角色对照表加载与候选角色归并。"""
 from __future__ import annotations
 
-import random
 import time
+import random
 from pathlib import Path
 
 from gsuid_core.logger import logger
 
+from .paths import (
+    _role_mode,
+    _pgr_wife_root,
+    _role_map_title,
+    _resolve_role_map_path,
+    _resolve_role_pile_root,
+    _nte_static_resource_roots,
+    _custom_upload_role_map_path,
+    _custom_upload_role_pile_root,
+    _resolve_nte_custom_panel_root,
+    _resolve_default_role_pile_root,
+    _resolve_nte_default_panel_root,
+)
+from .state import CANDIDATE_CACHE
+from .domain import WifeRecord, RoleCandidate
+from .payloads import RoleAccumulator, NamedRoleAccumulator
 from .constants import (
-    CACHE_TTL_SECONDS,
-    EXCLUDED_ROLE_KEYWORDS,
-    EXCLUDED_ROLE_NAMES,
-    IMAGE_EXTENSIONS,
     LOG_PREFIX,
-    NTE_DETAIL_CDN_BASE,
-    NTE_EXCLUDED_ROLE_KEYWORDS,
-    NTE_EXCLUDED_ROLE_NAMES,
     ROLE_MAP_RE,
+    IMAGE_EXTENSIONS,
+    CACHE_TTL_SECONDS,
+    EXCLUDED_ROLE_NAMES,
+    NTE_DETAIL_CDN_BASE,
+    EXCLUDED_ROLE_KEYWORDS,
+    NTE_EXCLUDED_ROLE_NAMES,
+    NTE_EXCLUDED_ROLE_KEYWORDS,
     _cfg_bool,
     _image_source,
 )
-from .domain import RoleCandidate, WifeRecord
 from .file_cache import read_file_text_cached
 from .folder_gallery import scan_named_role_directories
-from .paths import (
-    _custom_upload_role_map_path,
-    _custom_upload_role_pile_root,
-    _nte_static_resource_roots,
-    _pgr_wife_root,
-    _resolve_default_role_pile_root,
-    _resolve_nte_custom_panel_root,
-    _resolve_nte_default_panel_root,
-    _resolve_role_map_path,
-    _resolve_role_pile_root,
-    _role_map_title,
-    _role_mode,
-)
-from .payloads import NamedRoleAccumulator, RoleAccumulator
-from .state import CANDIDATE_CACHE
+
 
 def _pick_role_record(
     candidates: tuple['RoleCandidate', ...],

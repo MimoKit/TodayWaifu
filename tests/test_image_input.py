@@ -1,8 +1,7 @@
-import importlib.util
 import unittest
-from pathlib import Path
+import importlib.util
 from types import SimpleNamespace
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "TodayWaifu" / "image_input.py"

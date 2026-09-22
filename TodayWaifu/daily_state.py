@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from .domain import WifeRecord
-from .kind_metadata import DailyKindMetadata, daily_kind_metadata
 from .payloads import RoleRecordValue
+from .kind_metadata import DailyKindMetadata, daily_kind_metadata
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
 ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'shota')

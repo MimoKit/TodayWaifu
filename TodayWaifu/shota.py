@@ -1,10 +1,36 @@
 """TodayWaifu - shota module (今日正太)."""
 from __future__ import annotations
 
-from .shared import *  # noqa: F403
+from .shared import (
+    LOG_PREFIX,
+    CACHE_TTL_SECONDS,
+    Bot,
+    Event,
+    URLError,
+    HTTPError,
+    WifeRecord,
+    GalleryPayload,
+    RoleRecordValue,
+    _cfg,
+    json,
+    logger,
+    asyncio,
+    shota_sv,
+    _user_key,
+    _daily_rng,
+    _wife_state,
+    _shota_enabled,
+    _record_to_dict,
+    _send_shota_text,
+    _record_from_dict,
+    _daily_context_lock,
+    _load_daily_context,
+    _save_daily_records,
+    _http_get_with_retry,
+    _send_shota_result_image,
+)
 from .image_input import image_hash_id
 from .source_cache import AsyncSourceCache
-
 
 _SHOTA_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 

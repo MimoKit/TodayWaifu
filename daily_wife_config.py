@@ -5,7 +5,7 @@ from pathlib import Path
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.gs_config import StringConfig
 
-from .config_default import APPEARANCE_CONFIG_DEFAULT, CONFIG_DEFAULT
+from .config_default import CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
 
 # 配置文件放在 GsCore data 目录下，避免插件升级/卸载时丢失
 CONFIG_PATH = get_res_path('TodayWaifu') / 'config.json'

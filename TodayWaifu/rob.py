@@ -3,36 +3,36 @@ from __future__ import annotations
 
 import random
 
-from .payloads import RoleRecordValue
 from .shared import (
+    LOG_PREFIX,
     Bot,
     Event,
-    LOG_PREFIX,
     RoleCandidate,
     _cfg,
+    logger,
+    rob_sv,
     _cfg_bool,
-    _cfg_probability,
-    _daily_bucket_name,
-    _daily_context_lock,
-    _daily_item_title,
-    _daily_kind_metadata,
-    _get_event_target_user_id,
-    _get_existing_daily_record,
-    _has_active_wife,
-    _husband_available,
+    _user_key,
     _is_master,
+    _safe_send,
+    _wife_state,
+    _record_to_dict,
+    _cfg_probability,
+    _has_active_wife,
+    _daily_item_title,
+    _daily_bucket_name,
+    _husband_available,
+    _user_display_name,
+    _daily_context_lock,
     _is_secondhand_wife,
     _load_daily_context,
     _save_daily_records,
-    _record_to_dict,
+    _daily_kind_metadata,
     _send_daily_result_image,
-    _safe_send,
-    _user_display_name,
-    _user_key,
-    _wife_state,
-    logger,
-    rob_sv,
+    _get_event_target_user_id,
+    _get_existing_daily_record,
 )
+from .payloads import RoleRecordValue
 
 
 def _rob_enabled(kind: str) -> bool:

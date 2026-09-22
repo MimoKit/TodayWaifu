@@ -13,25 +13,25 @@ from typing import TYPE_CHECKING, Protocol
 
 from sqlmodel import Field, delete, select
 from sqlalchemy import Table, UniqueConstraint, tuple_
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.sql.dml import Insert
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from gsuid_core.logger import logger
 from gsuid_core.server import on_core_start_before
 from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
+from gsuid_core.utils.database.startup import exec_list
 from gsuid_core.utils.database.base_models import (
     BaseModel,
     engine,
-    with_read_session,
     with_session,
+    with_read_session,
 )
-from gsuid_core.utils.database.startup import exec_list
 
 if TYPE_CHECKING:
     # 仅供类型检查器解析：本模块会被测试用 importlib 独立加载，不能有运行时相对导入。
-    from .payloads import DailyContext, RoleRecordValue, WifeData
+    from .payloads import WifeData, DailyContext, RoleRecordValue
 
 LOG_PREFIX = '[鸣潮今日老婆]'
 

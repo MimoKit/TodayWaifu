@@ -1,8 +1,7 @@
-import importlib.util
 import unittest
+import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "TodayWaifu" / "storage.py"

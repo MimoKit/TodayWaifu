@@ -1,9 +1,8 @@
 import ast
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -1,9 +1,8 @@
 import ast
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,7 +58,12 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
 class PlatformMentionTests(unittest.TestCase):
     def test_personal_target_formats_are_supported(self) -> None:
         functions = _load_functions(
-            {'_normalise_target_user_id', '_target_user_id_from_text', '_iter_event_messages', '_get_event_target_user_id'}
+            {
+                '_normalise_target_user_id',
+                '_target_user_id_from_text',
+                '_iter_event_messages',
+                '_get_event_target_user_id',
+            }
         )
         normalise = functions['_normalise_target_user_id']
         parse_text = functions['_target_user_id_from_text']
@@ -88,7 +92,12 @@ class PlatformMentionTests(unittest.TestCase):
 
     def test_target_user_id_falls_back_to_personal_message_text(self) -> None:
         functions = _load_functions(
-            {'_normalise_target_user_id', '_target_user_id_from_text', '_iter_event_messages', '_get_event_target_user_id'}
+            {
+                '_normalise_target_user_id',
+                '_target_user_id_from_text',
+                '_iter_event_messages',
+                '_get_event_target_user_id',
+            }
         )
         get_target = functions['_get_event_target_user_id']
         event = SimpleNamespace(

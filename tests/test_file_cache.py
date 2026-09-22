@@ -1,11 +1,10 @@
 """TodayWaifu/file_cache.py 的单元测试：不依赖 gsuid_core，importlib 独立加载。"""
-import importlib.util
 import os
 import time
 import unittest
+import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "TodayWaifu" / "file_cache.py"

@@ -1,7 +1,63 @@
 """TodayWaifu - daily module."""
 from __future__ import annotations
 
-from .shared import *  # noqa: F403
+from .shared import (
+    LOG_PREFIX,
+    LIST_FORWARD_THRESHOLD,
+    Bot,
+    Event,
+    WifeRecord,
+    RoleCandidate,
+    MessageSegment,
+    MemberCandidate,
+    RoleRecordValue,
+    re,
+    _cfg,
+    time,
+    logger,
+    random,
+    _cfg_bool,
+    _user_key,
+    _daily_rng,
+    _event_rng,
+    _is_master,
+    _safe_send,
+    _wife_state,
+    wife_list_sv,
+    daily_wife_sv,
+    assign_wife_sv,
+    _filter_by_mode,
+    _record_to_dict,
+    husband_list_sv,
+    marry_member_sv,
+    specify_wife_sv,
+    _load_candidates,
+    _send_role_image,
+    daily_husband_sv,
+    _can_specify_wife,
+    _daily_item_title,
+    _pick_role_record,
+    _record_from_dict,
+    _send_local_image,
+    daily_nte_wife_sv,
+    _daily_bucket_name,
+    _husband_available,
+    _pick_group_member,
+    _save_daily_record,
+    _user_display_name,
+    _daily_context_lock,
+    _load_daily_context,
+    _save_daily_records,
+    _valid_display_name,
+    _daily_kind_metadata,
+    _normalize_role_name,
+    daily_normal_wife_sv,
+    _marry_member_enabled,
+    _roll_group_member_wife,
+    _get_event_target_user_id,
+    _load_group_display_names,
+    _get_other_daily_wife_name,
+)
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
@@ -206,7 +262,10 @@ def _wife_list_text_from_items(title_text: str, items: list[tuple[int, str, str]
     if not items:
         return title_text
     lines = [title_text]
-    lines.extend(f'{index}. {display_name} → {wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1))
+    lines.extend(
+        f'{index}. {display_name} → {wife_name}'
+        for index, (_, display_name, wife_name) in enumerate(items, 1)
+    )
     return '\n'.join(lines)
 
 
@@ -548,7 +607,14 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         f'member={member.name} qq={member.user_id} avatar={member.avatar}'
     )
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
-    await _send_local_image(bot, member.avatar, '本地群友头像文件不存在，请稍后重试。', text, ev.user_id, ev.group_id is not None)
+    await _send_local_image(
+        bot,
+        member.avatar,
+        '本地群友头像文件不存在，请稍后重试。',
+        text,
+        ev.user_id,
+        ev.group_id is not None,
+    )
 
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife') -> None:

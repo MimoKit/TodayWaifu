@@ -2,28 +2,29 @@
 from __future__ import annotations
 
 import random
+from pathlib import Path
 from datetime import date
 from importlib.util import find_spec
-from pathlib import Path
 
 import gsuid_core
-from gsuid_core.data_store import get_res_path
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
+from gsuid_core.data_store import get_res_path
 
 from .constants import (
     BASE_DIR,
-    HUSBAND_ROLE_MAP_PATH,
-    LEGACY_ROLE_MAP_PATH,
     LOG_PREFIX,
-    LOLI_IMAGE_DIR_NAME,
     NTE_ROLE_MAP_PATH,
     PGR_WIFE_DIR_NAME,
     WIFE_ROLE_MAP_PATH,
+    LOLI_IMAGE_DIR_NAME,
+    LEGACY_ROLE_MAP_PATH,
+    HUSBAND_ROLE_MAP_PATH,
     _cfg,
     _daily_kind_metadata,
 )
 from .daily_repository import ContextKey
+
 
 def _configured_path(key: str) -> Path | None:
     raw = str(_cfg(key) or '').strip().strip('"')

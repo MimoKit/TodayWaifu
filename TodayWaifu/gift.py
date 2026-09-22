@@ -3,38 +3,38 @@ from __future__ import annotations
 
 import time
 
-from .payloads import PendingGift
 from .shared import (
+    LOG_PREFIX,
     Bot,
     Event,
-    LOG_PREFIX,
-    MessageSegment,
+    WifeRecord,
     RoleCandidate,
+    MessageSegment,
     _cfg,
+    logger,
+    gift_sv,
     _cfg_bool,
+    _user_key,
+    _safe_send,
+    _wife_state,
     _context_key,
-    _daily_bucket_name,
-    _daily_context_lock,
-    _daily_item_title,
-    _daily_kind_metadata,
-    _get_event_target_user_id,
-    _get_existing_daily_record,
+    _record_to_dict,
     _has_active_wife,
+    _daily_item_title,
+    _record_from_dict,
+    _daily_bucket_name,
     _husband_available,
+    _user_display_name,
+    _daily_context_lock,
     _is_secondhand_wife,
     _load_daily_context,
     _save_daily_records,
-    _record_from_dict,
-    _record_to_dict,
+    _daily_kind_metadata,
     _send_daily_result_image,
-    _safe_send,
-    _user_display_name,
-    _user_key,
-    _wife_state,
-    logger,
-    gift_sv,
+    _get_event_target_user_id,
+    _get_existing_daily_record,
 )
-
+from .payloads import PendingGift
 
 GIFT_CONFIRM_TIMEOUT_SECONDS = 60
 GIFT_PENDING_MAX_ENTRIES = 4096

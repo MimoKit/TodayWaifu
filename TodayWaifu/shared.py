@@ -1,202 +1,200 @@
 """TodayWaifu 公共层：SV 定义、启动/维护钩子与对外再导出。
 
-本模块把拆分后的各子模块重新导出，业务模块继续 `from .shared import *`。
+本模块把拆分后的各子模块按原名重新导出（见 `__all__`），业务模块按需显式
+`from .shared import (...)` 取用，不再使用星号导入。
 """
 from __future__ import annotations
 
-from datetime import date
+import os
+import re
+import sys
+import json
+import time
+import random
+import shutil
+import asyncio
+import hashlib
+import binascii
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from datetime import date
+from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
-import asyncio
-import binascii
-import hashlib
-import json
-import os
-import random
-import re
-import shutil
-import sys
-import time
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..daily_wife_config import DailyWifeConfig
+from gsuid_core.sv import SV, Plugins
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
-from gsuid_core.data_store import get_res_path
-from gsuid_core.help.utils import register_help
 from gsuid_core.logger import logger
 from gsuid_core.models import Event, Message
-from gsuid_core.segment import MessageSegment
 from gsuid_core.server import on_core_shutdown, on_core_start_before
-from gsuid_core.sv import Plugins, SV
+from gsuid_core.segment import MessageSegment
+from gsuid_core.data_store import get_res_path
+from gsuid_core.help.utils import register_help
 from gsuid_core.utils.database.models import CoreUser
 
-from .daily_repository import ContextKey, ContextRegistry
-from .domain import MemberCandidate, RoleCandidate, WifeRecord
-from .file_cache import read_file_bytes_cached, clear_expired_files
-from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
-from .models import DailyWifeRecord
-from .payloads import DailyContext, GalleryPayload, PendingCustomRoleDelete, PendingGift, RoleRecordValue
-from .source_cache import AsyncSourceCache
-from .storage import read_json_dict
-from .upload_access import can_upload_images, normalized_user_ids
-
-
-from .constants import (
-    BASE_DIR,
-    CACHE_MAINTENANCE_FILE_LIMIT,
-    CACHE_MAINTENANCE_INTERVAL_SECONDS,
-    CACHE_TTL_SECONDS,
-    CUSTOM_ROLE_DELETE_CONFIRM_SECONDS,
-    CUSTOM_ROLE_ID_START,
-    DEFAULT_GALLERY_API_URL,
-    EXCLUDED_ROLE_KEYWORDS,
-    EXCLUDED_ROLE_NAMES,
-    HELP_ICON_PATH,
-    IMAGE_EXTENSIONS,
-    LIST_FORWARD_THRESHOLD,
-    LOG_PREFIX,
-    LOLICONAPP_API_URL,
-    LOLICONAPP_TAGS,
-    LOLI_DOWNLOAD_LOG_PREFIX,
-    LOLI_IMAGE_DIR_NAME,
-    LOLI_MOBILE_UA,
-    MAX_GALLERY_RESPONSE_BYTES,
-    MAX_IMAGE_RESPONSE_BYTES,
-    MEMBER_AVATAR_CACHE_SECONDS,
-    NTE_DETAIL_CDN_BASE,
-    NTE_ROLE_MAP_PATH,
-    ROLE_MAP_RE,
-    UPLOAD_IMAGE_MAX_BYTES,
-    _cfg,
-    _cfg_bool,
-    _cfg_probability,
-    _daily_bucket_name,
-    _daily_item_title,
-    _daily_kind_metadata,
-    _image_source,
-)
-from .state import (
-    CANDIDATE_CACHE,
-    CUSTOM_ROLE_DELETE_PENDING,
-    _CANDIDATE_INFLIGHT,
-    _CONTEXT_REGISTRY,
-    _DAILY_CONTEXT_CACHE,
-    _GROUP_DISPLAY_NAME_CACHE,
-    _IMAGE_INFLIGHT,
-    _MEMBER_AVATAR_INFLIGHT,
-    _MEMBER_CACHE,
-    _PGR_CANDIDATE_CACHE,
-    _SOURCE_CACHE,
-    _daily_data_lock,
-)
 from .paths import (
-    _configured_path,
-    _context_key,
-    _custom_upload_data_root,
-    _custom_upload_role_map_path,
-    _custom_upload_role_pile_root,
+    _user_key,
     _daily_rng,
     _event_rng,
-    _gallery_image_cache_root,
-    _loli_image_root,
+    _today_key,
+    _context_key,
     _pgr_wife_root,
-    _resolve_default_role_pile_root,
-    _resolve_nte_custom_panel_root,
-    _resolve_nte_default_panel_root,
+    _wife_data_path,
+    _configured_path,
+    _loli_image_root,
     _resolve_role_map_path,
     _resolve_role_pile_root,
-    _today_key,
-    _user_key,
-    _wife_data_path,
     _writable_role_map_path,
+    _custom_upload_data_root,
     _writable_role_pile_root,
+    _gallery_image_cache_root,
+    _custom_upload_role_map_path,
+    _custom_upload_role_pile_root,
+    _resolve_nte_custom_panel_root,
+    _resolve_default_role_pile_root,
+    _resolve_nte_default_panel_root,
 )
-from .delivery import _safe_send, _send_loli_text, _send_shota_text
-from .targets import _get_event_target_user_id
 from .roles import (
     _MALE_ROLE_NAMES_NORM,
-    _collect_role_candidates,
+    _role_images,
+    _is_male_role,
+    _loli_enabled,
+    _load_role_map,
+    _shota_enabled,
     _filter_by_mode,
-    _gallery_mode_enabled,
-    _husband_available,
     _husband_enabled,
     _is_excluded_role,
-    _is_male_role,
-    _load_local_candidates,
-    _load_pgr_local_candidates,
-    _load_role_map,
-    _loli_enabled,
-    _normalize_role_name,
     _pick_role_record,
-    _role_images,
-    _shota_enabled,
+    _husband_available,
+    _normalize_role_name,
+    _gallery_mode_enabled,
+    _load_local_candidates,
+    _collect_role_candidates,
+    _load_pgr_local_candidates,
 )
+from .state import (
+    _MEMBER_CACHE,
+    _SOURCE_CACHE,
+    _IMAGE_INFLIGHT,
+    CANDIDATE_CACHE,
+    _CONTEXT_REGISTRY,
+    _CANDIDATE_INFLIGHT,
+    _DAILY_CONTEXT_CACHE,
+    _PGR_CANDIDATE_CACHE,
+    _MEMBER_AVATAR_INFLIGHT,
+    _GROUP_DISPLAY_NAME_CACHE,
+    CUSTOM_ROLE_DELETE_PENDING,
+    _daily_data_lock,
+)
+from .domain import WifeRecord, RoleCandidate, MemberCandidate
+from .models import DailyWifeRecord
 from .gallery import (
-    _download_image,
-    _download_image_sync,
-    _fetch_gallery_payload_from_url_sync,
-    _fetch_gallery_payload_sync,
-    _gallery_api_url,
     _http_get,
-    _http_get_with_retry,
+    _download_image,
+    _gallery_api_url,
     _load_candidates,
-    _load_pgr_wife_candidates,
-    _parse_role_candidates,
     _request_headers,
+    _download_image_sync,
+    _http_get_with_retry,
+    _parse_role_candidates,
+    _load_pgr_wife_candidates,
+    _fetch_gallery_payload_sync,
+    _fetch_gallery_payload_from_url_sync,
 )
 from .members import (
-    _download_avatar,
-    _load_group_display_names,
-    _load_group_member_candidates,
-    _marry_member_enabled,
-    _member_avatar_cache_path,
-    _member_feature_enabled,
-    _member_probability,
-    _pick_group_member,
     _qq_avatar_url,
-    _resolve_member_avatar,
-    _resolve_member_candidate_avatar,
-    _roll_group_member_wife,
-    _usable_cached_avatar,
+    _download_avatar,
+    _pick_group_member,
     _user_display_name,
-    _valid_display_name,
     _valid_member_text,
+    _member_probability,
+    _valid_display_name,
+    _marry_member_enabled,
+    _usable_cached_avatar,
+    _resolve_member_avatar,
+    _member_feature_enabled,
+    _roll_group_member_wife,
+    _load_group_display_names,
+    _member_avatar_cache_path,
+    _load_group_member_candidates,
+    _resolve_member_candidate_avatar,
 )
 from .senders import (
-    _is_valid_image_ref,
-    _send_daily_result_image,
-    _send_local_image,
-    _send_loli_result_image,
     _send_role_image,
+    _send_local_image,
+    _is_valid_image_ref,
+    _send_loli_result_image,
+    _send_daily_result_image,
     _send_shota_result_image,
 )
-from .invalidation import _invalidate_candidate_cache
+from .storage import read_json_dict
+from .targets import _get_event_target_user_id
+from .delivery import _safe_send, _send_loli_text, _send_shota_text
+from .payloads import PendingGift, DailyContext, GalleryPayload, RoleRecordValue, PendingCustomRoleDelete
+from .constants import (
+    BASE_DIR,
+    LOG_PREFIX,
+    ROLE_MAP_RE,
+    HELP_ICON_PATH,
+    LOLI_MOBILE_UA,
+    LOLICONAPP_TAGS,
+    IMAGE_EXTENSIONS,
+    CACHE_TTL_SECONDS,
+    NTE_ROLE_MAP_PATH,
+    LOLICONAPP_API_URL,
+    EXCLUDED_ROLE_NAMES,
+    LOLI_IMAGE_DIR_NAME,
+    NTE_DETAIL_CDN_BASE,
+    CUSTOM_ROLE_ID_START,
+    EXCLUDED_ROLE_KEYWORDS,
+    LIST_FORWARD_THRESHOLD,
+    UPLOAD_IMAGE_MAX_BYTES,
+    DEFAULT_GALLERY_API_URL,
+    LOLI_DOWNLOAD_LOG_PREFIX,
+    MAX_IMAGE_RESPONSE_BYTES,
+    MAX_GALLERY_RESPONSE_BYTES,
+    MEMBER_AVATAR_CACHE_SECONDS,
+    CACHE_MAINTENANCE_FILE_LIMIT,
+    CACHE_MAINTENANCE_INTERVAL_SECONDS,
+    CUSTOM_ROLE_DELETE_CONFIRM_SECONDS,
+    _cfg,
+    _cfg_bool,
+    _image_source,
+    _cfg_probability,
+    _daily_item_title,
+    _daily_bucket_name,
+    _daily_kind_metadata,
+)
+from .file_cache import clear_expired_files, read_file_bytes_cached
 from .daily_store import (
-    _daily_context_lock,
-    _delete_daily_record,
-    _get_existing_daily_record,
-    _get_existing_daily_wife_record,
-    _get_other_daily_wife_name,
-    _get_today_context,
+    _wife_state,
+    _wife_origin,
+    _load_wife_data,
+    _record_to_dict,
+    _save_wife_data,
     _has_active_wife,
+    _record_from_dict,
+    _get_today_context,
+    _save_daily_record,
+    _daily_context_lock,
     _is_secondhand_wife,
     _load_daily_context,
-    _load_wife_data,
-    _mark_all_daily_records_divorced,
-    _record_from_dict,
-    _record_to_dict,
     _save_daily_context,
-    _save_daily_record,
     _save_daily_records,
-    _save_wife_data,
-    _wife_origin,
-    _wife_state,
+    _delete_daily_record,
+    _get_existing_daily_record,
+    _get_other_daily_wife_name,
+    _get_existing_daily_wife_record,
+    _mark_all_daily_records_divorced,
 )
-
+from .invalidation import _invalidate_candidate_cache
+from .source_cache import AsyncSourceCache
+from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
+from .upload_access import can_upload_images, normalized_user_ids
+from .daily_repository import ContextKey, ContextRegistry
+from ..daily_wife_config import DailyWifeConfig
 
 Plugins(
     name='TodayWaifu',
@@ -254,7 +252,8 @@ __all__ = [
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
-    '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role', '_is_master', '_is_secondhand_wife',
+    '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
+    '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
@@ -281,7 +280,8 @@ __all__ = [
     'DailyWifeRecord', '_daily_data_lock', '_migrate_legacy_wife_data',
     'read_file_bytes_cached',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
-    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv', 'daily_nte_wife_sv', 'daily_wife_sv',
+    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
+    'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv', 'shota_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
     'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',

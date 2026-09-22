@@ -6,6 +6,7 @@ from typing import Iterator
 
 from gsuid_core.models import Event, Message
 
+
 def _normalise_target_user_id(value: object) -> str:
     if isinstance(value, bool) or value is None:
         return ''

@@ -5,8 +5,9 @@ from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Message
 
-from .constants import LOG_PREFIX
 from .payloads import SendMessage
+from .constants import LOG_PREFIX
+
 
 def _is_xwuid_group_activity_hook_error(exc: Exception) -> bool:
     message = str(exc)

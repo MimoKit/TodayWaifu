@@ -1,12 +1,12 @@
 """TodayWaifu 的群成员目录、头像与显示名。"""
 from __future__ import annotations
 
-import asyncio
-import random
 import re
 import time
+import random
+import asyncio
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from urllib.error import URLError, HTTPError
 from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,10 +15,11 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.database.models import CoreUser
 
+from .paths import _user_key, _daily_rng, _custom_upload_data_root
+from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT, _GROUP_DISPLAY_NAME_CACHE
+from .domain import WifeRecord, MemberCandidate
 from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
-from .domain import MemberCandidate, WifeRecord
-from .paths import _custom_upload_data_root, _daily_rng, _user_key
-from .state import _GROUP_DISPLAY_NAME_CACHE, _MEMBER_AVATAR_INFLIGHT, _MEMBER_CACHE
+
 
 def _valid_display_name(value: object, user_id: str | int | None = None) -> str:
     text = str(value or '').strip()
@@ -257,7 +258,11 @@ async def _pick_group_member(
     return None
 
 
-async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, rng: random.Random | None = None) -> WifeRecord | None:
+async def _roll_group_member_wife(
+    ev: Event,
+    user_id: str | int | None = None,
+    rng: random.Random | None = None,
+) -> WifeRecord | None:
     if not _member_feature_enabled() or not ev.group_id:
         return None
 

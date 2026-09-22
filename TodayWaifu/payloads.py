@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from typing import TypedDict, Union
+from typing import Union, TypedDict
 
 from gsuid_core.models import Message
 

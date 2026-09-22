@@ -1,9 +1,48 @@
 """战双帕弥什本地图库抽取。"""
 from __future__ import annotations
 
-from .shared import *  # noqa: F403
+from .shared import (
+    LOG_PREFIX,
+    UPLOAD_IMAGE_MAX_BYTES,
+    Bot,
+    Path,
+    Event,
+    WifeRecord,
+    RoleCandidate,
+    _cfg,
+    time,
+    logger,
+    random,
+    asyncio,
+    _cfg_bool,
+    _user_key,
+    _daily_rng,
+    _is_master,
+    _safe_send,
+    _wife_state,
+    pgr_wife_sv,
+    _pgr_wife_root,
+    _record_to_dict,
+    image_upload_sv,
+    specify_wife_sv,
+    _send_role_image,
+    _can_specify_wife,
+    _pick_role_record,
+    _record_from_dict,
+    _send_local_image,
+    _can_upload_images,
+    _daily_bucket_name,
+    _daily_context_lock,
+    _load_daily_context,
+    _save_daily_records,
+    _daily_kind_metadata,
+    _normalize_role_name,
+    _load_pgr_wife_candidates,
+    _get_other_daily_wife_name,
+    _invalidate_candidate_cache,
+)
+from .image_input import image_hash_id, read_image_bytes, collect_image_refs
 from .folder_gallery import find_named_role_directory
-from .image_input import collect_image_refs, image_hash_id, read_image_bytes
 
 
 def _unique_pgr_image_path(role_dir: Path, suffix: str, index: int) -> Path:

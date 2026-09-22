@@ -1,16 +1,55 @@
 """TodayWaifu - loli module."""
 from __future__ import annotations
 
-from .shared import *  # noqa: F403
+from .shared import (
+    LOG_PREFIX,
+    IMAGE_EXTENSIONS,
+    CACHE_TTL_SECONDS,
+    UPLOAD_IMAGE_MAX_BYTES,
+    Bot,
+    Path,
+    Event,
+    Message,
+    URLError,
+    HTTPError,
+    WifeRecord,
+    GalleryPayload,
+    MessageSegment,
+    RoleRecordValue,
+    re,
+    _cfg,
+    json,
+    time,
+    logger,
+    shutil,
+    asyncio,
+    loli_sv,
+    _user_key,
+    _daily_rng,
+    _safe_send,
+    _wife_state,
+    _loli_enabled,
+    loli_manage_sv,
+    _record_to_dict,
+    _send_loli_text,
+    image_upload_sv,
+    _loli_image_root,
+    _record_from_dict,
+    _can_upload_images,
+    _daily_context_lock,
+    _load_daily_context,
+    _save_daily_records,
+    _http_get_with_retry,
+    _send_loli_result_image,
+)
 from .image_input import (
+    image_hash_id,
+    read_image_bytes,
     collect_image_refs,
     detect_image_suffix,
-    image_hash_id,
     image_suffix_from_source,
-    read_image_bytes,
 )
 from .source_cache import AsyncSourceCache
-
 
 _LOLI_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 
@@ -163,7 +202,10 @@ def _fetch_loli_image_urls_sync(api_url: str) -> tuple[str, ...]:
         body = _http_get_with_retry(api_url, timeout=15)
     except HTTPError as exc:
         if exc.code == 403:
-            raise RuntimeError('请求萝莉图库接口失败(403)：图库接口需要访问令牌，请在控制台配置「图库访问令牌」(DailyWifeGalleryToken)。') from exc
+            raise RuntimeError(
+                '请求萝莉图库接口失败(403)：图库接口需要访问令牌，'
+                '请在控制台配置「图库访问令牌」(DailyWifeGalleryToken)。'
+            ) from exc
         raise RuntimeError(f'请求萝莉图库接口失败，HTTP {exc.code}。') from exc
     except URLError as exc:
         raise RuntimeError(f'请求萝莉图库接口失败：{exc.reason}') from exc
