@@ -20,6 +20,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from sqlalchemy.exc import SQLAlchemyError
+
+import gsuid_core
 from gsuid_core.bot import Bot
 from gsuid_core.config import core_config
 from gsuid_core.data_store import get_res_path
@@ -462,12 +465,8 @@ def _resolve_role_pile_root() -> Path | None:
         ]
     )
 
-    try:
-        import gsuid_core
-        core_root = Path(gsuid_core.__file__).resolve().parents[1]
-        candidates.append(core_root / 'data' / 'XutheringWavesUID' / 'custom_role_pile')
-    except Exception:
-        pass
+    core_root = Path(gsuid_core.__file__).resolve().parents[1]
+    candidates.append(core_root / 'data' / 'XutheringWavesUID' / 'custom_role_pile')
 
     for path in candidates:
         if path and path.is_dir():
@@ -484,12 +483,8 @@ def _resolve_default_role_pile_root() -> Path | None:
         BASE_DIR.parent / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile',
     ]
 
-    try:
-        import gsuid_core
-        core_root = Path(gsuid_core.__file__).resolve().parents[1]
-        candidates.append(core_root / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile')
-    except Exception:
-        pass
+    core_root = Path(gsuid_core.__file__).resolve().parents[1]
+    candidates.append(core_root / 'data' / 'XutheringWavesUID' / 'resource' / 'role_pile')
 
     for path in candidates:
         if path and path.is_dir():
@@ -763,7 +758,7 @@ def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
         if role_mode == 'wife':
             role_map.update(_load_custom_upload_role_map())
         candidates = _collect_role_candidates(role_map, pile_root, default_pile_root, upload_pile_root)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.exception(f'{LOG_PREFIX} 读取本地图片目录失败: {exc}')
         return None, '读取本地图片目录失败。'
 
@@ -780,7 +775,7 @@ def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
 
     try:
         role_map = _load_role_map(role_map_path)
-    except Exception as exc:
+    except OSError as exc:
         logger.exception(f'{LOG_PREFIX} 读取异环角色对照表失败: {exc}')
         return None, '读取异环角色 ID 对照表失败。'
     role_map = {
@@ -901,7 +896,7 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
                 return candidates
 
             return await _PGR_CANDIDATE_CACHE.get(api_url, load_remote)
-        except Exception as exc:
+        except (RuntimeError, OSError, TimeoutError) as exc:
             logger.warning(f'{LOG_PREFIX} 读取战双远程图库失败，回退本地图库: {exc}')
     return await asyncio.to_thread(_load_pgr_local_candidates)
 
@@ -1046,7 +1041,7 @@ def _fetch_gallery_payload_sync() -> dict[str, Any]:
 
     try:
         payload = json.loads(body.decode('utf-8'))
-    except Exception as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimeError('图库接口返回内容不是有效 JSON。') from exc
     if not isinstance(payload, dict):
         raise RuntimeError('图库接口返回格式不正确。')
@@ -1212,16 +1207,12 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
                         )
                         candidates = tuple(sorted((*candidates, *supplement_candidates), key=lambda r: r.name))
         candidates = _merge_role_candidates(candidates, custom_candidates)
-    except RuntimeError as exc:
+    except (RuntimeError, OSError, TimeoutError) as exc:
         logger.warning(f'{LOG_PREFIX} 读取图库接口失败: {exc}')
-        candidates, error = await _fallback_to_local_candidates(role_mode, custom_candidates, str(exc))
-        if error or not candidates:
-            return None, error
-        CANDIDATE_CACHE[cache_key] = (now, candidates)
-        return candidates, None
-    except Exception as exc:
-        logger.warning(f'{LOG_PREFIX} 读取图库接口异常: {exc}')
-        candidates, error = await _fallback_to_local_candidates(role_mode, custom_candidates, '读取图库接口失败。')
+        # RuntimeError 携带图库接口的友好原因；I/O 类异常沿用原通用文案，避免把底层
+        # errno 细节直接暴露给用户。
+        reason = str(exc) if isinstance(exc, RuntimeError) else '读取图库接口失败。'
+        candidates, error = await _fallback_to_local_candidates(role_mode, custom_candidates, reason)
         if error or not candidates:
             return None, error
         CANDIDATE_CACHE[cache_key] = (now, candidates)
@@ -1309,10 +1300,9 @@ def _daily_rng(ev: Event, user_id: str | int | None = None, salt: str = '') -> r
 
 
 def _is_master(ev: Event) -> bool:
-    try:
-        masters = core_config.get_config('masters')
-    except Exception:
-        masters = []
+    masters = core_config.get_config('masters')
+    if not isinstance(masters, list):
+        return False
     return str(ev.user_id) in {str(master) for master in masters}
 
 
@@ -1387,7 +1377,7 @@ async def _load_group_display_names(ev: Event) -> dict[str, str]:
     async def load_names() -> dict[str, str]:
         try:
             users = await CoreUser.get_group_all_user(str(ev.group_id))
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             logger.warning(f'{LOG_PREFIX} 读取 GsCore 群成员缓存失败: {exc}')
             return {}
 
@@ -1445,7 +1435,7 @@ def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
             logger.debug(f'{LOG_PREFIX} 缓存的头像已过期: {path}')
             return False
         return True
-    except Exception:
+    except OSError:
         return False
 
 
@@ -1464,7 +1454,7 @@ def _download_avatar(url: str, path: Path) -> bool:
         tmp_path.replace(path)
         logger.debug(f'{LOG_PREFIX} 头像下载完成: {path}')
         return True
-    except Exception as exc:
+    except (OSError, HTTPError, URLError, TimeoutError) as exc:
         logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {url} -> {exc}')
         return False
 
@@ -1483,8 +1473,8 @@ def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
             local_path = Path(source)
             if local_path.is_file():
                 return str(local_path)
-        except Exception:
-            pass
+        except (OSError, ValueError):
+            logger.debug(f'{LOG_PREFIX} 头像本地路径无效: {source}')
 
     if str(user_id).isdigit() and _download_avatar(_qq_avatar_url(str(user_id)), cache_path):
         return str(cache_path)
@@ -1503,7 +1493,7 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
     async def load_members() -> tuple[MemberCandidate, ...]:
         try:
             users = await CoreUser.get_group_all_user(str(ev.group_id))
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             logger.warning(f'{LOG_PREFIX} 读取 GsCore 群成员缓存失败: {exc}')
             return ()
 
@@ -1749,7 +1739,7 @@ async def _save_wife_data(data: dict[str, Any]) -> None:
             bot_id, _, group_id = str(context_key).partition(':')
             try:
                 await DailyWifeRecord.save_context(day, bot_id, group_id or 'direct', context)
-            except Exception as exc:
+            except SQLAlchemyError as exc:
                 logger.error(f'{LOG_PREFIX} 保存每日记录到数据库失败: {exc}')
 
 
@@ -1810,7 +1800,7 @@ async def _migrate_daily_wife_data_on_startup() -> None:
     """插件启动钩子：在核心建表（priority=-90）之后执行旧 JSON 迁移。"""
     try:
         await _migrate_legacy_wife_data()
-    except Exception as exc:
+    except (OSError, SQLAlchemyError) as exc:
         logger.exception(f'{LOG_PREFIX} 旧每日记录迁移失败: {exc}')
 
 
@@ -1884,7 +1874,7 @@ async def _cache_maintenance_loop() -> None:
             await _cache_maintenance_once()
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
+        except (OSError, SQLAlchemyError) as exc:
             logger.warning(f'{LOG_PREFIX} 缓存维护失败: {exc}')
         await asyncio.sleep(CACHE_MAINTENANCE_INTERVAL_SECONDS)
 
@@ -1972,7 +1962,7 @@ def _is_valid_image_ref(image: str) -> bool:
         return True
     try:
         return Path(image).is_file()
-    except Exception:
+    except (OSError, ValueError):
         return False
 
 
@@ -1985,7 +1975,7 @@ def _record_from_dict(data: dict[str, Any]) -> WifeRecord | None:
             record_type=str(data.get('record_type') or 'role'),
             target_user_id=str(data.get('target_user_id') or ''),
         )
-    except Exception as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         logger.error(f'{LOG_PREFIX} 解析 Record 字典异常: {exc}')
         return None
     if not record.name:
@@ -2174,7 +2164,7 @@ async def _find_local_role_image(role: RoleCandidate, kind: str) -> str | None:
     """图库图片下载失败时，尝试从本地图片目录为该角色找一张图。"""
     try:
         candidates, error = await asyncio.to_thread(_load_local_candidates, kind)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.warning(f'{LOG_PREFIX} 回退本地图片失败: {exc}')
         return None
     if error or not candidates:

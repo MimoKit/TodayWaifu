@@ -390,7 +390,7 @@ async def _send_delete_custom_wife_image(bot: Bot, ev: Event):
 
     try:
         await asyncio.to_thread(image_path.unlink)
-    except Exception as exc:
+    except OSError as exc:
         logger.warning(f'{LOG_PREFIX} 删除自定义老婆图片失败: {image_path} -> {exc}')
         return await _safe_send(bot,f'【{role_name}】图片删除失败：{hash_id}')
 

@@ -380,7 +380,7 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
         return await _send_loli_text(bot, f'未找到图片ID：{hash_id}')
     try:
         await asyncio.to_thread(path.unlink)
-    except Exception as exc:
+    except OSError as exc:
         logger.warning(f'{LOG_PREFIX} 删除萝莉图片失败: {path} -> {exc}')
         return await _send_loli_text(bot, f'删除失败：{hash_id}')
     _invalidate_loli_paths_cache()

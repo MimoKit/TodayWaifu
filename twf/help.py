@@ -202,5 +202,5 @@ if HELP_ICON_PATH.is_file():
     try:
         with Image.open(HELP_ICON_PATH) as _help_icon:
             register_help('TodayWaifu', '今日老婆帮助', _help_icon.convert('RGBA'))
-    except Exception as exc:
+    except OSError as exc:
         logger.warning(f'{LOG_PREFIX} 注册插件帮助失败: {exc}')
