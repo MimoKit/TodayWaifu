@@ -9,11 +9,13 @@ record 字典整体序列化进 payload 列，name/state/origin 等列用于控�
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from sqlmodel import Field, delete, select
 from sqlalchemy import Table, UniqueConstraint, tuple_
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.sql.dml import Insert
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gsuid_core.logger import logger
@@ -38,6 +40,25 @@ LEGACY_MIGRATION_KEEP_DAYS = 2
 
 # 非 dict 的桶记录（如 rob_attempts 里的 True 标记）在表里的 record_type
 MARKER_RECORD_TYPE = 'marker'
+
+
+class _ExcludedColumns(Protocol):
+    """SQLite upsert 冲突时本次待写入的列集合（statement.excluded）。"""
+
+    def __getitem__(self, key: str) -> ColumnElement[object]: ...
+
+
+def _conflict_update_columns(statement: Insert) -> dict[str, ColumnElement[object]]:
+    """冲突时用 excluded（本次待写入的值）覆盖的业务列；列名固定，逐列按名取。"""
+    excluded: _ExcludedColumns = statement.excluded
+    return {column: excluded[column] for column in _CONFLICT_UPDATE_COLUMNS}
+
+
+# upsert 冲突时需要覆盖的业务列（与 _row_from_value 写入的列保持一致）
+_CONFLICT_UPDATE_COLUMNS = (
+    'name', 'display_name', 'image', 'record_type', 'state',
+    'origin', 'updated_at', 'payload',
+)
 
 
 def _record_state(raw: object) -> str:
@@ -261,13 +282,7 @@ class DailyWifeRecord(BaseModel, table=True):
         if not values:
             return
         statement = sqlite_insert(cls).values(values)
-        update_columns = {
-            key: getattr(statement.excluded, key)
-            for key in (
-                'name', 'display_name', 'image', 'record_type', 'state',
-                'origin', 'updated_at', 'payload',
-            )
-        }
+        update_columns = _conflict_update_columns(statement)
         await session.execute(
             statement.on_conflict_do_update(
                 index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
@@ -340,13 +355,7 @@ class DailyWifeRecord(BaseModel, table=True):
         if not values:
             return
         statement = sqlite_insert(cls).values(values)
-        update_columns = {
-            key: getattr(statement.excluded, key)
-            for key in (
-                'name', 'display_name', 'image', 'record_type', 'state',
-                'origin', 'updated_at', 'payload',
-            )
-        }
+        update_columns = _conflict_update_columns(statement)
         await session.execute(
             statement.on_conflict_do_update(
                 index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],

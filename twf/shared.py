@@ -15,6 +15,7 @@ import time
 from datetime import date
 from importlib.util import find_spec
 from pathlib import Path
+from typing import Iterator
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -613,12 +614,12 @@ def _role_images(role_dir: Path) -> tuple[str, ...]:
 
 
 def _invalidate_status_cache() -> None:
-    status_module = sys.modules.get(f'{__package__}.status')
-    if status_module is None:
+    # 延迟导入 + 存在性判断：status 反向依赖 shared，顶层导入会成环；未加载时跳过。
+    if f'{__package__}.status' not in sys.modules:
         return
-    invalidate = getattr(status_module, 'invalidate_status_cache', None)
-    if callable(invalidate):
-        invalidate()
+    from . import status as status_module
+
+    status_module.invalidate_status_cache()
 
 
 def _invalidate_candidate_cache() -> None:
@@ -628,10 +629,11 @@ def _invalidate_candidate_cache() -> None:
     _SOURCE_CACHE.invalidate()
     _PGR_CANDIDATE_CACHE.invalidate()
     _invalidate_status_cache()
-    normal_module = sys.modules.get(f'{__package__}.normal_wife')
-    invalidate_normal = getattr(normal_module, 'invalidate_normal_gallery_cache', None) if normal_module else None
-    if callable(invalidate_normal):
-        invalidate_normal()
+    if f'{__package__}.normal_wife' not in sys.modules:
+        return
+    from . import normal_wife
+
+    normal_wife.invalidate_normal_gallery_cache()
 
 
 
@@ -1383,7 +1385,7 @@ def _display_name_from_mapping(data: object, user_id: str | int | None = None) -
 def _user_display_name(ev: Event, user_id: str | int | None = None) -> str:
     key = _user_key(ev, user_id)
     if user_id is None or key == str(ev.user_id):
-        value = _display_name_from_mapping(getattr(ev, 'sender', {}) or {}, key)
+        value = _display_name_from_mapping(ev.sender or {}, key)
         if value:
             return value
     return key
@@ -1402,17 +1404,17 @@ async def _load_group_display_names(ev: Event) -> dict[str, str]:
             logger.warning(f'{LOG_PREFIX} 读取 GsCore 群成员缓存失败: {exc}')
             return {}
 
-        preferred_bot_id = str(getattr(ev, 'real_bot_id', '') or ev.bot_id or '').strip()
+        preferred_bot_id = str(ev.real_bot_id or ev.bot_id or '').strip()
         exact: dict[str, str] = {}
         fallback: dict[str, str] = {}
         for user in users or []:
-            user_id = str(getattr(user, 'user_id', '') or '').strip()
+            user_id = str(user.user_id or '').strip()
             if not user_id:
                 continue
-            name = _valid_display_name(getattr(user, 'user_name', ''), user_id)
+            name = _valid_display_name(user.user_name, user_id)
             if name:
                 fallback[user_id] = name
-                if preferred_bot_id and str(getattr(user, 'bot_id', '') or '').strip() == preferred_bot_id:
+                if preferred_bot_id and str(user.bot_id or '').strip() == preferred_bot_id:
                     exact[user_id] = name
         logger.debug(f'{LOG_PREFIX} 成功加载群 {ev.group_id} 的成员显示名称')
         return exact or fallback
@@ -1522,31 +1524,26 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
             str(item).strip()
             for item in (
                 ev.bot_id,
-                getattr(ev, 'real_bot_id', ''),
-                getattr(ev, 'bot_self_id', ''),
-                getattr(ev, 'self_id', ''),
+                ev.real_bot_id,
+                ev.bot_self_id,
             )
             if str(item or '').strip()
         }
         excluded_user_ids = set(bot_ids)
-        preferred_bot_id = str(getattr(ev, 'real_bot_id', '') or ev.bot_id or '').strip()
+        preferred_bot_id = str(ev.real_bot_id or ev.bot_id or '').strip()
         exact: dict[str, MemberCandidate] = {}
         fallback: dict[str, MemberCandidate] = {}
 
         for user in users or []:
-            user_id = str(getattr(user, 'user_id', '') or '').strip()
+            user_id = str(user.user_id or '').strip()
             if not user_id or user_id in excluded_user_ids:
                 continue
-            name = ''
-            for field in ('user_name', 'nickname', 'name', 'username'):
-                name = _valid_display_name(getattr(user, field, ''), user_id)
-                if name:
-                    break
-            name = name or user_id
-            avatar = _valid_member_text(getattr(user, 'user_icon', ''))
+            # CoreUser 的展示名列固定为 user_name（不存在 nickname/name/username 列）
+            name = _valid_display_name(user.user_name, user_id) or user_id
+            avatar = _valid_member_text(user.user_icon)
             candidate = MemberCandidate(name=name, user_id=user_id, avatar=avatar)
             fallback[user_id] = candidate
-            if preferred_bot_id and str(getattr(user, 'bot_id', '') or '').strip() == preferred_bot_id:
+            if preferred_bot_id and str(user.bot_id or '').strip() == preferred_bot_id:
                 exact[user_id] = candidate
 
         result = exact or fallback
@@ -1584,7 +1581,7 @@ async def _pick_group_member(
 
     target_user_id = str(exclude_user_id if exclude_user_id is not None else ev.user_id).strip()
     exclude_ids = {target_user_id}
-    bot_self_id = str(getattr(ev, 'bot_self_id', '') or '').strip()
+    bot_self_id = str(ev.bot_self_id or '').strip()
     if bot_self_id:
         exclude_ids.add(bot_self_id)
 
@@ -1842,15 +1839,15 @@ def _prune_pending_state() -> None:
             created_at = 0
         if now - created_at > CUSTOM_ROLE_DELETE_CONFIRM_SECONDS:
             CUSTOM_ROLE_DELETE_PENDING.pop(key, None)
-    # Gift requests live in gift.py; use its namespace-local cleanup hook when loaded.
-    gift_module = sys.modules.get(f'{__package__}.gift')
-    clear_expired = getattr(gift_module, 'clear_expired_pending_gifts', None) if gift_module else None
-    if callable(clear_expired):
-        clear_expired()
-    normal_module = sys.modules.get(f'{__package__}.normal_wife')
-    prune_normal = getattr(normal_module, 'prune_normal_gallery_cache', None) if normal_module else None
-    if callable(prune_normal):
-        prune_normal()
+    # gift / normal_wife 的待处理状态与缓存由各自模块持有，仅在已加载时清理。
+    if f'{__package__}.gift' in sys.modules:
+        from . import gift as gift_module
+
+        gift_module.clear_expired_pending_gifts()
+    if f'{__package__}.normal_wife' in sys.modules:
+        from . import normal_wife
+
+        normal_wife.prune_normal_gallery_cache()
 
 
 async def _cache_maintenance_once() -> None:
@@ -1864,10 +1861,10 @@ async def _cache_maintenance_once() -> None:
     _PGR_CANDIDATE_CACHE.prune()
     _MEMBER_CACHE.prune()
     _GROUP_DISPLAY_NAME_CACHE.prune()
-    normal_module = sys.modules.get(f'{__package__}.normal_wife')
-    prune_normal = getattr(normal_module, 'prune_normal_gallery_cache', None) if normal_module else None
-    if callable(prune_normal):
-        prune_normal()
+    if f'{__package__}.normal_wife' in sys.modules:
+        from . import normal_wife
+
+        normal_wife.prune_normal_gallery_cache()
     for registry in (_CONTEXT_REGISTRY,):
         registry.prune(_today_key())
     for mapping in (_CANDIDATE_INFLIGHT, _IMAGE_INFLIGHT, _MEMBER_AVATAR_INFLIGHT):
@@ -2122,21 +2119,19 @@ def _target_user_id_from_text(text: str) -> str | None:
     return None
 
 
-def _iter_event_messages(ev: Event):
-    for attr in ('content', 'message', 'original_message'):
-        value = getattr(ev, attr, None)
-        if not value:
-            continue
-        if isinstance(value, (list, tuple)):
-            for item in value:
-                yield item
-        else:
-            yield value
+def _iter_event_messages(ev: Event) -> Iterator[object]:
+    """遍历事件中承载消息段的字段。
+
+    仅 `content` 是消息段列表：Core 的 Event/MessageReceive 字段固定（msgspec Struct），
+    `ev.message` / `ev.original_message` 等属性并不存在（见 Core 的 Event 字段说明）。
+    """
+    for item in ev.content or ():
+        yield item
 
 
 def _get_event_target_user_id(ev: Event) -> str | None:
-    for attr in ('at_list', 'at', 'target_id', 'target_user_id'):
-        value = getattr(ev, attr, None)
+    """解析"抢/送老婆"等命令的目标用户，兼容 @、富文本与纯文本三种上报形态。"""
+    for value in (ev.at_list, ev.at):
         if value is not None:
             if isinstance(value, (list, tuple, set)):
                 value = next(iter(value), None)
@@ -2151,9 +2146,8 @@ def _get_event_target_user_id(ev: Event) -> str | None:
                 return user_id
 
     for item in _iter_event_messages(ev):
-        item_type = getattr(item, 'type', None)
-        if item_type in {'at', 'mention_user', 'mention'}:
-            user_id = _normalise_target_user_id(getattr(item, 'data', None))
+        if isinstance(item, Message) and item.type in {'at', 'mention_user', 'mention'}:
+            user_id = _normalise_target_user_id(item.data)
             if user_id:
                 return user_id
         if isinstance(item, dict) and item.get('type') in {'at', 'mention_user', 'mention'}:
@@ -2161,10 +2155,9 @@ def _get_event_target_user_id(ev: Event) -> str | None:
             if user_id:
                 return user_id
 
-    for attr in ('text', 'raw_text', 'raw_message', 'message', 'original_message'):
-        t = getattr(ev, attr, None)
-        if t is not None:
-            user_id = _target_user_id_from_text(str(t))
+    for text in (ev.text, ev.raw_text):
+        if text:
+            user_id = _target_user_id_from_text(str(text))
             if user_id:
                 return user_id
 
