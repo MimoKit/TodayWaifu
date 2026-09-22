@@ -26,7 +26,7 @@ def _normalize_shota_api_url(url: str) -> str:
     return clean
 
 
-def _parse_shota_image_urls(payload: dict[str, Any]) -> tuple[str, ...]:
+def _parse_shota_image_urls(payload: GalleryPayload) -> tuple[str, ...]:
     if 'roles' not in payload or not isinstance(payload['roles'], list):
         raise RuntimeError('正太图库接口缺少 roles 列表。')
 
@@ -98,7 +98,7 @@ def _fetch_shota_image_urls_sync(api_url: str) -> tuple[str, ...]:
     return _parse_shota_image_urls(payload)
 
 
-def _shota_unavailable_text(record_data: dict[str, Any]) -> str | None:
+def _shota_unavailable_text(record_data: RoleRecordValue) -> str | None:
     state = _wife_state(record_data)
     if state == 'lost_stolen':
         robber = record_data.get('stolen_by_name') or record_data.get('stolen_by') or ''

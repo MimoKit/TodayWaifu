@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
+from .payloads import GalleryPayload
 from .shared import (
     CACHE_TTL_SECONDS,
     LOG_PREFIX,
@@ -16,7 +16,7 @@ from .shared import (
 )
 from .source_cache import AsyncSourceCache
 
-_NORMAL_GALLERY_CACHE = AsyncSourceCache[dict[str, Any]](CACHE_TTL_SECONDS, max_entries=4)
+_NORMAL_GALLERY_CACHE = AsyncSourceCache[GalleryPayload](CACHE_TTL_SECONDS, max_entries=4)
 
 
 def prune_normal_gallery_cache() -> None:
@@ -33,7 +33,7 @@ def _normal_gallery_api_url() -> str:
 
 
 def _parse_normal_gallery_candidates(
-    payload: dict[str, Any],
+    payload: GalleryPayload,
 ) -> tuple[RoleCandidate, ...]:
     roles_data = payload.get('roles')
     if not isinstance(roles_data, list) or not roles_data:

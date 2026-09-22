@@ -119,7 +119,7 @@ def _loli_record_name(image: str) -> str:
     return f'萝莉图{_loli_image_hash_id(image)}'
 
 
-def _parse_loli_image_urls(payload: dict[str, Any]) -> tuple[str, ...]:
+def _parse_loli_image_urls(payload: GalleryPayload) -> tuple[str, ...]:
     if 'roles' not in payload or not isinstance(payload['roles'], list):
         raise RuntimeError('萝莉图库接口缺少 roles 列表。')
 
@@ -185,7 +185,7 @@ def _is_legacy_remote_loli_record(record: WifeRecord) -> bool:
     return record.record_type == 'loli' and record.role_ids == ('接口',)
 
 
-def _loli_unavailable_text(record_data: dict[str, Any]) -> str | None:
+def _loli_unavailable_text(record_data: RoleRecordValue) -> str | None:
     state = _wife_state(record_data)
     if state == 'lost_stolen':
         robber = record_data['stolen_by'] if 'stolen_by' in record_data else ''
@@ -359,7 +359,7 @@ async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
     image_map = await asyncio.to_thread(_loli_image_map)
     if not image_map:
         return await _send_loli_text(bot, '本地还没有萝莉图片，使用「上传萝莉图片」添加图片。')
-    nodes: list[Any] = []
+    nodes: list[Message | str] = []
     for hash_id, path in image_map.items():
         nodes.append(f'萝莉图片ID：{hash_id}')
         nodes.append(MessageSegment.image(path))

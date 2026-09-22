@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
-
 from PIL import Image
 
 from gsuid_core.status.plugin_status import register_status
 
+from .payloads import DailyContext
 from .shared import DailyWifeRecord, HELP_ICON_PATH, _daily_bucket_name, _load_wife_data, _today_key
 
 
@@ -15,7 +14,7 @@ _STATUS_INFLIGHT: asyncio.Task[dict[str, int]] | None = None
 _STATUS_CACHE: tuple[str, dict[str, int]] | None = None
 
 
-def _is_countable_daily_record(raw: Any) -> bool:
+def _is_countable_daily_record(raw: object) -> bool:
     if not isinstance(raw, dict):
         return False
     name = raw.get('name')
@@ -24,7 +23,7 @@ def _is_countable_daily_record(raw: Any) -> bool:
     return not (raw.get('stolen_from') or raw.get('gifted_from') or raw.get('safe'))
 
 
-def _daily_record_count(day_data: Any, bucket_name: str) -> int:
+def _daily_record_count(day_data: object, bucket_name: str) -> int:
     if not isinstance(day_data, dict):
         return 0
 
@@ -39,7 +38,7 @@ def _daily_record_count(day_data: Any, bucket_name: str) -> int:
     return count
 
 
-async def _today_data() -> dict[str, Any]:
+async def _today_data() -> DailyContext:
     """兼容旧的状态读取辅助函数；指标本身使用下方的一次聚合查询。"""
     data = await _load_wife_data()
     days = data.get('days')

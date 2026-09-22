@@ -9,10 +9,10 @@ record 字典整体序列化进 payload 列，name/state/origin 等列用于控�
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING
 
 from sqlmodel import Field, delete, select
-from sqlalchemy import UniqueConstraint, tuple_
+from sqlalchemy import Table, UniqueConstraint, tuple_
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,10 @@ from gsuid_core.utils.database.base_models import (
 )
 from gsuid_core.utils.database.startup import exec_list
 
+if TYPE_CHECKING:
+    # 仅供类型检查器解析：本模块会被测试用 importlib 独立加载，不能有运行时相对导入。
+    from .payloads import DailyContext, RoleRecordValue, WifeData
+
 LOG_PREFIX = '[鸣潮今日老婆]'
 
 # 迁移旧 JSON 时只保留最近几天的数据
@@ -36,7 +40,7 @@ LEGACY_MIGRATION_KEEP_DAYS = 2
 MARKER_RECORD_TYPE = 'marker'
 
 
-def _record_state(raw: Any) -> str:
+def _record_state(raw: object) -> str:
     """与 shared._wife_state 口径一致：owned/lost_stolen/lost_gifted/divorced。"""
     if not isinstance(raw, dict):
         return 'owned'
@@ -49,7 +53,7 @@ def _record_state(raw: Any) -> str:
     return 'owned'
 
 
-def _record_origin(raw: Any) -> str:
+def _record_origin(raw: object) -> str:
     """与 shared._wife_origin 口径一致：self/robbed/gifted/safe。"""
     if not isinstance(raw, dict):
         return 'self'
@@ -88,7 +92,7 @@ class DailyWifeRecord(BaseModel, table=True):
     updated_at: int = Field(default=0, title='更新时间')
     payload: str = Field(default='{}', title='完整记录JSON')
 
-    def to_record_value(self) -> Any:
+    def to_record_value(self) -> RoleRecordValue | bool | None:
         """还原为旧 JSON 结构里的记录值（dict 或 True 标记）。"""
         try:
             value = json.loads(self.payload)
@@ -116,8 +120,8 @@ class DailyWifeRecord(BaseModel, table=True):
         group_id: str,
         bucket: str,
         user_key: str,
-        value: Any,
-    ) -> 'DailyWifeRecord':
+        value: RoleRecordValue | bool | None,
+    ) -> "DailyWifeRecord":
         if isinstance(value, dict):
             try:
                 updated_at = int(value.get('updated_at') or 0)
@@ -157,7 +161,7 @@ class DailyWifeRecord(BaseModel, table=True):
         day: str,
         bot_id: str,
         group_id: str,
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> DailyContext:
         """只加载一个 bot/group 上下文，供每日热路径使用。"""
         result = await session.execute(
             select(cls)
@@ -165,7 +169,7 @@ class DailyWifeRecord(BaseModel, table=True):
             .where(cls.bot_id == bot_id)
             .where(cls.group_id == group_id)
         )
-        context: Dict[str, Dict[str, Any]] = {}
+        context: DailyContext = {}
         for row in result.scalars().all():
             context.setdefault(row.bucket, {})[row.user_id] = row.to_record_value()
         return context
@@ -180,7 +184,7 @@ class DailyWifeRecord(BaseModel, table=True):
         group_id: str,
         bucket: str,
         user_key: str,
-        value: Any,
+        value: RoleRecordValue | bool | None,
     ) -> None:
         """定向写入一条记录，不影响同一上下文的其它用户或桶。"""
         row = cls._row_from_value(day, bot_id, group_id, bucket, user_key, value)
@@ -217,7 +221,7 @@ class DailyWifeRecord(BaseModel, table=True):
         day: str,
         bot_id: str,
         group_id: str,
-        records: list[tuple[str, str, Any]],
+        records: list[tuple[str, str, RoleRecordValue | bool | None]],
         deletes: list[tuple[str, str]] | None = None,
     ) -> None:
         """在一个事务中定向更新或删除少量业务记录。"""
@@ -279,7 +283,7 @@ class DailyWifeRecord(BaseModel, table=True):
         day: str,
         bot_id: str,
         group_id: str,
-        context: Dict[str, Dict[str, Any]],
+        context: DailyContext,
     ) -> None:
         """在一个写事务中 upsert 一个上下文的全部记录。"""
         values = []
@@ -381,7 +385,7 @@ class DailyWifeRecord(BaseModel, table=True):
         group_id: str,
         bucket: str,
         user_key: str,
-    ) -> Any:
+    ) -> RoleRecordValue | bool | None:
         """读取一个业务键对应的记录值。"""
         result = await session.execute(
             select(cls)
@@ -435,10 +439,10 @@ class DailyWifeRecord(BaseModel, table=True):
         cls,
         session: AsyncSession,
         day: str,
-    ) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    ) -> dict[str, DailyContext]:
         """加载某一天的全部记录，返回 {context_key: {bucket: {user_key: value}}}。"""
         result = await session.execute(select(cls).where(cls.day == day))
-        contexts: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        contexts: dict[str, DailyContext] = {}
         for row in result.scalars().all():
             context_key = f'{row.bot_id}:{row.group_id}'
             bucket_data = contexts.setdefault(context_key, {}).setdefault(row.bucket, {})
@@ -453,7 +457,7 @@ class DailyWifeRecord(BaseModel, table=True):
         day: str,
         bot_id: str,
         group_id: str,
-        context: Dict[str, Dict[str, Any]],
+        context: DailyContext,
     ) -> int:
         """整体覆写某一天某个群的全部桶记录（先删后插，幂等）。
 
@@ -465,7 +469,7 @@ class DailyWifeRecord(BaseModel, table=True):
             .where(cls.bot_id == bot_id)
             .where(cls.group_id == group_id)
         )
-        rows: List['DailyWifeRecord'] = []
+        rows: list[DailyWifeRecord] = []
         for bucket, records in context.items():
             if not isinstance(records, dict):
                 continue
@@ -480,7 +484,7 @@ class DailyWifeRecord(BaseModel, table=True):
     async def import_legacy_data(
         cls,
         session: AsyncSession,
-        data: Dict[str, Any],
+        data: WifeData,
         keep_days: int = LEGACY_MIGRATION_KEEP_DAYS,
     ) -> int:
         """导入旧 daily_wife_data.json 的内容，只保留最近 keep_days 天。
@@ -506,7 +510,7 @@ class DailyWifeRecord(BaseModel, table=True):
                     .where(cls.bot_id == bot_id)
                     .where(cls.group_id == group_id)
                 )
-                rows: List['DailyWifeRecord'] = []
+                rows: list[DailyWifeRecord] = []
                 for bucket, records in context.items():
                     if not isinstance(records, dict):
                         continue
@@ -525,7 +529,7 @@ class DailyWifeRecord(BaseModel, table=True):
 # SQLModel 对 ``Field(index=True)`` 的重复声明会挂上同名 Index，随后
 # create_all 会尝试执行两次 CREATE INDEX。只保留同一表上的一个等价索引，
 # 不改变现有表名、索引名或业务键。
-def _deduplicate_table_indexes(table: Any) -> None:
+def _deduplicate_table_indexes(table: Table) -> None:
     seen: set[tuple[str | None, tuple[str, ...], bool | None]] = set()
     for index in tuple(table.indexes):
         signature = (

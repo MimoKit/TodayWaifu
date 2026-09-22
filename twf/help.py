@@ -4,13 +4,20 @@ from __future__ import annotations
 import json
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any
 
 from PIL import Image
 from gsuid_core.help.draw_new_plugin_help import get_new_help
+from gsuid_core.help.model import PluginHelp
 
 from ..daily_wife_config import DailyWifeShowConfig
 from .shared import *  # noqa: F403
+
+# 资源签名：路径、mtime_ns、大小；缺失时为 None
+PathSignature = tuple[str, int, int] | None
+# 帮助缓存键：5 个资源签名 + 列数 + 权限等级（见 _help_cache_key）
+HelpCacheKey = tuple[
+    PathSignature, PathSignature, PathSignature, PathSignature, PathSignature, int, int
+]
 
 _HELP_JSON_PATH = BASE_DIR / 'help.json'
 _TEXTURE_DIR = BASE_DIR / 'texture2d'
@@ -18,11 +25,11 @@ _BANNER_BG_PATH = BASE_DIR / 'fb93f5370f556a51db172863420aa50e.png'
 _BG_PATH = _TEXTURE_DIR / 'bj.jpg'
 _ICON_PATH = _TEXTURE_DIR / 'icons'
 _HELP_CACHE_MAX_ENTRIES = 4
-_HELP_CACHE: OrderedDict[tuple[Any, ...], str] = OrderedDict()
-_HELP_INFLIGHT: dict[tuple[Any, ...], asyncio.Task[str]] = {}
+_HELP_CACHE: OrderedDict[HelpCacheKey, str] = OrderedDict()
+_HELP_INFLIGHT: dict[HelpCacheKey, asyncio.Task[str]] = {}
 
 
-def _load_help_data():
+def _load_help_data() -> dict[str, PluginHelp]:
     with _HELP_JSON_PATH.open('r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -60,7 +67,7 @@ def _help_cache_key(
     help_bg_path: Path,
     column: int,
     pm: int,
-) -> tuple[Any, ...]:
+) -> HelpCacheKey:
     return (
         _path_signature(_HELP_JSON_PATH),
         _path_signature(icon_path),
@@ -76,7 +83,7 @@ def _build_help_inputs(
     plugin_icon_path: Path,
     custom_banner_bg_path: Path | None,
     custom_help_bg_path: Path | None,
-) -> tuple[Image.Image, dict[str, Any], dict[str, Image.Image | Path]]:
+) -> tuple[Image.Image, dict[str, PluginHelp], dict[str, Image.Image | Path]]:
     """在线程中读取 JSON 和 PIL 资源，避免阻塞事件循环。"""
     with Image.open(plugin_icon_path) as source:
         icon = source.convert('RGBA')
@@ -111,7 +118,7 @@ def _build_help_inputs(
 
 
 async def _render_help(
-    key: tuple[Any, ...],
+    key: HelpCacheKey,
     plugin_icon_path: Path,
     custom_banner_bg_path: Path | None,
     custom_help_bg_path: Path | None,

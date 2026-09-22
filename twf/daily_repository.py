@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+
+from .payloads import DailyContext
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,7 @@ class ContextKey:
 @dataclass(frozen=True)
 class ContextSnapshot:
     generation: int
-    value: dict[str, Any]
+    value: DailyContext
 
 
 class ContextRegistry:
@@ -29,7 +30,7 @@ class ContextRegistry:
     def __init__(self) -> None:
         self.locks: dict[ContextKey, asyncio.Lock] = {}
         self.cache: dict[ContextKey, ContextSnapshot] = {}
-        self.inflight: dict[ContextKey, asyncio.Task[dict[str, Any]]] = {}
+        self.inflight: dict[ContextKey, asyncio.Task[DailyContext]] = {}
         self._generations: dict[ContextKey, int] = {}
 
     def lock_for(self, key: ContextKey) -> asyncio.Lock:
@@ -42,7 +43,7 @@ class ContextRegistry:
     def generation(self, key: ContextKey) -> int:
         return self._generations.get(key, 0)
 
-    def put(self, key: ContextKey, value: dict[str, Any], generation: int | None = None) -> bool:
+    def put(self, key: ContextKey, value: DailyContext, generation: int | None = None) -> bool:
         """发布成功提交的快照；旧 generation 不能覆盖较新的快照。"""
         current = self.generation(key)
         if generation is not None and generation < current:
@@ -52,7 +53,7 @@ class ContextRegistry:
         self.cache[key] = ContextSnapshot(next_generation, value)
         return True
 
-    def get(self, key: ContextKey) -> dict[str, Any] | None:
+    def get(self, key: ContextKey) -> DailyContext | None:
         snapshot = self.cache.get(key)
         return snapshot.value if snapshot is not None else None
 

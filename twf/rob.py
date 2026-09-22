@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import random
-from typing import Any
 
+from .payloads import RoleRecordValue
 from .shared import (
     Bot,
     Event,
@@ -97,7 +97,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     # 读-改-写全程持锁：校验、记次数、转移归属、落库串行执行，替代旧的"无 await"原子段
     refusal: str | None = None
     rob_failed = False
-    updates: list[tuple[str, str, Any]] = []
+    updates: list[tuple[str, str, RoleRecordValue | bool | None]] = []
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
         bucket = _daily_bucket_name(kind)

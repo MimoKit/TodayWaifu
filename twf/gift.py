@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any
 
+from .payloads import PendingGift
 from .shared import (
     Bot,
     Event,
@@ -38,7 +38,7 @@ from .shared import (
 
 GIFT_CONFIRM_TIMEOUT_SECONDS = 60
 GIFT_PENDING_MAX_ENTRIES = 4096
-_GIFT_PENDING: dict[str, dict[str, Any]] = {}
+_GIFT_PENDING: dict[str, PendingGift] = {}
 
 
 def _gift_enabled(kind: str) -> bool:
@@ -75,7 +75,7 @@ async def _send_gift_result_image(
     await _send_daily_result_image(bot, role, image, text, user_id, is_group, kind)
 
 
-def _get_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> dict[str, Any] | None:
+def _get_pending_gift(ev: Event, target_user_id: str, kind: str = 'wife') -> PendingGift | None:
     key = _gift_pending_key(ev, target_user_id, kind)
     pending = _GIFT_PENDING.get(key)
     if not isinstance(pending, dict):

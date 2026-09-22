@@ -15,7 +15,6 @@ import time
 from datetime import date
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -47,6 +46,18 @@ from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata, daily_kind_me
 from .models import DailyWifeRecord
 from .daily_repository import ContextKey, ContextRegistry
 from .domain import MemberCandidate, RoleCandidate, WifeRecord
+from .payloads import (
+    ConfigValue,
+    DailyContext,
+    GalleryPayload,
+    NamedRoleAccumulator,
+    PendingCustomRoleDelete,
+    PendingGift,
+    RoleAccumulator,
+    RoleRecordValue,
+    SendMessage,
+    WifeData,
+)
 from .resource_paths import (
     BASE_DIR,
     HELP_ICON_PATH,
@@ -126,18 +137,19 @@ LOG_PREFIX = '[鸣潮今日老婆]'
 LOLI_DOWNLOAD_LOG_PREFIX = '[今日萝莉下载]'
 
 __all__ = [
-    'Any', 'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
+    'BASE_DIR', 'Bot', 'CACHE_TTL_SECONDS', 'CANDIDATE_CACHE',
     'ContextKey', 'ContextRegistry',
     'AsyncSourceCache',
     'CUSTOM_ROLE_DELETE_CONFIRM_SECONDS', 'CUSTOM_ROLE_DELETE_PENDING',
     'CUSTOM_ROLE_ID_START', 'CoreUser', 'DAILY_KIND_METADATA', 'DEFAULT_GALLERY_API_URL',
-    'DailyKindMetadata', 'DailyWifeConfig',
+    'DailyKindMetadata', 'DailyWifeConfig', 'DailyContext',
     'EXCLUDED_ROLE_KEYWORDS', 'EXCLUDED_ROLE_NAMES', 'Event', 'HELP_ICON_PATH',
     'HTTPError', 'IMAGE_EXTENSIONS', 'LIST_FORWARD_THRESHOLD', 'LOG_PREFIX',
     'LOLI_DOWNLOAD_LOG_PREFIX', 'LOLI_IMAGE_DIR_NAME', 'LOLI_MOBILE_UA',
     'LOLICONAPP_API_URL', 'LOLICONAPP_TAGS',
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins',
-    'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'SV',
+    'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'RoleRecordValue', 'SV',
+    'PendingCustomRoleDelete', 'PendingGift', 'GalleryPayload',
     'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
@@ -197,7 +209,10 @@ def _is_xwuid_group_activity_hook_error(exc: Exception) -> bool:
     )
 
 
-def _parse_send_options(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[bool, Any, bool]:
+def _parse_send_options(
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+) -> tuple[bool, dict[str, object] | None, bool]:
     options = dict(kwargs)
     at_sender = options.pop('at_sender', False)
     extra_metadata = options.pop('extra_metadata', None)
@@ -214,15 +229,16 @@ def _parse_send_options(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[
     if options:
         unexpected = ', '.join(options)
         raise TypeError(f'Bot.send got unexpected keyword argument(s): {unexpected}')
-    return bool(at_sender), extra_metadata, bool(wait_recall)
+    metadata = extra_metadata if isinstance(extra_metadata, dict) else None
+    return bool(at_sender), metadata, bool(wait_recall)
 
 
 async def _target_send_without_bot_hooks(
     bot: Bot,
-    message: Any,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
+    message: SendMessage,
+    *args: object,
+    **kwargs: object,
+) -> list[str] | None:
     at_sender, extra_metadata, wait_recall = _parse_send_options(args, kwargs)
     ev = bot.ev
     target_type = ev.user_type
@@ -244,13 +260,13 @@ async def _target_send_without_bot_hooks(
     )
 
 
-def _is_at_message(item: Any) -> bool:
+def _is_at_message(item: object) -> bool:
     return isinstance(item, Message) and item.type == 'at'
 
 
-def _remove_private_mentions(message: Any) -> Any:
-    items = message if isinstance(message, list) else [message]
-    result: list[Any] = []
+def _remove_private_mentions(message: SendMessage) -> SendMessage:
+    items: list[object] = list(message) if isinstance(message, list) else [message]
+    result: list[object] = []
     skip_linebreak = False
     for item in items:
         if _is_at_message(item):
@@ -267,28 +283,33 @@ def _remove_private_mentions(message: Any) -> Any:
     return result[0] if result else ''
 
 
-def _adapt_mentions_for_platform(bot: Bot, message: Any) -> Any:
+def _adapt_mentions_for_platform(bot: Bot, message: SendMessage) -> SendMessage:
     if bot.ev.user_type == 'direct':
         return _remove_private_mentions(message)
     return message
 
 
-async def _safe_send(bot: Bot, message: Any, *args: Any, **kwargs: Any) -> Any:
-    message = _adapt_mentions_for_platform(bot, message)
+async def _safe_send(
+    bot: Bot,
+    message: SendMessage,
+    *args: object,
+    **kwargs: object,
+) -> list[str] | None:
+    adapted = _adapt_mentions_for_platform(bot, message)
     try:
-        return await bot.send(message, *args, **kwargs)
+        return await bot.send(adapted, *args, **kwargs)
     except AttributeError as exc:
         if not _is_xwuid_group_activity_hook_error(exc):
             raise
         logger.warning(f'{LOG_PREFIX} 检测到 XWUID BotHook 兼容问题，改用底层发送: {exc}')
-        return await _target_send_without_bot_hooks(bot, message, *args, **kwargs)
+        return await _target_send_without_bot_hooks(bot, adapted, *args, **kwargs)
 
 
-async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
+async def _send_loli_text(bot: Bot, text: str, *args: object, **kwargs: object) -> list[str] | None:
     return await _safe_send(bot, text, *args, **kwargs)
 
 
-async def _send_shota_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
+async def _send_shota_text(bot: Bot, text: str, *args: object, **kwargs: object) -> list[str] | None:
     return await _safe_send(bot, text, *args, **kwargs)
 
 
@@ -324,16 +345,16 @@ NTE_EXCLUDED_ROLE_KEYWORDS = (
 # 按数据源分别缓存候选，避免切换数据源后误用旧缓存
 CANDIDATE_CACHE: dict[str, tuple[float, tuple['RoleCandidate', ...]]] = {}
 _CANDIDATE_INFLIGHT: dict[str, asyncio.Task[tuple[tuple['RoleCandidate', ...] | None, str | None]]] = {}
-_SOURCE_CACHE = AsyncSourceCache[dict[str, Any]](CACHE_TTL_SECONDS, max_entries=16)
+_SOURCE_CACHE = AsyncSourceCache[GalleryPayload](CACHE_TTL_SECONDS, max_entries=16)
 _PGR_CANDIDATE_CACHE = AsyncSourceCache[tuple[RoleCandidate, ...]](CACHE_TTL_SECONDS, max_entries=4)
 _CANDIDATE_CACHE_GENERATION = 0
 _CANDIDATE_LOAD_SEMAPHORE = asyncio.Semaphore(4)
 _IMAGE_INFLIGHT: dict[str, asyncio.Task[bytes]] = {}
 _IMAGE_DOWNLOAD_SEMAPHORE = asyncio.Semaphore(8)
-CUSTOM_ROLE_DELETE_PENDING: dict[str, dict[str, Any]] = {}
+CUSTOM_ROLE_DELETE_PENDING: dict[str, PendingCustomRoleDelete] = {}
 
 
-def _cfg(key: str) -> Any:
+def _cfg(key: str) -> ConfigValue:
     return DailyWifeConfig.get_config(key).data
 
 
@@ -621,7 +642,7 @@ def _collect_role_candidates(
     upload_pile_root: Path | None = None,
     default_name_patterns: tuple[str, ...] = ('role_pile_{role_id}{ext}',),
 ) -> tuple[RoleCandidate, ...]:
-    grouped: dict[str, dict[str, list[Any]]] = {}
+    grouped: dict[str, RoleAccumulator] = {}
     for role_id in sorted(role_map.keys(), key=lambda item: int(item) if item.isdigit() else item):
         role_name = role_map[role_id]
         if _is_excluded_role(role_name):
@@ -697,7 +718,7 @@ def _merge_role_candidates(
     if not base:
         return tuple(sorted(extra, key=lambda item: item.name))
 
-    grouped: dict[str, dict[str, Any]] = {}
+    grouped: dict[str, NamedRoleAccumulator] = {}
     for candidate in (*base, *extra):
         key = _normalize_role_name(candidate.name)
         bucket = grouped.setdefault(
@@ -845,7 +866,7 @@ def _pgr_gallery_api_url() -> str:
     return str(_cfg('DailyWifePgrGalleryApiUrl') or '').strip()
 
 
-def _parse_pgr_gallery_candidates(payload: dict[str, Any]) -> tuple[RoleCandidate, ...]:
+def _parse_pgr_gallery_candidates(payload: GalleryPayload) -> tuple[RoleCandidate, ...]:
     roles_data = payload.get('roles')
     if not isinstance(roles_data, list):
         return ()
@@ -1024,7 +1045,7 @@ def _http_get_with_retry(
     raise last_exc  # type: ignore[misc]
 
 
-def _fetch_gallery_payload_sync() -> dict[str, Any]:
+def _fetch_gallery_payload_sync() -> GalleryPayload:
     api_url = _gallery_api_url()
     if not api_url:
         raise RuntimeError('未配置图库接口地址。')
@@ -1048,7 +1069,7 @@ def _fetch_gallery_payload_sync() -> dict[str, Any]:
     return payload
 
 
-def _fetch_gallery_payload_from_url_sync(url: str) -> dict[str, Any]:
+def _fetch_gallery_payload_from_url_sync(url: str) -> GalleryPayload:
     body = _http_get_with_retry(url, timeout=15)
     try:
         payload = json.loads(body.decode('utf-8'))
@@ -1060,7 +1081,7 @@ def _fetch_gallery_payload_from_url_sync(url: str) -> dict[str, Any]:
 
 
 def _parse_role_candidates(
-    payload: dict[str, Any],
+    payload: GalleryPayload,
     mode: str = 'wife',
     role_map: dict[str, str] | None = None,
 ) -> tuple[RoleCandidate, ...]:
@@ -1340,7 +1361,7 @@ def _user_key(ev: Event, user_id: str | int | None = None) -> str:
     return str(ev.user_id if user_id is None else user_id)
 
 
-def _valid_display_name(value: Any, user_id: str | int | None = None) -> str:
+def _valid_display_name(value: object, user_id: str | int | None = None) -> str:
     text = str(value or '').strip()
     if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
         return ''
@@ -1349,7 +1370,7 @@ def _valid_display_name(value: Any, user_id: str | int | None = None) -> str:
     return text
 
 
-def _display_name_from_mapping(data: Any, user_id: str | int | None = None) -> str:
+def _display_name_from_mapping(data: object, user_id: str | int | None = None) -> str:
     if not isinstance(data, dict):
         return ''
     for field in ('card', 'nickname', 'name', 'username', 'user_name'):
@@ -1411,7 +1432,7 @@ def _member_probability() -> float:
     return _cfg_probability('DailyWifeGroupMemberProbability', 0.1)
 
 
-def _valid_member_text(value: Any) -> str:
+def _valid_member_text(value: object) -> str:
     text = str(value or '').strip()
     if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
         return ''
@@ -1611,8 +1632,8 @@ async def _roll_group_member_wife(ev: Event, user_id: str | int | None = None, r
 _daily_data_lock = asyncio.Lock()
 _CONTEXT_REGISTRY = ContextRegistry()
 _DAILY_CONTEXT_LOCKS: dict[str, asyncio.Lock] = _CONTEXT_REGISTRY.locks  # compatibility view
-_DAILY_CONTEXT_CACHE: dict[str, tuple[str, dict[str, Any]]] = {}
-_DAILY_CONTEXT_INFLIGHT: dict[str, asyncio.Task[dict[str, Any]]] = _CONTEXT_REGISTRY.inflight  # compatibility view
+_DAILY_CONTEXT_CACHE: dict[str, tuple[str, DailyContext]] = {}
+_DAILY_CONTEXT_INFLIGHT: dict[str, asyncio.Task[DailyContext]] = _CONTEXT_REGISTRY.inflight  # compatibility view
 _MEMBER_CACHE = AsyncSourceCache[tuple[MemberCandidate, ...]](60.0, max_entries=128)
 _GROUP_DISPLAY_NAME_CACHE = AsyncSourceCache[dict[str, str]](60.0, max_entries=128)
 _MEMBER_AVATAR_INFLIGHT: dict[str, asyncio.Task[str]] = {}
@@ -1628,7 +1649,7 @@ def _daily_context_lock(ev: Event) -> asyncio.Lock:
     return _CONTEXT_REGISTRY.lock_for(_daily_context_key(ev))
 
 
-async def _load_daily_context(ev: Event) -> dict[str, Any]:
+async def _load_daily_context(ev: Event) -> DailyContext:
     """按上下文 hydrate 一次每日快照；数据库失败直接向调用方传播。"""
     key = _daily_context_key(ev)
     cached = _CONTEXT_REGISTRY.get(key)
@@ -1636,7 +1657,7 @@ async def _load_daily_context(ev: Event) -> dict[str, Any]:
         return cached
     task = _CONTEXT_REGISTRY.inflight.get(key)
     if task is None:
-        async def hydrate() -> dict[str, Any]:
+        async def hydrate() -> DailyContext:
             context = await DailyWifeRecord.get_context(
                 key.day,
                 key.bot_id,
@@ -1658,7 +1679,7 @@ async def _load_daily_context(ev: Event) -> dict[str, Any]:
 
 async def _save_daily_records(
     ev: Event,
-    records: list[tuple[str, str, Any]],
+    records: list[tuple[str, str, RoleRecordValue | bool | None]],
     deletes: list[tuple[str, str]] | None = None,
 ) -> None:
     """在一个事务中定向提交少量记录，并同步当前上下文缓存。"""
@@ -1678,7 +1699,7 @@ async def _save_daily_records(
 
 
 async def _save_daily_record(
-    ev: Event, bucket: str, user_key: str, value: Any
+    ev: Event, bucket: str, user_key: str, value: RoleRecordValue | bool | None
 ) -> None:
     """提交单条记录，成功后才更新内存快照。"""
     day = _today_key()
@@ -1707,7 +1728,7 @@ async def _delete_daily_record(ev: Event, bucket: str, user_key: str) -> None:
     _invalidate_status_cache()
 
 
-async def _save_daily_context(ev: Event, context: dict[str, Any]) -> None:
+async def _save_daily_context(ev: Event, context: DailyContext) -> None:
     """兼容路径整体提交上下文；成功后才发布新的内存快照。"""
     key = _daily_context_key(ev)
     snapshot = copy.deepcopy(context)
@@ -1718,14 +1739,14 @@ async def _save_daily_context(ev: Event, context: dict[str, Any]) -> None:
     _DAILY_CONTEXT_CACHE[key.cache_key] = (key.day, snapshot)
     _invalidate_status_cache()
 
-async def _load_wife_data() -> dict[str, Any]:
+async def _load_wife_data() -> WifeData:
     """从数据库加载今天的全部记录，返回与旧 JSON 相同的 {'days': {today: {context: ...}}} 结构。"""
     today = _today_key()
     contexts = await DailyWifeRecord.load_day(today)
     return {'days': {today: contexts}}
 
 
-async def _save_wife_data(data: dict[str, Any]) -> None:
+async def _save_wife_data(data: WifeData) -> None:
     """把 {'days': {day: {context_key: context}}} 结构整体写回数据库（按 context 先删后插）。"""
     days = data.get('days') if isinstance(data, dict) else None
     if not isinstance(days, dict):
@@ -1743,7 +1764,7 @@ async def _save_wife_data(data: dict[str, Any]) -> None:
                 logger.error(f'{LOG_PREFIX} 保存每日记录到数据库失败: {exc}')
 
 
-def _get_today_context(data: dict[str, Any], ev: Event) -> dict[str, Any]:
+def _get_today_context(data: WifeData, ev: Event) -> DailyContext:
     day = data.setdefault('days', {}).setdefault(_today_key(), {})
     context = day.setdefault(_context_key(ev), {})
     context.setdefault('wives', {})
@@ -1931,8 +1952,12 @@ async def _get_other_daily_wife_name(ev: Event, requested_kind: str) -> str | No
     return None
 
 
-def _record_to_dict(record: WifeRecord, ev: Event | None = None, user_id: str | int | None = None) -> dict[str, Any]:
-    data: dict[str, Any] = {
+def _record_to_dict(
+    record: WifeRecord,
+    ev: Event | None = None,
+    user_id: str | int | None = None,
+) -> RoleRecordValue:
+    data: RoleRecordValue = {
         'name': record.name,
         'role_ids': list(record.role_ids),
         'image': record.image,
@@ -1966,7 +1991,7 @@ def _is_valid_image_ref(image: str) -> bool:
         return False
 
 
-def _record_from_dict(data: dict[str, Any]) -> WifeRecord | None:
+def _record_from_dict(data: RoleRecordValue) -> WifeRecord | None:
     try:
         record = WifeRecord(
             name=str(data['name']),
@@ -1996,7 +2021,7 @@ def _record_from_dict(data: dict[str, Any]) -> WifeRecord | None:
 # 沿用现有标记位，不新增持久化字段、不迁移历史数据：
 #   stolen_by / gifted_to / divorced ：记录已离手（被抢走 / 送出去 / 主动离婚），原主变“空”
 #   stolen_from / gifted_from ：记录来源（抢来的 / 别人送的），即“二手”
-def _wife_state(raw: Any) -> str:
+def _wife_state(raw: object) -> str:
     """返回记录持有状态：owned 正常持有 / lost_stolen 被抢走 / lost_gifted 送出去 / divorced 主动离婚。"""
     if not isinstance(raw, dict):
         return 'owned'
@@ -2009,7 +2034,7 @@ def _wife_state(raw: Any) -> str:
     return 'owned'
 
 
-def _wife_origin(raw: Any) -> str:
+def _wife_origin(raw: object) -> str:
     """返回老婆记录的来源：self 自己抽到 / robbed 抢来的 / gifted 别人送的。"""
     if not isinstance(raw, dict):
         return 'self'
@@ -2022,18 +2047,18 @@ def _wife_origin(raw: Any) -> str:
     return 'self'
 
 
-def _is_secondhand_wife(raw: Any) -> bool:
+def _is_secondhand_wife(raw: object) -> bool:
     """二手老婆 = 抢来的/别人送的/补偿抽的（到手即终结，不能再流转）。"""
     return _wife_origin(raw) in ('robbed', 'gifted', 'safe')
 
 
-def _has_active_wife(raw: Any) -> bool:
+def _has_active_wife(raw: object) -> bool:
     """是否仍持有一个有效（未离手）的老婆。"""
     return isinstance(raw, dict) and bool(raw.get('name')) and _wife_state(raw) == 'owned'
 
 
 def _mark_all_daily_records_divorced(
-    context: dict[str, Any],
+    context: DailyContext,
     user_key: str,
     divorced_at: int,
 ) -> list[tuple[str, str]]:
@@ -2062,7 +2087,7 @@ def _mark_all_daily_records_divorced(
     return divorced
 
 
-def _normalise_target_user_id(value: Any) -> str:
+def _normalise_target_user_id(value: object) -> str:
     if isinstance(value, bool) or value is None:
         return ''
     if isinstance(value, Message):
@@ -2190,7 +2215,7 @@ async def _send_role_image(
     is_gallery_image = image_url.startswith(('http://', 'https://'))
     if is_gallery_image:
         try:
-            image: Any = await _download_image(image_url)
+            image: bytes = await _download_image(image_url)
         except RuntimeError as exc:
             logger.warning(f'{LOG_PREFIX} 下载图库图片失败: {exc}')
             local_image = await _find_local_role_image(role, kind)
@@ -2208,7 +2233,7 @@ async def _send_role_image(
         # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
         image = await asyncio.to_thread(read_file_bytes_cached, Path(image_url))
 
-    messages: list[Any] = []
+    messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')
@@ -2239,13 +2264,13 @@ async def _send_daily_result_image(
 
 async def _send_loli_result_image(
     bot: Bot,
-    image: Any,
+    image: str | bytes,
     text: str,
     user_id: str | int | None,
     is_group: bool,
 ) -> None:
 
-    messages: list[Any] = []
+    messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')
@@ -2279,7 +2304,7 @@ async def _send_local_image(
     is_group: bool = True,
     kind: str = 'wife',
 ) -> None:
-    messages: list[Any] = []
+    messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
         messages.append('\n')

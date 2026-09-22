@@ -91,7 +91,7 @@ def _pgr_candidates_by_name(
     )
 
 
-def _stored_pgr_record(raw: Any) -> WifeRecord | None:
+def _stored_pgr_record(raw: object) -> WifeRecord | None:
     if not isinstance(raw, dict) or _wife_state(raw) != 'owned':
         return None
     record = _record_from_dict(raw)

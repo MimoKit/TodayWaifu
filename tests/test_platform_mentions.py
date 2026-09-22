@@ -17,11 +17,15 @@ class FakeMessage:
 def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> dict[str, Any]:
     source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8')
     tree = ast.parse(source)
-    body = [
+    body: list[ast.stmt] = [
+        ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
+        ast.ImportFrom(module='typing', names=[ast.alias(name='Any')], level=0),
+    ]
+    body.extend(
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names
-    ]
+    )
     values = config or {}
     namespace: dict[str, Any] = {
         'Any': Any,
@@ -32,7 +36,9 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
         '_cfg': lambda key: values.get(key, ''),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
     }
-    exec(compile(ast.Module(body=body, type_ignores=[]), 'mentions', 'exec'), namespace)
+    module = ast.Module(body=body, type_ignores=[])
+    ast.fix_missing_locations(module)
+    exec(compile(module, 'mentions', 'exec'), namespace)
     return namespace
 
 

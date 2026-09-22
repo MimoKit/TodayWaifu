@@ -114,7 +114,7 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             wives = {}
 
         data_changed = False
-        changed_records: list[tuple[str, str, dict[str, Any]]] = []
+        changed_records: list[tuple[str, str, RoleRecordValue]] = []
         items: list[tuple[int, str, str]] = []
         seen_users: set[str] = set()
         for user_id, raw_record in wives.items():

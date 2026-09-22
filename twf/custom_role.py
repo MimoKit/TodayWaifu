@@ -149,7 +149,7 @@ def _custom_role_delete_confirm_key(ev: Event) -> str:
     return f'{_context_key(ev)}:{_user_key(ev)}'
 
 
-def _get_pending_custom_role_delete(ev: Event) -> dict[str, Any] | None:
+def _get_pending_custom_role_delete(ev: Event) -> PendingCustomRoleDelete | None:
     key = _custom_role_delete_confirm_key(ev)
     pending = CUSTOM_ROLE_DELETE_PENDING.get(key)
     if not isinstance(pending, dict):
@@ -326,7 +326,7 @@ async def _send_custom_wife_image_list(bot: Bot, ev: Event):
     if not images:
         return await _safe_send(bot,f'自定义老婆【{role_name}】暂未上传过图片。')
 
-    nodes: list[Any] = []
+    nodes: list[Message | str] = []
     for hash_id, path in images:
         nodes.append(f'{role_name} 老婆图片ID：{hash_id}')
         nodes.append(MessageSegment.image(path))

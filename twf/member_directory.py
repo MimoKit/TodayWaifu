@@ -5,9 +5,9 @@ import asyncio
 import re
 import time
 from pathlib import Path
-from typing import Any
 from urllib.request import Request, urlopen
 
+from gsuid_core.models import Event
 from gsuid_core.utils.database.models import CoreUser
 
 from .domain import MemberCandidate
@@ -17,7 +17,7 @@ MEMBER_AVATAR_CACHE_SECONDS = 7 * 24 * 60 * 60
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
 
-def valid_display_name(value: Any, user_id: str | int | None = None) -> str:
+def valid_display_name(value: object, user_id: str | int | None = None) -> str:
     text = str(value or '').strip()
     if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
         return ''
@@ -26,7 +26,7 @@ def valid_display_name(value: Any, user_id: str | int | None = None) -> str:
     return text
 
 
-def valid_member_text(value: Any) -> str:
+def valid_member_text(value: object) -> str:
     text = str(value or '').strip()
     if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
         return ''
@@ -67,7 +67,7 @@ class MemberDirectory:
         self._members = AsyncSourceCache[tuple[MemberCandidate, ...]](ttl_seconds, max_entries=128)
         self._avatars = AsyncSourceCache[str](ttl_seconds, max_entries=512)
 
-    async def load(self, ev: Any) -> tuple[MemberCandidate, ...]:
+    async def load(self, ev: Event) -> tuple[MemberCandidate, ...]:
         if not ev.group_id:
             return ()
         key = f'{ev.bot_id}:{ev.group_id}'

@@ -4,7 +4,7 @@ import base64
 import binascii
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Protocol, runtime_checkable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -12,7 +12,25 @@ from urllib.request import Request, urlopen
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
 
-def collect_image_refs(event: Any) -> tuple[str, ...]:
+@runtime_checkable
+class MessageContent(Protocol):
+    """消息段：type 决定类别，data 按类别承载字符串引用。"""
+
+    type: str
+    data: object
+
+
+@runtime_checkable
+class ImageBearingEvent(Protocol):
+    """图片字段协议：字段可能整体缺失（历史兼容 b36eaa8），故各字段均为可选。"""
+
+    content: list[MessageContent] | None
+    image_list: list[object] | None
+    image: str | None
+
+
+def collect_image_refs(event: ImageBearingEvent) -> tuple[str, ...]:
+    # 历史兼容（b36eaa8）：部分适配器上报的事件缺 image/image_list 字段，按“无图片”处理。
     refs: list[str] = []
     for content in getattr(event, "content", None) or []:
         if content.type in {"image", "img"} and isinstance(content.data, str):

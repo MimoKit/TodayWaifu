@@ -1,10 +1,9 @@
 """TodayWaifu 领域状态与记录转换策略。"""
 from __future__ import annotations
 
-from typing import Any
-
 from .domain import WifeRecord
 from .kind_metadata import DailyKindMetadata, daily_kind_metadata
+from .payloads import RoleRecordValue
 
 DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
 ALL_DAILY_RECORD_KINDS = ('wife', 'nte', 'pgr', 'husband', 'loli', 'shota')
@@ -22,7 +21,7 @@ def daily_bucket_name(kind: str) -> str:
     return daily_kind_metadata(kind).bucket
 
 
-def wife_state(raw: Any) -> str:
+def wife_state(raw: object) -> str:
     if not isinstance(raw, dict):
         return 'owned'
     if raw.get('divorced'):
@@ -34,7 +33,7 @@ def wife_state(raw: Any) -> str:
     return 'owned'
 
 
-def wife_origin(raw: Any) -> str:
+def wife_origin(raw: object) -> str:
     if not isinstance(raw, dict):
         return 'self'
     if raw.get('stolen_from'):
@@ -46,11 +45,11 @@ def wife_origin(raw: Any) -> str:
     return 'self'
 
 
-def is_secondhand_wife(raw: Any) -> bool:
+def is_secondhand_wife(raw: object) -> bool:
     return wife_origin(raw) in ('robbed', 'gifted', 'safe')
 
 
-def has_active_wife(raw: Any) -> bool:
+def has_active_wife(raw: object) -> bool:
     return isinstance(raw, dict) and bool(raw.get('name')) and wife_state(raw) == 'owned'
 
 
@@ -63,8 +62,8 @@ def record_to_dict(
     bot_id: str,
     day: str,
     updated_at: int,
-) -> dict[str, Any]:
-    data: dict[str, Any] = {
+) -> RoleRecordValue:
+    data: RoleRecordValue = {
         'name': record.name,
         'role_ids': list(record.role_ids),
         'image': record.image,
