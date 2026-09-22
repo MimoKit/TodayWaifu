@@ -267,6 +267,8 @@ async def _send_daily_pgr_wife(
     Args:
         text: 战双角色名，例如“露西亚”；仅主人或白名单用户可用。
     """,
+    covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'],
 )
 async def daily_pgr_wife_prefix(bot: Bot, ev: Event) -> None:
     await _send_daily_pgr_wife(bot, ev, str(ev.text or '').strip())
@@ -280,6 +282,8 @@ async def daily_pgr_wife_prefix(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空。
     """,
+    covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'],
 )
 async def daily_pgr_wife(bot: Bot, ev: Event) -> None:
     await _send_daily_pgr_wife(bot, ev, '')

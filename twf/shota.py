@@ -219,6 +219,8 @@ async def _send_shota_image(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空。
     """,
+    covers=['正太图片每日随机抽取（图库或本地图库）'],
+    aliases=['今日老婆·抽正太', '今日老婆·今日正太'],
 )
 async def daily_shota(bot: Bot, ev: Event):
     if not _shota_enabled():

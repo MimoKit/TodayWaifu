@@ -171,6 +171,8 @@ async def _render_help(
     Args:
         text: 无需参数，留空。
     """,
+    covers=['插件全部指令与用法说明'],
+    aliases=['今日老婆·帮助', '今日老婆·怎么用'],
 )
 async def daily_wife_help(bot: Bot, ev: Event):
     plugin_icon_path = _show_config_path('DailyWifeHelpIconUpload') or HELP_ICON_PATH

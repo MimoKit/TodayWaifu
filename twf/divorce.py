@@ -106,6 +106,8 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
     Args:
         text: 无需参数，留空。
     """,
+    covers=['结束今日老婆婚姻关系'],
+    aliases=['今日老婆·离婚', '今日老婆·和老婆离婚'],
 )
 async def divorce_wife(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'wife')
@@ -120,6 +122,8 @@ async def divorce_wife(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空即可
     """,
+    covers=['结束今日老公婚姻关系'],
+    aliases=['今日老婆·和老公离婚', '今日老婆·老公离婚'],
 )
 async def divorce_husband(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'husband')
@@ -134,6 +138,8 @@ async def divorce_husband(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空即可
     """,
+    covers=['结束今日萝莉关系'],
+    aliases=['今日老婆·和萝莉离婚', '今日老婆·萝莉离婚'],
 )
 async def divorce_loli(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'loli')
@@ -148,6 +154,8 @@ async def divorce_loli(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空即可
     """,
+    covers=['结束今日正太关系'],
+    aliases=['今日老婆·和正太离婚', '今日老婆·正太离婚'],
 )
 async def divorce_shota(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'shota')
@@ -162,6 +170,8 @@ async def divorce_shota(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空即可
     """,
+    covers=['结束今日异环老婆婚姻关系'],
+    aliases=['今日老婆·异环老婆离婚'],
 )
 async def divorce_nte(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'nte')
@@ -176,6 +186,8 @@ async def divorce_nte(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空即可
     """,
+    covers=['结束今日战双老婆婚姻关系'],
+    aliases=['今日老婆·战双老婆离婚'],
 )
 async def divorce_pgr(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'pgr')

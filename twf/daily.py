@@ -570,6 +570,8 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife'):
     Args:
         text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。
     """,
+    covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'],
+    aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'],
 )
 async def daily_wife_prefix(bot: Bot, ev: Event):
     specified_name = str(ev.text or '').strip()
@@ -593,6 +595,8 @@ async def daily_wife_prefix(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'],
+    aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'],
 )
 async def daily_wife_full(bot: Bot, ev: Event):
     await _send_daily_wife(bot, ev, mode='wife', specified_name='')
@@ -606,6 +610,8 @@ async def daily_wife_full(bot: Bot, ev: Event):
     Args:
         text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。
     """,
+    covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'],
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event):
     if not _cfg_bool('DailyWifeNteEnabled', False):
@@ -621,6 +627,8 @@ async def daily_nte_wife_prefix(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'],
 )
 async def daily_nte_wife_full(bot: Bot, ev: Event):
     if not _cfg_bool('DailyWifeNteEnabled', False):
@@ -637,6 +645,8 @@ async def daily_nte_wife_full(bot: Bot, ev: Event):
     Args:
         text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。
     """,
+    covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'],
+    aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'],
 )
 async def daily_normal_wife_prefix(bot: Bot, ev: Event):
     specified_name = str(ev.text or '').strip()
@@ -653,6 +663,8 @@ async def daily_normal_wife_prefix(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'],
+    aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'],
 )
 async def daily_normal_wife_full(bot: Bot, ev: Event):
     await _send_daily_wife(bot, ev, mode='normal', specified_name='')
@@ -666,6 +678,8 @@ async def daily_normal_wife_full(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['普通（动漫）老婆的今日抽取记录与可抽角色'],
+    aliases=['今日老婆·普通老婆列表', '今日老婆·动漫老婆列表'],
 )
 async def daily_normal_wife_list(bot: Bot, ev: Event):
     await _send_wife_list(bot, ev, mode='normal')
@@ -679,6 +693,8 @@ async def daily_normal_wife_list(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['鸣潮可抽取角色名单与今日已抽取记录'],
+    aliases=['今日老婆·老婆列表', '今日老婆·可抽角色'],
 )
 async def daily_wife_list(bot: Bot, ev: Event):
     await _send_wife_list(bot, ev)
@@ -692,6 +708,8 @@ async def daily_wife_list(bot: Bot, ev: Event):
     Args:
         text: 分配参数，通常包含目标用户和老婆名，例如“@用户 今汐”。
     """,
+    covers=['机器人主人为指定用户分配今日老婆（含角色名）'],
+    aliases=['今日老婆·分配老婆'],
 )
 async def assign_wife(bot: Bot, ev: Event):
     await _send_assign_wife(bot, ev)
@@ -705,6 +723,8 @@ async def assign_wife(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['「分配老婆」的用法说明'],
+    aliases=['今日老婆·分配老婆用法'],
 )
 async def assign_wife_usage(bot: Bot, ev: Event):
     await _send_assign_wife(bot, ev)
@@ -719,6 +739,8 @@ async def assign_wife_usage(bot: Bot, ev: Event):
     Args:
         text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。
     """,
+    covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽老公', '今日老婆·今日老公'],
 )
 async def daily_husband_prefix(bot: Bot, ev: Event):
     if not _husband_available():
@@ -737,6 +759,8 @@ async def daily_husband_prefix(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'],
+    aliases=['今日老婆·抽老公', '今日老婆·今日老公'],
 )
 async def daily_husband_full(bot: Bot, ev: Event):
     if not _husband_available():
@@ -752,6 +776,8 @@ async def daily_husband_full(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['鸣潮可抽取男性角色名单与今日已抽取记录'],
+    aliases=['今日老婆·老公列表', '今日老婆·可抽老公'],
 )
 async def daily_husband_list(bot: Bot, ev: Event):
     if not _husband_available():
@@ -767,6 +793,8 @@ async def daily_husband_list(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['从当前群成员中随机抽取一位作为今日互动对象'],
+    aliases=['今日老婆·娶群友', '今日老婆·抽群友'],
 )
 async def group_member_wife(bot: Bot, ev: Event):
     await _send_group_member_wife(bot, ev)

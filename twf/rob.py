@@ -185,6 +185,8 @@ async def _send_rob_shota(bot: Bot, ev: Event) -> None:
     Args:
         text: 目标用户，通常是 @用户 或用户 ID。
     """,
+    covers=['抢夺他人今日老婆，按概率判定成败'],
+    aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'],
 )
 async def rob_wife(bot: Bot, ev: Event):
     await _send_rob_wife(bot, ev)
@@ -198,6 +200,8 @@ async def rob_wife(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['抢夺他人今日老婆，按概率判定成败'],
+    aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'],
 )
 async def rob_wife_at(bot: Bot, ev: Event):
     await _send_rob_wife(bot, ev)
@@ -211,6 +215,8 @@ async def rob_wife_at(bot: Bot, ev: Event):
     Args:
         text: 目标用户，通常是 @用户 或用户 ID。
     """,
+    covers=['抢夺他人今日老公，按概率判定成败'],
+    aliases=['今日老婆·抢老公'],
 )
 async def rob_husband(bot: Bot, ev: Event):
     await _send_rob_husband(bot, ev)
@@ -224,6 +230,8 @@ async def rob_husband(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['抢夺他人今日老公，按概率判定成败'],
+    aliases=['今日老婆·抢老公'],
 )
 async def rob_husband_at(bot: Bot, ev: Event):
     await _send_rob_husband(bot, ev)
@@ -237,6 +245,8 @@ async def rob_husband_at(bot: Bot, ev: Event):
     Args:
         text: 目标用户，通常是 @用户 或用户 ID。
     """,
+    covers=['抢夺他人今日萝莉，按概率判定成败'],
+    aliases=['今日老婆·抢萝莉'],
 )
 async def rob_loli(bot: Bot, ev: Event):
     await _send_rob_loli(bot, ev)
@@ -250,6 +260,8 @@ async def rob_loli(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['抢夺他人今日萝莉，按概率判定成败'],
+    aliases=['今日老婆·抢萝莉'],
 )
 async def rob_loli_at(bot: Bot, ev: Event):
     await _send_rob_loli(bot, ev)
@@ -263,6 +275,8 @@ async def rob_loli_at(bot: Bot, ev: Event):
     Args:
         text: 目标用户，通常是 @用户 或用户 ID。
     """,
+    covers=['抢夺他人今日正太，按概率判定成败'],
+    aliases=['今日老婆·抢正太'],
 )
 async def rob_shota(bot: Bot, ev: Event):
     await _send_rob_shota(bot, ev)
@@ -276,6 +290,8 @@ async def rob_shota(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['抢夺他人今日正太，按概率判定成败'],
+    aliases=['今日老婆·抢正太'],
 )
 async def rob_shota_at(bot: Bot, ev: Event):
     await _send_rob_shota(bot, ev)

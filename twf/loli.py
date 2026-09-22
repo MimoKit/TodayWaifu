@@ -398,6 +398,8 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
     Args:
         text: 无需参数，留空。
     """,
+    covers=['萝莉图片每日随机抽取（图库或本地图库）'],
+    aliases=['今日老婆·抽萝莉', '今日老婆·今日萝莉'],
 )
 async def daily_loli(bot: Bot, ev: Event):
     if not _loli_enabled():  # noqa: F405
@@ -418,6 +420,8 @@ async def upload_loli(bot: Bot, ev: Event):
     Args:
         text: 无需参数，留空。
     """,
+    covers=['本地萝莉图库的图片 ID 列表'],
+    aliases=['今日老婆·萝莉图片列表', '今日老婆·萝莉图库'],
 )
 async def list_loli(bot: Bot, ev: Event):
     await _send_loli_image_list(bot, ev)
