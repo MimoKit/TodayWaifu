@@ -337,7 +337,7 @@ async def _reject_gift_shota(bot: Bot, ev: Event) -> None:
     covers=['把自己今日老婆赠送给他人，需对方确认'],
     aliases=['今日老婆·送老婆', '今日老婆·赠送老婆'],
 )
-async def gift_wife(bot: Bot, ev: Event):
+async def gift_wife(bot: Bot, ev: Event) -> None:
     await _send_gift_wife(bot, ev)
 
 
@@ -352,7 +352,7 @@ async def gift_wife(bot: Bot, ev: Event):
     covers=['把自己今日老婆赠送给他人，需对方确认'],
     aliases=['今日老婆·送老婆', '今日老婆·赠送老婆'],
 )
-async def gift_wife_at(bot: Bot, ev: Event):
+async def gift_wife_at(bot: Bot, ev: Event) -> None:
     await _send_gift_wife(bot, ev)
 
 
@@ -367,7 +367,7 @@ async def gift_wife_at(bot: Bot, ev: Event):
     covers=['接受他人赠送的老婆'],
     aliases=['今日老婆·接受送老婆', '今日老婆·同意送老婆'],
 )
-async def gift_wife_accept(bot: Bot, ev: Event):
+async def gift_wife_accept(bot: Bot, ev: Event) -> None:
     await _accept_gift_wife(bot, ev)
 
 
@@ -382,7 +382,7 @@ async def gift_wife_accept(bot: Bot, ev: Event):
     covers=['拒绝他人赠送的老婆'],
     aliases=['今日老婆·拒绝送老婆'],
 )
-async def gift_wife_reject(bot: Bot, ev: Event):
+async def gift_wife_reject(bot: Bot, ev: Event) -> None:
     await _reject_gift_wife(bot, ev)
 
 
@@ -397,7 +397,7 @@ async def gift_wife_reject(bot: Bot, ev: Event):
     covers=['把自己今日老公赠送给他人，需对方确认'],
     aliases=['今日老婆·送老公', '今日老婆·赠送老公'],
 )
-async def gift_husband(bot: Bot, ev: Event):
+async def gift_husband(bot: Bot, ev: Event) -> None:
     await _send_gift_husband(bot, ev)
 
 
@@ -412,7 +412,7 @@ async def gift_husband(bot: Bot, ev: Event):
     covers=['把自己今日老公赠送给他人，需对方确认'],
     aliases=['今日老婆·送老公', '今日老婆·赠送老公'],
 )
-async def gift_husband_at(bot: Bot, ev: Event):
+async def gift_husband_at(bot: Bot, ev: Event) -> None:
     await _send_gift_husband(bot, ev)
 
 
@@ -427,7 +427,7 @@ async def gift_husband_at(bot: Bot, ev: Event):
     covers=['接受他人赠送的老公'],
     aliases=['今日老婆·接受送老公', '今日老婆·同意送老公'],
 )
-async def gift_husband_accept(bot: Bot, ev: Event):
+async def gift_husband_accept(bot: Bot, ev: Event) -> None:
     await _accept_gift_husband(bot, ev)
 
 
@@ -442,7 +442,7 @@ async def gift_husband_accept(bot: Bot, ev: Event):
     covers=['拒绝他人赠送的老公'],
     aliases=['今日老婆·拒绝送老公'],
 )
-async def gift_husband_reject(bot: Bot, ev: Event):
+async def gift_husband_reject(bot: Bot, ev: Event) -> None:
     await _reject_gift_husband(bot, ev)
 
 
@@ -457,7 +457,7 @@ async def gift_husband_reject(bot: Bot, ev: Event):
     covers=['把自己今日萝莉赠送给他人，需对方确认'],
     aliases=['今日老婆·送萝莉', '今日老婆·赠送萝莉'],
 )
-async def gift_loli(bot: Bot, ev: Event):
+async def gift_loli(bot: Bot, ev: Event) -> None:
     await _send_gift_loli(bot, ev)
 
 
@@ -472,7 +472,7 @@ async def gift_loli(bot: Bot, ev: Event):
     covers=['把自己今日萝莉赠送给他人，需对方确认'],
     aliases=['今日老婆·送萝莉', '今日老婆·赠送萝莉'],
 )
-async def gift_loli_at(bot: Bot, ev: Event):
+async def gift_loli_at(bot: Bot, ev: Event) -> None:
     await _send_gift_loli(bot, ev)
 
 
@@ -487,7 +487,7 @@ async def gift_loli_at(bot: Bot, ev: Event):
     covers=['接受他人赠送的萝莉'],
     aliases=['今日老婆·接受送萝莉', '今日老婆·同意送萝莉'],
 )
-async def gift_loli_accept(bot: Bot, ev: Event):
+async def gift_loli_accept(bot: Bot, ev: Event) -> None:
     await _accept_gift_loli(bot, ev)
 
 
@@ -502,7 +502,7 @@ async def gift_loli_accept(bot: Bot, ev: Event):
     covers=['拒绝他人赠送的萝莉'],
     aliases=['今日老婆·拒绝送萝莉'],
 )
-async def gift_loli_reject(bot: Bot, ev: Event):
+async def gift_loli_reject(bot: Bot, ev: Event) -> None:
     await _reject_gift_loli(bot, ev)
 
 
@@ -517,7 +517,7 @@ async def gift_loli_reject(bot: Bot, ev: Event):
     covers=['把自己今日正太赠送给他人，需对方确认'],
     aliases=['今日老婆·送正太', '今日老婆·赠送正太'],
 )
-async def gift_shota(bot: Bot, ev: Event):
+async def gift_shota(bot: Bot, ev: Event) -> None:
     await _send_gift_shota(bot, ev)
 
 
@@ -532,7 +532,7 @@ async def gift_shota(bot: Bot, ev: Event):
     covers=['把自己今日正太赠送给他人，需对方确认'],
     aliases=['今日老婆·送正太', '今日老婆·赠送正太'],
 )
-async def gift_shota_at(bot: Bot, ev: Event):
+async def gift_shota_at(bot: Bot, ev: Event) -> None:
     await _send_gift_shota(bot, ev)
 
 
@@ -547,7 +547,7 @@ async def gift_shota_at(bot: Bot, ev: Event):
     covers=['接受他人赠送的正太'],
     aliases=['今日老婆·接受送正太', '今日老婆·同意送正太'],
 )
-async def gift_shota_accept(bot: Bot, ev: Event):
+async def gift_shota_accept(bot: Bot, ev: Event) -> None:
     await _accept_gift_shota(bot, ev)
 
 
@@ -562,5 +562,5 @@ async def gift_shota_accept(bot: Bot, ev: Event):
     covers=['拒绝他人赠送的正太'],
     aliases=['今日老婆·拒绝送正太'],
 )
-async def gift_shota_reject(bot: Bot, ev: Event):
+async def gift_shota_reject(bot: Bot, ev: Event) -> None:
     await _reject_gift_shota(bot, ev)

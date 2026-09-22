@@ -174,7 +174,7 @@ async def _render_help(
     covers=['插件全部指令与用法说明'],
     aliases=['今日老婆·帮助', '今日老婆·怎么用'],
 )
-async def daily_wife_help(bot: Bot, ev: Event):
+async def daily_wife_help(bot: Bot, ev: Event) -> list[str] | None:
     plugin_icon_path = _show_config_path('DailyWifeHelpIconUpload') or HELP_ICON_PATH
     if not plugin_icon_path.is_file():
         logger.warning(f'{LOG_PREFIX} 插件图标不存在: {plugin_icon_path}')

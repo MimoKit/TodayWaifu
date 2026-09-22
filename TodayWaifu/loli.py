@@ -401,14 +401,14 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
     covers=['萝莉图片每日随机抽取（图库或本地图库）'],
     aliases=['今日老婆·抽萝莉', '今日老婆·今日萝莉'],
 )
-async def daily_loli(bot: Bot, ev: Event):
+async def daily_loli(bot: Bot, ev: Event) -> None:
     if not _loli_enabled():  # noqa: F405
         return
     await _send_loli_image(bot, ev)
 
 
 @image_upload_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)
-async def upload_loli(bot: Bot, ev: Event):
+async def upload_loli(bot: Bot, ev: Event) -> None:
     await _send_upload_loli(bot, ev)
 
 
@@ -423,10 +423,10 @@ async def upload_loli(bot: Bot, ev: Event):
     covers=['本地萝莉图库的图片 ID 列表'],
     aliases=['今日老婆·萝莉图片列表', '今日老婆·萝莉图库'],
 )
-async def list_loli(bot: Bot, ev: Event):
+async def list_loli(bot: Bot, ev: Event) -> None:
     await _send_loli_image_list(bot, ev)
 
 
 @loli_manage_sv.on_command('删除萝莉图片', block=True)
-async def delete_loli(bot: Bot, ev: Event):
+async def delete_loli(bot: Bot, ev: Event) -> None:
     await _send_delete_loli(bot, ev)

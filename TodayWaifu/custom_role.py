@@ -255,7 +255,7 @@ def _save_upload_image_ref(role_dir: Path, role_id: str, source: str, index: int
     return path
 
 
-async def _send_create_custom_wife_role(bot: Bot, ev: Event):
+async def _send_create_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     role_id, created, error = await asyncio.to_thread(
         _create_or_get_custom_role,
@@ -270,7 +270,7 @@ async def _send_create_custom_wife_role(bot: Bot, ev: Event):
         await _safe_send(bot,f'自定义老婆已存在\n角色ID：{role_id}')
 
 
-async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
+async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | None:
     if not _can_upload_images(ev):
         return await _safe_send(bot, '你不在图片上传白名单中。')
 
@@ -316,7 +316,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event):
     await _safe_send(bot,'\n'.join(msg))
 
 
-async def _send_custom_wife_image_list(bot: Bot, ev: Event):
+async def _send_custom_wife_image_list(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     entries = await asyncio.to_thread(_custom_role_image_entries, role_name)
     if entries is None:
@@ -333,7 +333,7 @@ async def _send_custom_wife_image_list(bot: Bot, ev: Event):
     await _safe_send(bot, MessageSegment.node(nodes))
 
 
-async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event):
+async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.regex_dict.get('role') or ev.text, strip_wife_suffix=True)
     role_id, role_name, images, error = await asyncio.to_thread(
         _resolve_custom_role_for_delete,
@@ -353,7 +353,7 @@ async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event):
     )
 
 
-async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event):
+async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     pending = _get_pending_custom_role_delete(ev)
     if pending is None:
         return await _safe_send(bot, '没有待确认删除的自定义老婆。')
@@ -369,14 +369,14 @@ async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event):
     await _safe_send(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
 
 
-async def _send_cancel_delete_custom_wife_role(bot: Bot, ev: Event):
+async def _send_cancel_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     if _get_pending_custom_role_delete(ev) is None:
         return await _safe_send(bot, '没有待取消的自定义老婆删除。')
     _clear_pending_custom_role_delete(ev)
     await _safe_send(bot, '已取消删除自定义老婆。')
 
 
-async def _send_delete_custom_wife_image(bot: Bot, ev: Event):
+async def _send_delete_custom_wife_image(bot: Bot, ev: Event) -> list[str] | None:
     role_name, hash_id = _parse_delete_custom_image_text(ev.text)
     role_id, role_name, image_path, error = await asyncio.to_thread(
         _resolve_custom_image_for_delete,
@@ -399,36 +399,36 @@ async def _send_delete_custom_wife_image(bot: Bot, ev: Event):
 
 
 @custom_role_sv.on_prefix(('创建老婆', '老婆创建'), block=True)
-async def custom_wife_create(bot: Bot, ev: Event):
+async def custom_wife_create(bot: Bot, ev: Event) -> None:
     await _send_create_custom_wife_role(bot, ev)
 
 
 @image_upload_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)
-async def custom_wife_upload(bot: Bot, ev: Event):
+async def custom_wife_upload(bot: Bot, ev: Event) -> None:
     await _send_upload_custom_wife_images(bot, ev)
 
 
 @custom_role_sv.on_prefix(('查看老婆图片', '老婆图片列表', '老婆图片'), block=True)
-async def custom_wife_image_list(bot: Bot, ev: Event):
+async def custom_wife_image_list(bot: Bot, ev: Event) -> None:
     await _send_custom_wife_image_list(bot, ev)
 
 
 @custom_role_sv.on_prefix(('删除老婆图片', '老婆删除图片', '老婆删图片'), block=True)
-async def custom_wife_delete_image(bot: Bot, ev: Event):
+async def custom_wife_delete_image(bot: Bot, ev: Event) -> None:
     await _send_delete_custom_wife_image(bot, ev)
 
 
 @custom_role_sv.on_fullmatch(('确认删除老婆', '老婆删除确认'), block=True)
-async def custom_wife_confirm_delete(bot: Bot, ev: Event):
+async def custom_wife_confirm_delete(bot: Bot, ev: Event) -> None:
     await _send_confirm_delete_custom_wife_role(bot, ev)
 
 
 @custom_role_sv.on_fullmatch(('取消删除老婆', '老婆删除取消'), block=True)
-async def custom_wife_cancel_delete(bot: Bot, ev: Event):
+async def custom_wife_cancel_delete(bot: Bot, ev: Event) -> None:
     await _send_cancel_delete_custom_wife_role(bot, ev)
 
 
 @custom_role_sv.on_regex(r'^(?:删除老婆|老婆删除)(?!图片|确认|取消)(?P<role>.+)$', block=True)
-async def custom_wife_delete_role(bot: Bot, ev: Event):
+async def custom_wife_delete_role(bot: Bot, ev: Event) -> None:
     await _send_request_delete_custom_wife_role(bot, ev)
 
