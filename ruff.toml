@@ -16,7 +16,7 @@ select = ["E", "F", "I", "W"]
 [lint.isort]
 combine-as-imports = true
 length-sort = true
-known-first-party = ["gsuid_core", "TodayWaifu", "twf"]
+known-first-party = ["gsuid_core", "TodayWaifu"]
 section-order = [
     "future",
     "standard-library",

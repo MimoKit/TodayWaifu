@@ -5,7 +5,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LOLI_PATH = ROOT / 'twf' / 'loli.py'
+LOLI_PATH = ROOT / 'TodayWaifu' / 'loli.py'
 
 
 def _extract_function(name: str, globals_dict: dict[str, Any]) -> Any:
@@ -76,7 +76,7 @@ class LoliGalleryContractTests(unittest.TestCase):
 
     def test_selected_url_is_persisted_and_reused_by_interactions(self) -> None:
         loli_source = LOLI_PATH.read_text(encoding='utf-8-sig')
-        rob_source = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8-sig')
+        rob_source = (ROOT / 'TodayWaifu' / 'rob.py').read_text(encoding='utf-8-sig')
         self.assertIn("role_ids=('loli',)", loli_source)
         self.assertIn('image=image_url', loli_source)
         self.assertNotIn('image=custom_url', loli_source)

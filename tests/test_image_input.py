@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "twf" / "image_input.py"
+MODULE_PATH = ROOT / "TodayWaifu" / "image_input.py"
 
 
 def _load_module():

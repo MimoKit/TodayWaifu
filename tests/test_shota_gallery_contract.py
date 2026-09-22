@@ -5,7 +5,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SHOTA_PATH = ROOT / 'twf' / 'shota.py'
+SHOTA_PATH = ROOT / 'TodayWaifu' / 'shota.py'
 
 
 def _extract_function(name: str, globals_dict: dict[str, Any]) -> Any:
@@ -88,9 +88,9 @@ class ShotaGalleryContractTests(unittest.TestCase):
 
     def test_shota_source_code_contract(self) -> None:
         shota_source = SHOTA_PATH.read_text(encoding='utf-8-sig')
-        rob_source = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8-sig')
-        gift_source = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8-sig')
-        divorce_source = (ROOT / 'twf' / 'divorce.py').read_text(encoding='utf-8-sig')
+        rob_source = (ROOT / 'TodayWaifu' / 'rob.py').read_text(encoding='utf-8-sig')
+        gift_source = (ROOT / 'TodayWaifu' / 'gift.py').read_text(encoding='utf-8-sig')
+        divorce_source = (ROOT / 'TodayWaifu' / 'divorce.py').read_text(encoding='utf-8-sig')
 
         self.assertIn("role_ids=('shota',)", shota_source)
         self.assertIn("record_type='shota'", shota_source)

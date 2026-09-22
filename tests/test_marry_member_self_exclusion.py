@@ -21,7 +21,7 @@ def _load_module_functions() -> dict:
     body: list[ast.stmt] = [
         ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
     ]
-    for path in sorted((ROOT / 'twf').glob('*.py')):
+    for path in sorted((ROOT / 'TodayWaifu').glob('*.py')):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         body.extend(
             node

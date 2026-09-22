@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load_status_helpers() -> dict[str, Any]:
-    status_path = ROOT / 'twf' / 'status.py'
+    status_path = ROOT / 'TodayWaifu' / 'status.py'
     tree = ast.parse(status_path.read_text(encoding='utf-8-sig'))
     functions = [
         node
@@ -25,11 +25,11 @@ def _load_status_helpers() -> dict[str, Any]:
 
 class StatusSourceTests(unittest.TestCase):
     def test_status_module_is_loaded_by_plugin_entry(self) -> None:
-        source = (ROOT / '__init__.py').read_text(encoding='utf-8-sig')
-        self.assertIn('from .twf import status', source)
+        source = (ROOT / 'TodayWaifu' / '__init__.py').read_text(encoding='utf-8-sig')
+        self.assertIn('from . import status', source)
 
     def test_status_registers_three_daily_metrics(self) -> None:
-        source = (ROOT / 'twf' / 'status.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'TodayWaifu' / 'status.py').read_text(encoding='utf-8-sig')
         self.assertIn('register_status(', source)
         self.assertIn("'今日老婆': get_today_wife_count", source)
         self.assertIn("'今日萝莉': get_today_loli_count", source)

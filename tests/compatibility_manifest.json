@@ -300,302 +300,302 @@
   },
   "triggers": [
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_create",
       "decorator": "custom_role_sv.on_prefix(('创建老婆', '老婆创建'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_upload",
       "decorator": "image_upload_sv.on_prefix(('上传老婆图片', '老婆上传图片'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_image_list",
       "decorator": "custom_role_sv.on_prefix(('查看老婆图片', '老婆图片列表', '老婆图片'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_delete_image",
       "decorator": "custom_role_sv.on_prefix(('删除老婆图片', '老婆删除图片', '老婆删图片'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_confirm_delete",
       "decorator": "custom_role_sv.on_fullmatch(('确认删除老婆', '老婆删除确认'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_cancel_delete",
       "decorator": "custom_role_sv.on_fullmatch(('取消删除老婆', '老婆删除取消'), block=True)"
     },
     {
-      "file": "twf/custom_role.py",
+      "file": "TodayWaifu/custom_role.py",
       "function": "custom_wife_delete_role",
       "decorator": "custom_role_sv.on_regex('^(?:删除老婆|老婆删除)(?!图片|确认|取消)(?P<role>.+)$', block=True)"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_wife_prefix",
       "decorator": "specify_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ', covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'], aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_wife_full",
       "decorator": "daily_wife_sv.on_fullmatch(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='随机抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“我今天老婆是谁”“帮我娶个老婆”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'], aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_nte_wife_prefix",
       "decorator": "specify_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。机器人主人或指定老婆白名单用户可把角色名放入 text。\\n    Args:\\n        text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。\\n    ', covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_nte_wife_full",
       "decorator": "daily_nte_wife_sv.on_fullmatch('今日异环老婆', block=True, to_ai='随机抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_normal_wife_prefix",
       "decorator": "specify_wife_sv.on_prefix(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='抽取当前用户今天的普通老婆（二次元作品角色）。\\n    当用户说“今日普通老婆”“普通老婆”时调用。\\n    如果用户指定了角色名或作品名，把角色名或作品名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。\\n    ', covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'], aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_normal_wife_full",
       "decorator": "daily_normal_wife_sv.on_fullmatch(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='随机抽取当前用户今天的普通老婆（二次元作品角色）。\\n    当用户说“今日普通老婆”“普通老婆”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'], aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_normal_wife_list",
       "decorator": "wife_list_sv.on_fullmatch(('普通老婆列表', '查看普通老婆列表'), block=True, to_ai='查看今日已抽取的普通老婆记录列表。\\n    当用户询问“普通老婆列表”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['普通（动漫）老婆的今日抽取记录与可抽角色'], aliases=['今日老婆·普通老婆列表', '今日老婆·动漫老婆列表'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_wife_list",
       "decorator": "wife_list_sv.on_fullmatch(('老婆列表', '查看老婆列表'), block=True, to_ai='查看可抽取的老婆角色列表。\\n    当用户询问“老婆列表”“有哪些老婆可以抽”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['鸣潮可抽取角色名单与今日已抽取记录'], aliases=['今日老婆·老婆列表', '今日老婆·可抽角色'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "assign_wife",
       "decorator": "assign_wife_sv.on_prefix(('分配老婆', '分配今日老婆'), block=True, to_ai='为指定用户分配今日老婆。\\n    当管理员或用户说“给某人分配老婆”“分配今日老婆 @某人 角色名”时调用。\\n    Args:\\n        text: 分配参数，通常包含目标用户和老婆名，例如“@用户 今汐”。\\n    ', covers=['机器人主人为指定用户分配今日老婆（含角色名）'], aliases=['今日老婆·分配老婆'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "assign_wife_usage",
       "decorator": "assign_wife_sv.on_fullmatch(('分配老婆', '分配今日老婆'), block=True, to_ai='显示分配今日老婆的用法。\\n    当用户只说“分配老婆”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['「分配老婆」的用法说明'], aliases=['今日老婆·分配老婆用法'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_husband_prefix",
       "decorator": "specify_wife_sv.on_prefix('今日老公', block=True, to_ai='抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天的老公是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。\\n    ', covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽老公', '今日老婆·今日老公'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_husband_full",
       "decorator": "daily_husband_sv.on_fullmatch('今日老公', block=True, to_ai='随机抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天老公是谁”且没有指定角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽老公', '今日老婆·今日老公'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "daily_husband_list",
       "decorator": "husband_list_sv.on_fullmatch(('老公列表', '查看老公列表'), block=True, to_ai='查看可抽取的老公角色列表。\\n    当用户询问“老公列表”“有哪些老公可以抽”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['鸣潮可抽取男性角色名单与今日已抽取记录'], aliases=['今日老婆·老公列表', '今日老婆·可抽老公'])"
     },
     {
-      "file": "twf/daily.py",
+      "file": "TodayWaifu/daily.py",
       "function": "group_member_wife",
       "decorator": "marry_member_sv.on_fullmatch(('娶群友', '取群友'), block=True, to_ai='随机抽取当前群里的一个群友作为今日互动对象。\\n    当用户说“娶群友”“随机娶一个群友”“帮我抽个群友”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['从当前群成员中随机抽取一位作为今日互动对象'], aliases=['今日老婆·娶群友', '今日老婆·抽群友'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_wife",
       "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的老婆婚姻关系。\\n    “离婚”默认表示离婚老婆，也可以使用老婆离婚等同义命令。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['结束今日老婆婚姻关系'], aliases=['今日老婆·离婚', '今日老婆·和老婆离婚'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_husband",
       "decorator": "divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的老公婚姻关系。\\n    当用户说“跟老公离婚”“老公离婚”“离婚老公”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ', covers=['结束今日老公婚姻关系'], aliases=['今日老婆·和老公离婚', '今日老婆·老公离婚'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_loli",
       "decorator": "divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的萝莉关系。\\n    当用户说“跟萝莉离婚”“萝莉离婚”“离婚萝莉”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ', covers=['结束今日萝莉关系'], aliases=['今日老婆·和萝莉离婚', '今日老婆·萝莉离婚'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_shota",
       "decorator": "divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的正太关系。\\n    当用户说“跟正太离婚”“正太离婚”“离婚正太”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ', covers=['结束今日正太关系'], aliases=['今日老婆·和正太离婚', '今日老婆·正太离婚'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_nte",
       "decorator": "divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的异环老婆婚姻关系。\\n    当用户说“异环老婆离婚”“离婚异环老婆”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ', covers=['结束今日异环老婆婚姻关系'], aliases=['今日老婆·异环老婆离婚'])"
     },
     {
-      "file": "twf/divorce.py",
+      "file": "TodayWaifu/divorce.py",
       "function": "divorce_pgr",
       "decorator": "divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的战双老婆婚姻关系。\\n    当用户说“战双老婆离婚”“离婚战双老婆”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ', covers=['结束今日战双老婆婚姻关系'], aliases=['今日老婆·战双老婆离婚'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_wife",
       "decorator": "gift_sv.on_prefix(('送老婆', '送今日老婆'), block=True, to_ai='把当前用户今天的老婆送给指定用户。\\n    当用户说“把我的老婆送给某人”“送老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['把自己今日老婆赠送给他人，需对方确认'], aliases=['今日老婆·送老婆', '今日老婆·赠送老婆'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_wife_at",
       "decorator": "gift_sv.on_fullmatch(('送老婆', '送今日老婆'), block=True, to_ai='显示送老婆的用法。\\n    当用户只说“送老婆”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['把自己今日老婆赠送给他人，需对方确认'], aliases=['今日老婆·送老婆', '今日老婆·赠送老婆'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_wife_accept",
       "decorator": "gift_sv.on_fullmatch(('接受老婆赠送', '同意送老婆'), block=True, to_ai='同意接收别人赠送的今日老婆。\\n    当用户说“接受老婆赠送”“同意送老婆”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['接受他人赠送的老婆'], aliases=['今日老婆·接受送老婆', '今日老婆·同意送老婆'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_wife_reject",
       "decorator": "gift_sv.on_fullmatch(('拒绝老婆赠送', '拒绝送老婆'), block=True, to_ai='拒绝接收别人赠送的今日老婆。\\n    当用户说“拒绝老婆赠送”“拒绝送老婆”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['拒绝他人赠送的老婆'], aliases=['今日老婆·拒绝送老婆'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_husband",
       "decorator": "gift_sv.on_prefix(('送老公', '送今日老公'), block=True, to_ai='把当前用户今天的老公送给指定用户。\\n    当用户说“把我的老公送给某人”“送老公 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['把自己今日老公赠送给他人，需对方确认'], aliases=['今日老婆·送老公', '今日老婆·赠送老公'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_husband_at",
       "decorator": "gift_sv.on_fullmatch(('送老公', '送今日老公'), block=True, to_ai='显示送老公的用法。\\n    当用户只说“送老公”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['把自己今日老公赠送给他人，需对方确认'], aliases=['今日老婆·送老公', '今日老婆·赠送老公'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_husband_accept",
       "decorator": "gift_sv.on_fullmatch(('接受老公赠送', '同意送老公'), block=True, to_ai='同意接收别人赠送的今日老公。\\n    当用户说“接受老公赠送”“同意送老公”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['接受他人赠送的老公'], aliases=['今日老婆·接受送老公', '今日老婆·同意送老公'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_husband_reject",
       "decorator": "gift_sv.on_fullmatch(('拒绝老公赠送', '拒绝送老公'), block=True, to_ai='拒绝接收别人赠送的今日老公。\\n    当用户说“拒绝老公赠送”“拒绝送老公”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['拒绝他人赠送的老公'], aliases=['今日老婆·拒绝送老公'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_loli",
       "decorator": "gift_sv.on_prefix(('送萝莉', '送今日萝莉'), block=True, to_ai='把当前用户今天的萝莉送给指定用户。\\n    当用户说“把我的萝莉送给某人”“送萝莉 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['把自己今日萝莉赠送给他人，需对方确认'], aliases=['今日老婆·送萝莉', '今日老婆·赠送萝莉'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_loli_at",
       "decorator": "gift_sv.on_fullmatch(('送萝莉', '送今日萝莉'), block=True, to_ai='显示送萝莉的用法。\\n    当用户只说“送萝莉”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['把自己今日萝莉赠送给他人，需对方确认'], aliases=['今日老婆·送萝莉', '今日老婆·赠送萝莉'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_loli_accept",
       "decorator": "gift_sv.on_fullmatch(('接受萝莉赠送', '同意送萝莉'), block=True, to_ai='同意接收别人赠送的今日萝莉。\\n    当用户说“接受萝莉赠送”“同意送萝莉”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['接受他人赠送的萝莉'], aliases=['今日老婆·接受送萝莉', '今日老婆·同意送萝莉'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_loli_reject",
       "decorator": "gift_sv.on_fullmatch(('拒绝萝莉赠送', '拒绝送萝莉'), block=True, to_ai='拒绝接收别人赠送的今日萝莉。\\n    当用户说“拒绝萝莉赠送”“拒绝送萝莉”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['拒绝他人赠送的萝莉'], aliases=['今日老婆·拒绝送萝莉'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_shota",
       "decorator": "gift_sv.on_prefix(('送正太', '送今日正太'), block=True, to_ai='把当前用户今天的正太送给指定用户。\\n    当用户说“把我的正太送给某人”“送正太 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['把自己今日正太赠送给他人，需对方确认'], aliases=['今日老婆·送正太', '今日老婆·赠送正太'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_shota_at",
       "decorator": "gift_sv.on_fullmatch(('送正太', '送今日正太'), block=True, to_ai='显示送正太的用法。\\n    当用户只说“送正太”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['把自己今日正太赠送给他人，需对方确认'], aliases=['今日老婆·送正太', '今日老婆·赠送正太'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_shota_accept",
       "decorator": "gift_sv.on_fullmatch(('接受正太赠送', '同意送正太'), block=True, to_ai='同意接收别人赠送的今日正太。\\n    当用户说“接受正太赠送”“同意送正太”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['接受他人赠送的正太'], aliases=['今日老婆·接受送正太', '今日老婆·同意送正太'])"
     },
     {
-      "file": "twf/gift.py",
+      "file": "TodayWaifu/gift.py",
       "function": "gift_shota_reject",
       "decorator": "gift_sv.on_fullmatch(('拒绝正太赠送', '拒绝送正太'), block=True, to_ai='拒绝接收别人赠送的今日正太。\\n    当用户说“拒绝正太赠送”“拒绝送正太”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['拒绝他人赠送的正太'], aliases=['今日老婆·拒绝送正太'])"
     },
     {
-      "file": "twf/help.py",
+      "file": "TodayWaifu/help.py",
       "function": "daily_wife_help",
       "decorator": "help_sv.on_fullmatch(('今日老婆帮助', '老婆帮助'), block=True, to_ai='查看 TodayWaifu 今日老婆插件帮助。\\n    当用户问“今日老婆怎么用”“今日老婆帮助”“老婆插件有什么命令”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['插件全部指令与用法说明'], aliases=['今日老婆·帮助', '今日老婆·怎么用'])"
     },
     {
-      "file": "twf/loli.py",
+      "file": "TodayWaifu/loli.py",
       "function": "daily_loli",
       "decorator": "loli_sv.on_fullmatch('今日萝莉', block=True, to_ai='随机抽取当前用户今天的萝莉图片。\\n    当用户说“今日萝莉”“抽一张萝莉”“我今天的萝莉是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['萝莉图片每日随机抽取（图库或本地图库）'], aliases=['今日老婆·抽萝莉', '今日老婆·今日萝莉'])"
     },
     {
-      "file": "twf/loli.py",
+      "file": "TodayWaifu/loli.py",
       "function": "upload_loli",
       "decorator": "image_upload_sv.on_command(('上传萝莉图片', '今日萝莉上传', '萝莉上传图片'), block=True)"
     },
     {
-      "file": "twf/loli.py",
+      "file": "TodayWaifu/loli.py",
       "function": "list_loli",
       "decorator": "loli_manage_sv.on_fullmatch(('查看萝莉图片', '今日萝莉列表', '萝莉图片列表'), block=True, to_ai='查看今日萝莉图库列表。\\n    当用户说“查看萝莉图片”“萝莉图片列表”“有哪些萝莉图”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['本地萝莉图库的图片 ID 列表'], aliases=['今日老婆·萝莉图片列表', '今日老婆·萝莉图库'])"
     },
     {
-      "file": "twf/loli.py",
+      "file": "TodayWaifu/loli.py",
       "function": "delete_loli",
       "decorator": "loli_manage_sv.on_command('删除萝莉图片', block=True)"
     },
     {
-      "file": "twf/pgr.py",
+      "file": "TodayWaifu/pgr.py",
       "function": "daily_pgr_wife_prefix",
       "decorator": "specify_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    机器人主人或指定老婆白名单用户可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅主人或白名单用户可用。\\n    ', covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'])"
     },
     {
-      "file": "twf/pgr.py",
+      "file": "TodayWaifu/pgr.py",
       "function": "daily_pgr_wife",
       "decorator": "pgr_wife_sv.on_fullmatch(('今日战双老婆', 'jrzslp'), block=True, to_ai='随机抽取当前用户今天的战双老婆。\\n    当用户说“今日战双老婆”“jrzslp”“我今天的战双老婆是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'])"
     },
     {
-      "file": "twf/pgr.py",
+      "file": "TodayWaifu/pgr.py",
       "function": "upload_pgr_wife",
       "decorator": "image_upload_sv.on_command(('上传战双老婆图片', '战双老婆上传图片'), block=True)"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_wife",
       "decorator": "rob_sv.on_prefix(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='抢夺指定用户今天的老婆。\\n    当用户说“抢某人的老婆”“抢老婆 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['抢夺他人今日老婆，按概率判定成败'], aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_wife_at",
       "decorator": "rob_sv.on_fullmatch(('抢老婆', '抢今日老婆', '抢婆娘'), block=True, to_ai='显示抢老婆的用法。\\n    当用户只说“抢老婆”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['抢夺他人今日老婆，按概率判定成败'], aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_husband",
       "decorator": "rob_sv.on_prefix(('抢老公', '抢今日老公'), block=True, to_ai='抢夺指定用户今天的老公。\\n    当用户说“抢某人的老公”“抢老公 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['抢夺他人今日老公，按概率判定成败'], aliases=['今日老婆·抢老公'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_husband_at",
       "decorator": "rob_sv.on_fullmatch(('抢老公', '抢今日老公'), block=True, to_ai='显示抢老公的用法。\\n    当用户只说“抢老公”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['抢夺他人今日老公，按概率判定成败'], aliases=['今日老婆·抢老公'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_loli",
       "decorator": "rob_sv.on_prefix(('抢萝莉', '抢今日萝莉'), block=True, to_ai='抢夺指定用户今天的萝莉。\\n    当用户说“抢某人的萝莉”“抢萝莉 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['抢夺他人今日萝莉，按概率判定成败'], aliases=['今日老婆·抢萝莉'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_loli_at",
       "decorator": "rob_sv.on_fullmatch(('抢萝莉', '抢今日萝莉'), block=True, to_ai='显示抢萝莉的用法。\\n    当用户只说“抢萝莉”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['抢夺他人今日萝莉，按概率判定成败'], aliases=['今日老婆·抢萝莉'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_shota",
       "decorator": "rob_sv.on_prefix(('抢正太', '抢今日正太'), block=True, to_ai='抢夺指定用户今天的正太。\\n    当用户说“抢某人的正太”“抢正太 @某人”时调用。\\n    Args:\\n        text: 目标用户，通常是 @用户 或用户 ID。\\n    ', covers=['抢夺他人今日正太，按概率判定成败'], aliases=['今日老婆·抢正太'])"
     },
     {
-      "file": "twf/rob.py",
+      "file": "TodayWaifu/rob.py",
       "function": "rob_shota_at",
       "decorator": "rob_sv.on_fullmatch(('抢正太', '抢今日正太'), block=True, to_ai='显示抢正太的用法。\\n    当用户只说“抢正太”但没有指定目标用户时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['抢夺他人今日正太，按概率判定成败'], aliases=['今日老婆·抢正太'])"
     },
     {
-      "file": "twf/shota.py",
+      "file": "TodayWaifu/shota.py",
       "function": "daily_shota",
       "decorator": "shota_sv.on_fullmatch('今日正太', block=True, to_ai='随机抽取当前用户今天的正太图片。\\n    当用户说“今日正太”“抽一张正太”“我今天的正太是谁”时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['正太图片每日随机抽取（图库或本地图库）'], aliases=['今日老婆·抽正太', '今日老婆·今日正太'])"
     }

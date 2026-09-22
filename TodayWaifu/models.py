@@ -4,7 +4,7 @@
 一行 = 某用户（user_id）某天（day）在某群（bot_id+group_id）某个桶（bucket）里的一条记录。
 record 字典整体序列化进 payload 列，name/state/origin 等列用于控制台展示与查询过滤。
 
-本模块不依赖 twf 内其它模块，可独立加载（测试用 importlib 直接加载）。
+本模块不依赖 TodayWaifu 内其它模块，可独立加载（测试用 importlib 直接加载）。
 """
 from __future__ import annotations
 

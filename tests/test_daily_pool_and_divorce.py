@@ -54,7 +54,7 @@ class NteRosterTests(unittest.TestCase):
         )
 
     def test_nte_filter_rejects_men_and_both_protagonists(self) -> None:
-        roles_path = ROOT / 'twf' / 'roles.py'
+        roles_path = ROOT / 'TodayWaifu' / 'roles.py'
         is_excluded = _extract_function(
             roles_path,
             '_is_excluded_nte_role',
@@ -97,7 +97,7 @@ class UnifiedDivorceTests(unittest.TestCase):
             'loli': 'lolis',
         }
         return _extract_function(
-            ROOT / 'twf' / 'daily_store.py',
+            ROOT / 'TodayWaifu' / 'daily_store.py',
             '_mark_all_daily_records_divorced',
             {
                 'Any': Any,
@@ -148,7 +148,7 @@ class UnifiedDivorceTests(unittest.TestCase):
 
     def test_divorced_state_takes_precedence_over_old_transfer_flags(self) -> None:
         wife_state = _extract_function(
-            ROOT / 'twf' / 'daily_store.py',
+            ROOT / 'TodayWaifu' / 'daily_store.py',
             '_wife_state',
             {'Any': Any},
         )
@@ -167,7 +167,7 @@ class UnifiedDivorceTests(unittest.TestCase):
 
     def test_loli_divorce_result_hides_internal_image_id(self) -> None:
         result_name = _extract_function(
-            ROOT / 'twf' / 'divorce.py',
+            ROOT / 'TodayWaifu' / 'divorce.py',
             '_divorce_result_name',
             {},
         )

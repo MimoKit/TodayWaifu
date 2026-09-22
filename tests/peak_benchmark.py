@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('todaywaifu_source_cache', ROOT / 'twf' / 'source_cache.py')
+spec = importlib.util.spec_from_file_location('todaywaifu_source_cache', ROOT / 'TodayWaifu' / 'source_cache.py')
 if spec is None or spec.loader is None:
     raise RuntimeError('cannot load source cache module')
 module = importlib.util.module_from_spec(spec)

@@ -28,7 +28,7 @@ def _config_manifest() -> dict[str, list[dict[str, str]]]:
 
 def _trigger_manifest() -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    for path in sorted((ROOT / "twf").glob("*.py")):
+    for path in sorted((ROOT / "TodayWaifu").glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -59,15 +59,15 @@ class CompatibilityContractTests(unittest.TestCase):
             self.assertTrue((ROOT / relative).exists(), relative)
 
     def test_plugin_loading_order_remains_compatible(self) -> None:
-        source = (ROOT / "__init__.py").read_text(encoding="utf-8-sig")
+        source = (ROOT / "TodayWaifu" / "__init__.py").read_text(encoding="utf-8-sig")
         modules = ["shared", "help", "normal_wife", "daily", "rob", "gift", "divorce", "loli", "custom_role"]
-        positions = [source.index(f"from .twf import {name}") for name in modules]
+        positions = [source.index(f"from . import {name}") for name in modules]
         self.assertEqual(positions, sorted(positions))
 
     def test_runtime_data_paths_remain_compatible(self) -> None:
-        # shared 已按职责拆分，路径常量散落在 paths/constants 等模块，故扫描整个 twf 包。
+        # shared 已按职责拆分，路径常量散落在 paths/constants 等模块，故扫描整个 TodayWaifu 包。
         twf_source = "\n".join(
-            path.read_text(encoding="utf-8-sig") for path in sorted((ROOT / "twf").glob("*.py"))
+            path.read_text(encoding="utf-8-sig") for path in sorted((ROOT / "TodayWaifu").glob("*.py"))
         )
         config = (ROOT / "daily_wife_config.py").read_text(encoding="utf-8-sig")
         for text in (

@@ -1,4 +1,4 @@
-"""twf/models.py 数据库层测试。
+"""TodayWaifu/models.py 数据库层测试。
 
 需要 gsuid_core 环境（sqlmodel/aiosqlite），用核心 venv 运行：
     D:/122/bot/xiaoyu/botkj/gsuid_core/.venv/Scripts/python.exe tests/test_models_db.py
@@ -20,7 +20,7 @@ except ImportError:
     _DEPS_OK = False
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "twf" / "models.py"
+MODULE_PATH = ROOT / "TodayWaifu" / "models.py"
 
 
 def _load_models():

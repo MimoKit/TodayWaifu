@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CommandPriorityTests(unittest.TestCase):
     def test_help_runs_before_specified_wife_prefix(self) -> None:
-        source = (ROOT / 'twf' / 'shared.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'TodayWaifu' / 'shared.py').read_text(encoding='utf-8-sig')
         help_priority = re.search(
             r"help_sv\s*=\s*SV\('今日老婆-帮助',\s*priority=(\d+)\)",
             source,
@@ -27,7 +27,7 @@ class CommandPriorityTests(unittest.TestCase):
         )
 
     def test_daily_wife_prefix_routes_help_alias(self) -> None:
-        source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8-sig')
         self.assertIn("str(ev.command or '').strip() == '今日老婆'", source)
         self.assertIn("specified_name == '帮助'", source)
         self.assertIn('from .help import daily_wife_help', source)
@@ -35,12 +35,12 @@ class CommandPriorityTests(unittest.TestCase):
 
 
     def test_help_passes_command_icon_directory_to_renderer(self) -> None:
-        source = (ROOT / 'twf' / 'help.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'TodayWaifu' / 'help.py').read_text(encoding='utf-8-sig')
         self.assertIn("extra['icon_path'] = _ICON_PATH", source)
         self.assertIn("'icon_path'", source)
 
     def test_help_imports_pil_image(self) -> None:
-        source = (ROOT / 'twf' / 'help.py').read_text(encoding='utf-8-sig')
+        source = (ROOT / 'TodayWaifu' / 'help.py').read_text(encoding='utf-8-sig')
         self.assertIn('from PIL import Image', source)
         self.assertIn('Image.open', source)
 

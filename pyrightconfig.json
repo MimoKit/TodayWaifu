@@ -2,6 +2,6 @@
   "typeCheckingMode": "basic",
   "pythonVersion": "3.11",
   "extraPaths": ["${workspaceFolder}/../..", "${workspaceFolder}/../../gsuid_core"],
-  "include": ["twf", "tests", "config_default.py", "daily_wife_config.py", "__init__.py"],
+  "include": ["TodayWaifu", "tests", "config_default.py", "daily_wife_config.py", "__init__.py"],
   "exclude": ["**/__pycache__", ".venv"]
 }

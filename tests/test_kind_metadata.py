@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "twf" / "kind_metadata.py"
+MODULE_PATH = ROOT / "TodayWaifu" / "kind_metadata.py"
 
 
 def _load_module():

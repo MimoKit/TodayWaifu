@@ -4,7 +4,7 @@
   文件变更后自动失效，避免 0 点高峰时反复读盘。
 - read_url_cache / write_url_cache：远程图库图片按 URL 哈希落盘缓存。
 
-本模块不依赖 gsuid_core 与 twf 内其它模块，可独立加载（测试用 importlib 直接加载）。
+本模块不依赖 gsuid_core 与 TodayWaifu 内其它模块，可独立加载（测试用 importlib 直接加载）。
 """
 from __future__ import annotations
 

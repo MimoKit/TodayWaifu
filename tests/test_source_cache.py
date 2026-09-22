@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load_cache_class():
-    path = ROOT / 'twf' / 'source_cache.py'
+    path = ROOT / 'TodayWaifu' / 'source_cache.py'
     spec = importlib.util.spec_from_file_location('todaywaifu_source_cache', path)
     if spec is None or spec.loader is None:
         raise RuntimeError('cannot load source cache module')

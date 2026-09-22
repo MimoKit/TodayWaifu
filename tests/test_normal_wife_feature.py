@@ -8,18 +8,18 @@ from unittest.mock import AsyncMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DAILY_PATH = ROOT / 'twf' / 'daily.py'
-NORMAL_WIFE_PATH = ROOT / 'twf' / 'normal_wife.py'
+DAILY_PATH = ROOT / 'TodayWaifu' / 'daily.py'
+NORMAL_WIFE_PATH = ROOT / 'TodayWaifu' / 'normal_wife.py'
 
 
 def _module_defining(name: str) -> Path:
-    """定位定义 name 的 twf 模块（shared 已按职责拆分）。"""
-    for path in sorted((ROOT / 'twf').glob('*.py')):
+    """定位定义 name 的 TodayWaifu 模块（shared 已按职责拆分）。"""
+    for path in sorted((ROOT / 'TodayWaifu').glob('*.py')):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
                 return path
-    raise AssertionError(f'{name} 未在任何 twf 模块中定义')
+    raise AssertionError(f'{name} 未在任何 TodayWaifu 模块中定义')
 
 
 def _extract_function(path: Path, name: str, globals_dict: dict[str, Any]):

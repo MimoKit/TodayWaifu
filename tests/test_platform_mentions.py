@@ -15,13 +15,13 @@ class FakeMessage:
 
 
 def _twf_module_defining(name: str) -> Path:
-    """定位定义 name 的 twf 模块（shared 已按职责拆分，不再固定单文件）。"""
-    for path in sorted((ROOT / 'twf').glob('*.py')):
+    """定位定义 name 的 TodayWaifu 模块（shared 已按职责拆分，不再固定单文件）。"""
+    for path in sorted((ROOT / 'TodayWaifu').glob('*.py')):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
                 return path
-    raise AssertionError(f'{name} 未在任何 twf 模块中定义')
+    raise AssertionError(f'{name} 未在任何 TodayWaifu 模块中定义')
 
 
 def _twf_source_defining(name: str) -> str:
@@ -33,7 +33,7 @@ def _load_functions(names: set[str], config: dict[str, Any] | None = None) -> di
         ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
         ast.ImportFrom(module='typing', names=[ast.alias(name='Any')], level=0),
     ]
-    for path in sorted((ROOT / 'twf').glob('*.py')):
+    for path in sorted((ROOT / 'TodayWaifu').glob('*.py')):
         tree = ast.parse(path.read_text(encoding='utf-8-sig'))
         body.extend(
             node
@@ -121,7 +121,7 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertEqual(direct[1].type, 'image')
 
     def test_result_image_senders_keep_personal_message_segments(self) -> None:
-        source = (ROOT / 'twf' / 'senders.py').read_text(encoding='utf-8')
+        source = (ROOT / 'TodayWaifu' / 'senders.py').read_text(encoding='utf-8')
         for function_name in ('_send_role_image', '_send_loli_result_image', '_send_local_image'):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
@@ -130,7 +130,7 @@ class PlatformMentionTests(unittest.TestCase):
 
     def test_personal_compatibility_is_not_removed(self) -> None:
         combined = '\n'.join(
-            path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'twf').glob('*.py'))
+            path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'TodayWaifu').glob('*.py'))
         )
         self.assertIn('_target_user_id_from_text', combined)
         self.assertIn('_qq_avatar_url', combined)
@@ -140,19 +140,19 @@ class PlatformMentionTests(unittest.TestCase):
         self.assertNotIn('DailyWifeOfficialImageGalleryToken', combined)
 
     def test_private_account_prompts_remain_compatible(self) -> None:
-        daily = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')
-        rob = (ROOT / 'twf' / 'rob.py').read_text(encoding='utf-8')
-        gift = (ROOT / 'twf' / 'gift.py').read_text(encoding='utf-8')
+        daily = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8')
+        rob = (ROOT / 'TodayWaifu' / 'rob.py').read_text(encoding='utf-8')
+        gift = (ROOT / 'TodayWaifu' / 'gift.py').read_text(encoding='utf-8')
         self.assertIn('CQ:at', daily)
         self.assertIn('对方 QQ', rob)
         self.assertIn('对方 QQ', gift)
 
     def test_daily_loli_results_use_the_shared_sender(self) -> None:
-        source = (ROOT / 'twf' / 'loli.py').read_text(encoding='utf-8')
+        source = (ROOT / 'TodayWaifu' / 'loli.py').read_text(encoding='utf-8')
         self.assertIn('_send_loli_result_image(', source)
 
     def test_assignment_has_no_platform_specific_branch(self) -> None:
-        source = (ROOT / 'twf' / 'daily.py').read_text(encoding='utf-8')
+        source = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8')
         assignment_start = source.index('async def _send_assign_wife(')
         assignment_end = source.index('\nasync def ', assignment_start + 1)
         assignment = source[assignment_start:assignment_end]
