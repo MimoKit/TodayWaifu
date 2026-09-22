@@ -1,0 +1,32 @@
+line-length = 120
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "pyproject.toml",
+    "**/*.toml",
+]
+
+[lint]
+select = ["E", "F", "I", "W"]
+
+[lint.isort]
+combine-as-imports = true
+length-sort = true
+known-first-party = ["gsuid_core", "TodayWaifu", "twf"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

@@ -1,0 +1,11 @@
+[project]
+name = "todaywaifu"
+version = "1.0.0"
+description = "基于 GsCore 框架的多游戏「今日老婆」娱乐插件"
+requires-python = ">=3.11,<4.0"
+authors = [{ name = "MimoKit" }]
+license = { text = "GPL-3.0-or-later" }
+# 插件仅依赖 GsCore 框架与其自带依赖（Pillow 等随 Core 提供），故此处不重复声明。
+# python / fastapi / pydantic / gsuid-core / sqlmodel / apscheduler / pydantic-ai
+# 等框架基础依赖无需声明；启动时框架会自动安装此处列出的依赖。
+dependencies = []
