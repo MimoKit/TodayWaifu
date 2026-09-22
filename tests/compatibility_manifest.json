@@ -412,27 +412,27 @@
     {
       "file": "twf/divorce.py",
       "function": "divorce_husband",
-      "decorator": "divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True)"
+      "decorator": "divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的老公婚姻关系。\\n    当用户说“跟老公离婚”“老公离婚”“离婚老公”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ')"
     },
     {
       "file": "twf/divorce.py",
       "function": "divorce_loli",
-      "decorator": "divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True)"
+      "decorator": "divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的萝莉关系。\\n    当用户说“跟萝莉离婚”“萝莉离婚”“离婚萝莉”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ')"
     },
     {
       "file": "twf/divorce.py",
       "function": "divorce_shota",
-      "decorator": "divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True)"
+      "decorator": "divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的正太关系。\\n    当用户说“跟正太离婚”“正太离婚”“离婚正太”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ')"
     },
     {
       "file": "twf/divorce.py",
       "function": "divorce_nte",
-      "decorator": "divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)"
+      "decorator": "divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的异环老婆婚姻关系。\\n    当用户说“异环老婆离婚”“离婚异环老婆”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ')"
     },
     {
       "file": "twf/divorce.py",
       "function": "divorce_pgr",
-      "decorator": "divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True)"
+      "decorator": "divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的战双老婆婚姻关系。\\n    当用户说“战双老婆离婚”“离婚战双老婆”时调用。\\n\\n    Args:\\n        text: 无需参数，留空即可\\n    ')"
     },
     {
       "file": "twf/gift.py",

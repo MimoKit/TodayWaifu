@@ -111,26 +111,71 @@ async def divorce_wife(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'wife')
 
 
-@divorce_sv.on_fullmatch(HUSBAND_DIVORCE_COMMANDS, block=True)
+@divorce_sv.on_fullmatch(
+    HUSBAND_DIVORCE_COMMANDS,
+    block=True,
+    to_ai="""结束当前用户今天的老公婚姻关系。
+    当用户说“跟老公离婚”“老公离婚”“离婚老公”时调用。
+
+    Args:
+        text: 无需参数，留空即可
+    """,
+)
 async def divorce_husband(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'husband')
 
 
-@divorce_sv.on_fullmatch(LOLI_DIVORCE_COMMANDS, block=True)
+@divorce_sv.on_fullmatch(
+    LOLI_DIVORCE_COMMANDS,
+    block=True,
+    to_ai="""结束当前用户今天的萝莉关系。
+    当用户说“跟萝莉离婚”“萝莉离婚”“离婚萝莉”时调用。
+
+    Args:
+        text: 无需参数，留空即可
+    """,
+)
 async def divorce_loli(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'loli')
 
 
-@divorce_sv.on_fullmatch(SHOTA_DIVORCE_COMMANDS, block=True)
+@divorce_sv.on_fullmatch(
+    SHOTA_DIVORCE_COMMANDS,
+    block=True,
+    to_ai="""结束当前用户今天的正太关系。
+    当用户说“跟正太离婚”“正太离婚”“离婚正太”时调用。
+
+    Args:
+        text: 无需参数，留空即可
+    """,
+)
 async def divorce_shota(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'shota')
 
 
-@divorce_sv.on_fullmatch(NTE_DIVORCE_COMMANDS, block=True)
+@divorce_sv.on_fullmatch(
+    NTE_DIVORCE_COMMANDS,
+    block=True,
+    to_ai="""结束当前用户今天的异环老婆婚姻关系。
+    当用户说“异环老婆离婚”“离婚异环老婆”时调用。
+
+    Args:
+        text: 无需参数，留空即可
+    """,
+)
 async def divorce_nte(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'nte')
 
 
-@divorce_sv.on_fullmatch(PGR_DIVORCE_COMMANDS, block=True)
+@divorce_sv.on_fullmatch(
+    PGR_DIVORCE_COMMANDS,
+    block=True,
+    to_ai="""结束当前用户今天的战双老婆婚姻关系。
+    当用户说“战双老婆离婚”“离婚战双老婆”时调用。
+
+    Args:
+        text: 无需参数，留空即可
+    """,
+)
 async def divorce_pgr(bot: Bot, ev: Event) -> None:
     await _send_divorce(bot, ev, 'pgr')
