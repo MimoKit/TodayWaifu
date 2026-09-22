@@ -59,15 +59,6 @@ from .resource_paths import (
     role_upload_map,
     role_upload_root,
 )
-from .message_delivery import (
-    adapt_mentions_for_platform as _adapt_mentions_for_platform_impl,
-    is_xwuid_group_activity_hook_error as _is_xwuid_group_activity_hook_error_impl,
-    parse_send_options as _parse_send_options_impl,
-    remove_private_mentions as _remove_private_mentions_impl,
-    safe_send as _safe_send_impl,
-    send_loli_text as _send_loli_text_impl,
-    target_send_without_bot_hooks as _target_send_without_bot_hooks_impl,
-)
 from .source_cache import AsyncSourceCache
 from .storage import read_json_dict
 from .upload_access import can_upload_images, normalized_user_ids
@@ -194,7 +185,6 @@ __all__ = [
 ]
 
 
-# 本地图片读取相关常量
 def _is_xwuid_group_activity_hook_error(exc: Exception) -> bool:
     message = str(exc)
     return (
@@ -298,7 +288,7 @@ async def _send_loli_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any
 async def _send_shota_text(bot: Bot, text: str, *args: Any, **kwargs: Any) -> Any:
     return await _safe_send(bot, text, *args, **kwargs)
 
-# 本地图片读取相关常量
+
 # 本地图片读取相关常量
 ROLE_MAP_RE = re.compile(r'^\s*(\d+)\s*[:：]\s*(.+?)\s*$')
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'}
