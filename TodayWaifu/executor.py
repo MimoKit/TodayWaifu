@@ -19,8 +19,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 T = TypeVar('T')
 
-# 刻意小于并发下载信号量（8）：让排队发生在信号量那一层，线程池永远不是瓶颈
-MAX_BLOCKING_WORKERS = 4
+# 必须**大于**并发下载信号量（8），给读缓存与回退扫描留出余量。
+# 反过来设（池 < 信号量）会让线程池变成真正的瓶颈：信号量放行 8 个下载，
+# 池里只有 4 个线程能跑，吞吐直接减半 —— 真机压测实测排空时间从 13s 恶化到 25s。
+# 12 = 8 个下载 + 4 个给 read_url_cache / 本地图回退扫描。
+MAX_BLOCKING_WORKERS = 12
 
 _EXECUTOR: ThreadPoolExecutor | None = None
 

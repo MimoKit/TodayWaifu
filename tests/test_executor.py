@@ -55,10 +55,14 @@ class DedicatedExecutorTests(unittest.TestCase):
 
         self.assertEqual(asyncio.run(run()), 7)
 
-    def test_worker_count_stays_below_download_semaphore(self) -> None:
-        # 线程池必须小于下载信号量，否则排队会积在池子而不是信号量上，失去限流意义
-        self.assertLess(executor.MAX_BLOCKING_WORKERS, 8)
-        self.assertGreaterEqual(executor.MAX_BLOCKING_WORKERS, 1)
+    def test_worker_count_exceeds_the_download_semaphore(self) -> None:
+        """池必须大于下载信号量，否则线程池自己成了瓶颈、吞吐减半。
+
+        真机压测实测：池=4 而信号量=8 时，排空时间从 13s 恶化到 25s。
+        """
+        self.assertGreater(executor.MAX_BLOCKING_WORKERS, 8)
+        # 但也不能无限大：插件线程数必须有界，否则等于把 Core 的线程池问题搬回自己身上
+        self.assertLessEqual(executor.MAX_BLOCKING_WORKERS, 32)
 
     def test_shutdown_is_idempotent(self) -> None:
         executor.shutdown_blocking_executor()
