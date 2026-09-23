@@ -385,6 +385,17 @@ class DailyWifeRecord(BaseModel, table=True):
         )
 
     @classmethod
+    @with_session
+    async def delete_before(cls, session: AsyncSession, cutoff_day: str) -> int:
+        """删除 `cutoff_day` 之前的每日记录，返回删除行数。
+
+        `day` 是 ISO 日期字符串（`YYYY-MM-DD`），字典序与时间序一致，可以直接比较。
+        表行数 = 群 × 用户 × 桶 × 天数，不清理会随天数无限增长。
+        """
+        result = await session.execute(delete(cls).where(cls.day < cutoff_day))
+        return int(result.rowcount or 0)
+
+    @classmethod
     @with_read_session
     async def get_record(
         cls,

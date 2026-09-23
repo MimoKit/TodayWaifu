@@ -61,6 +61,12 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '仅图库模式生效，限时限量且可被取消',
         True,
     ),
+    'DailyWifeRecordRetentionDays': GsIntConfig(
+        '每日记录保留天数',
+        '超过该天数的每日老婆记录会被定期清理，避免数据表随天数无限增长；设为 0 表示永久保留',
+        30,
+        3650,
+    ),
     'DailyWifePrefetchImagesPerRole': GsIntConfig(
         '每个角色预热图片数',
         '预热时每个角色最多下载几张图。数值越大命中率越高、占用带宽越多；设为 0 可只保留开关效果',

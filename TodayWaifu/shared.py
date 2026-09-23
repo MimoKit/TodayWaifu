@@ -16,7 +16,7 @@ import asyncio
 import hashlib
 import binascii
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -162,6 +162,7 @@ from .constants import (
     CIRCUIT_FAILURE_THRESHOLD,
     IMAGE_HTTP_TIMEOUT_SECONDS,
     MAX_GALLERY_RESPONSE_BYTES,
+    DAILY_RECORD_RETENTION_DAYS,
     MEMBER_AVATAR_CACHE_SECONDS,
     CACHE_MAINTENANCE_FILE_LIMIT,
     GALLERY_HTTP_TIMEOUT_SECONDS,
@@ -252,7 +253,7 @@ __all__ = [
     'NTE_DETAIL_CDN_BASE', 'ROLE_MAP_JSON_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     'CircuitBreaker', 'HTTP_RETRIES', 'GALLERY_HTTP_TIMEOUT_SECONDS', 'IMAGE_HTTP_TIMEOUT_SECONDS',
     'IMAGE_ACQUIRE_TIMEOUT_SECONDS', 'CIRCUIT_FAILURE_THRESHOLD', 'CIRCUIT_COOLDOWN_SECONDS',
-    'STATUS_MIN_RECOMPUTE_SECONDS',
+    'STATUS_MIN_RECOMPUTE_SECONDS', 'DAILY_RECORD_RETENTION_DAYS',
     'loads_role_map', 'write_role_map', 'migrate_legacy_text_map',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
@@ -406,6 +407,28 @@ def _prune_pending_state() -> None:
         normal_wife.prune_normal_gallery_cache()
 
 
+async def _prune_old_daily_records() -> None:
+    """删除保留期之外的每日记录，避免表随天数无限增长。"""
+    retention_days = _record_retention_days()
+    if retention_days <= 0:
+        return
+    cutoff = (date.today() - timedelta(days=retention_days)).isoformat()
+    try:
+        removed = await DailyWifeRecord.delete_before(cutoff)
+    except SQLAlchemyError as exc:
+        logger.warning(f'{LOG_PREFIX} 清理过期每日记录失败: {exc}')
+        return
+    if removed:
+        logger.info(f'{LOG_PREFIX} 已清理 {removed} 条 {cutoff} 之前的每日记录')
+
+
+def _record_retention_days() -> int:
+    try:
+        return int(_cfg('DailyWifeRecordRetentionDays'))
+    except (TypeError, ValueError):
+        return DAILY_RECORD_RETENTION_DAYS
+
+
 async def _cache_maintenance_once() -> None:
     now = time.time()
     for key, (created, _) in list(CANDIDATE_CACHE.items()):
@@ -413,6 +436,7 @@ async def _cache_maintenance_once() -> None:
             CANDIDATE_CACHE.pop(key, None)
     _prune_daily_context_state()
     _prune_pending_state()
+    await _prune_old_daily_records()
     _SOURCE_CACHE.prune()
     _PGR_CANDIDATE_CACHE.prune()
     _MEMBER_CACHE.prune()
@@ -439,6 +463,9 @@ async def _cache_maintenance_once() -> None:
         MEMBER_AVATAR_CACHE_SECONDS,
         CACHE_MAINTENANCE_FILE_LIMIT,
     )
+    from .metrics import log_metrics
+
+    log_metrics()
 
 
 async def _cache_maintenance_loop() -> None:

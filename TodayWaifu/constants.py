@@ -98,6 +98,11 @@ PREFETCH_MAX_SECONDS = 10 * 60
 STATUS_MIN_RECOMPUTE_SECONDS = 30.0
 
 
+# 每日记录保留天数上限（0 表示永久保留）。表行数 = 群 × 用户 × 桶 × 天数，
+# 不清理会随天数无限增长，拖慢按天查询。
+DAILY_RECORD_RETENTION_DAYS = 30
+
+
 LIST_FORWARD_THRESHOLD = 10
 
 

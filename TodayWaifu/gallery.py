@@ -138,6 +138,12 @@ def _circuit_key(url: str) -> str:
     return urlparse(url).netloc or url
 
 
+def gallery_circuit_state() -> tuple[bool, float]:
+    """返回图库主机的 (是否熔断, 距离冷却结束秒数)，供可观测性使用。"""
+    key = _circuit_key(_gallery_api_url())
+    return _HTTP_BREAKER.is_open(key), _HTTP_BREAKER.retry_after(key)
+
+
 def _retry_delay(attempt: int) -> float:
     """指数退避 + 抖动，避免所有失败请求在同一时刻重试形成同步脉冲。"""
     base = RETRY_BASE_DELAY_SECONDS * (2 ** attempt)
