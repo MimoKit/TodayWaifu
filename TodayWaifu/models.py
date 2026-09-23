@@ -12,7 +12,7 @@ import json
 from typing import TYPE_CHECKING, Protocol
 
 from sqlmodel import Field, delete, select
-from sqlalchemy import Table, UniqueConstraint, tuple_
+from sqlalchemy import Table, UniqueConstraint, func, tuple_
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
@@ -415,31 +415,26 @@ class DailyWifeRecord(BaseModel, table=True):
         day: str,
         bucket_names: tuple[str, ...],
     ) -> dict[str, int]:
-        """一次读取指定日期各桶的可计数原始记录数量。"""
+        """一次聚合查询统计指定日期各桶的「原始」记录数量。
+
+        原来是把当天所有行的 `payload` 全拉回来逐行 `json.loads` 再判断，
+        是**全天所有群的全表扫描**。这些判断条件其实都已经落到列上了：
+        非空 name + `origin == 'self'`（即没有 stolen_from/gifted_from/safe），
+        所以改成一条带索引的 COUNT 聚合，不再传输与解析任何 payload。
+        """
         if not bucket_names:
             return {}
         result = await session.execute(
-            select(cls.bucket, cls.payload, cls.record_type)
+            select(cls.bucket, func.count())
             .where(cls.day == day)
             .where(cls.bucket.in_(bucket_names))
+            .where(cls.name != '')
+            .where(cls.origin == 'self')
+            .group_by(cls.bucket)
         )
         counts = {bucket: 0 for bucket in bucket_names}
-        for bucket, payload, record_type in result.all():
-            try:
-                value = json.loads(payload)
-            except (TypeError, ValueError):
-                value = True if record_type == MARKER_RECORD_TYPE else None
-            if not isinstance(value, dict):
-                continue
-            name = value.get('name')
-            if (
-                isinstance(name, str)
-                and name.strip()
-                and not value.get('stolen_from')
-                and not value.get('gifted_from')
-                and not value.get('safe')
-            ):
-                counts[bucket] = counts.get(bucket, 0) + 1
+        for bucket, count in result.all():
+            counts[bucket] = int(count)
         return counts
 
     @classmethod

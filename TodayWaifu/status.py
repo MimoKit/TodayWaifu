@@ -1,17 +1,27 @@
 """TodayWaifu status metrics for core status page."""
 from __future__ import annotations
 
+import time
 import asyncio
 
 from PIL import Image
 
 from gsuid_core.status.plugin_status import register_status
 
-from .shared import HELP_ICON_PATH, DailyWifeRecord, _today_key, _load_wife_data, _daily_bucket_name
+from .shared import (
+    HELP_ICON_PATH,
+    STATUS_MIN_RECOMPUTE_SECONDS,
+    DailyWifeRecord,
+    _today_key,
+    _load_wife_data,
+    _daily_bucket_name,
+)
 from .payloads import DailyContext
 
 _STATUS_INFLIGHT: asyncio.Task[dict[str, int]] | None = None
 _STATUS_CACHE: tuple[str, dict[str, int]] | None = None
+_STATUS_COMPUTED_AT = 0.0
+_STATUS_STALE = True
 
 
 def _is_countable_daily_record(raw: object) -> bool:
@@ -49,10 +59,18 @@ async def _today_data() -> DailyContext:
 
 async def _today_record_counts() -> dict[str, int]:
     """一次数据库查询计算三个指标，避免每个回调重复 hydrate 全部上下文。"""
-    global _STATUS_INFLIGHT, _STATUS_CACHE
+    global _STATUS_INFLIGHT, _STATUS_CACHE, _STATUS_COMPUTED_AT, _STATUS_STALE
     day = _today_key()
-    if _STATUS_CACHE is not None and _STATUS_CACHE[0] == day:
-        return _STATUS_CACHE[1]
+    cached = _STATUS_CACHE
+    if cached is not None and cached[0] == day:
+        # 刚提交过写入但还没到最小重算间隔时，先返回上一次的聚合结果。
+        # 高峰期每次写入都重算会让网页控制台的每次轮询都打一次数据库聚合。
+        fresh_enough = (
+            not _STATUS_STALE
+            or time.monotonic() - _STATUS_COMPUTED_AT < STATUS_MIN_RECOMPUTE_SECONDS
+        )
+        if fresh_enough:
+            return cached[1]
 
     task = _STATUS_INFLIGHT
     if task is None:
@@ -74,13 +92,20 @@ async def _today_record_counts() -> dict[str, int]:
         if task.done() and _STATUS_INFLIGHT is task:
             _STATUS_INFLIGHT = None
     _STATUS_CACHE = (day, counts)
+    _STATUS_COMPUTED_AT = time.monotonic()
+    _STATUS_STALE = False
     return counts
 
 
 def invalidate_status_cache() -> None:
-    """在每日记录成功提交后丢弃聚合快照。"""
-    global _STATUS_CACHE
-    _STATUS_CACHE = None
+    """在每日记录成功提交后把聚合快照标记为过期。
+
+    这里**只标记、不丢弃**：真正的重算由 `_today_record_counts` 按
+    `STATUS_MIN_RECOMPUTE_SECONDS` 的最小间隔决定，避免高峰期每次写入
+    都让网页控制台的下一次轮询触发一次全表聚合。
+    """
+    global _STATUS_STALE
+    _STATUS_STALE = True
 
 
 async def _today_record_count(kind: str) -> int:
