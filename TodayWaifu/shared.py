@@ -304,6 +304,9 @@ __all__ = [
 _CACHE_MAINTENANCE_TASK: asyncio.Task[None] | None = None
 
 
+_PREFETCH_TASK: asyncio.Task[None] | None = None
+
+
 def _is_master(ev: Event) -> bool:
     masters = core_config.get_config('masters')
     if not isinstance(masters, list):
@@ -468,3 +471,24 @@ async def _stop_cache_maintenance_on_shutdown() -> None:
 async def _stop_blocking_executor_on_shutdown() -> None:
     """释放插件专用线程池，避免热重载时线程泄漏。"""
     shutdown_blocking_executor()
+
+
+@on_core_start_before(priority=-60)
+async def _start_gallery_prefetch_on_startup() -> None:
+    """启动零点前图库预热循环（把 00:00 的抽签变成纯缓存命中）。"""
+    global _PREFETCH_TASK
+    from .prefetch import _prefetch_loop
+
+    if _PREFETCH_TASK is None or _PREFETCH_TASK.done():
+        _PREFETCH_TASK = asyncio.create_task(_prefetch_loop())
+
+
+@on_core_shutdown
+async def _stop_gallery_prefetch_on_shutdown() -> None:
+    global _PREFETCH_TASK
+    task = _PREFETCH_TASK
+    _PREFETCH_TASK = None
+    if task is None or task.done():
+        return
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)

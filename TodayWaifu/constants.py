@@ -82,6 +82,18 @@ CIRCUIT_FAILURE_THRESHOLD = 5
 CIRCUIT_COOLDOWN_SECONDS = 30.0
 
 
+# 零点前预热图库图片的时刻（本地时间）与时间上限。
+# 日期一翻转，`_daily_rng` 的种子就变，每个用户都会抽到新的图片 URL，
+# 磁盘缓存全部失效 —— 预热是为了让 00:00 的抽签直接命中缓存。
+PREFETCH_HOUR = 23
+
+
+PREFETCH_MINUTE = 50
+
+
+PREFETCH_MAX_SECONDS = 10 * 60
+
+
 LIST_FORWARD_THRESHOLD = 10
 
 

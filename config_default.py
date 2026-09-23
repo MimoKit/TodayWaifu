@@ -55,6 +55,18 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后“今日老婆”指令使用普通老婆远程图库，文案使用“你的老婆来啦！”，并遵循今日老婆限制',
         False,
     ),
+    'DailyWifePrefetchEnabled': GsBoolConfig(
+        '零点前预热图库图片',
+        '每天 23:50 把候选角色图片预先下载到本地缓存，避免 0 点日期翻转后全员同时下载造成卡顿；'
+        '仅图库模式生效，限时限量且可被取消',
+        True,
+    ),
+    'DailyWifePrefetchImagesPerRole': GsIntConfig(
+        '每个角色预热图片数',
+        '预热时每个角色最多下载几张图。数值越大命中率越高、占用带宽越多；设为 0 可只保留开关效果',
+        2,
+        20,
+    ),
     'DailyWifeNormalGalleryApiUrl': GsStrConfig(
         '普通老婆图库地址',
         '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌',
