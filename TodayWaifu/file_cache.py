@@ -165,3 +165,64 @@ def write_url_cache(cache_root: Path, url: str, data: bytes) -> bool:
 def cached_url_count() -> int:
     """索引里记录的已缓存 URL 数量（可观测性用，非磁盘真实文件数）。"""
     return len(_CACHED_URL_HASHES)
+
+
+def enforce_cache_size_budget(cache_root: Path, max_bytes: int, limit: int = 5000) -> int:
+    """把缓存目录的总字节数压到 `max_bytes` 以内，按 mtime 从旧到新删。
+
+    图库图片缓存原来只有「按天过期」一条清理策略，没有总容量上限：
+    只要图库返回的 URL 会变（带签名/时间戳），缓存就会无限增长把磁盘吃满。
+    这里做一层兜底，删除时同步维护已缓存 URL 索引。
+    """
+    if max_bytes <= 0 or limit <= 0 or not cache_root.is_dir():
+        return 0
+
+    entries: list[tuple[float, int, Path]] = []
+    total = 0
+    try:
+        for path in cache_root.iterdir():
+            if not path.is_file() or path.name.endswith('.tmp') or path.name.startswith('.'):
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            entries.append((stat.st_mtime, stat.st_size, path))
+            total += stat.st_size
+    except OSError:
+        return 0
+
+    if total <= max_bytes:
+        return 0
+
+    entries.sort(key=lambda item: item[0])
+    removed = 0
+    for _mtime, size, path in entries:
+        if total <= max_bytes or removed >= limit:
+            break
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        _CACHED_URL_HASHES.discard(path.name)
+        total -= size
+        removed += 1
+    return removed
+
+
+def cache_dir_bytes(cache_root: Path) -> int:
+    """缓存目录当前总字节数（可观测性用）。"""
+    if not cache_root.is_dir():
+        return 0
+    total = 0
+    try:
+        for path in cache_root.iterdir():
+            if not path.is_file() or path.name.endswith('.tmp') or path.name.startswith('.'):
+                continue
+            try:
+                total += path.stat().st_size
+            except OSError:
+                continue
+    except OSError:
+        return 0
+    return total

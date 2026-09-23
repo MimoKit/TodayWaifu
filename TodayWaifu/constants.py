@@ -103,6 +103,11 @@ STATUS_MIN_RECOMPUTE_SECONDS = 30.0
 DAILY_RECORD_RETENTION_DAYS = 30
 
 
+# 图库图片磁盘缓存的总容量上限（MB，0 表示不限）。
+# 原来只有「按天过期」，若图库 URL 会变（带签名/时间戳）缓存会无限增长吃满磁盘。
+GALLERY_CACHE_MAX_MB = 512
+
+
 LIST_FORWARD_THRESHOLD = 10
 
 

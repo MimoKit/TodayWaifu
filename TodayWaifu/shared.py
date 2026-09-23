@@ -156,6 +156,7 @@ from .constants import (
     LOLI_IMAGE_DIR_NAME,
     NTE_DETAIL_CDN_BASE,
     CUSTOM_ROLE_ID_START,
+    GALLERY_CACHE_MAX_MB,
     EXCLUDED_ROLE_KEYWORDS,
     LIST_FORWARD_THRESHOLD,
     UPLOAD_IMAGE_MAX_BYTES,
@@ -182,7 +183,13 @@ from .constants import (
     _daily_bucket_name,
     _daily_kind_metadata,
 )
-from .file_cache import is_url_cached, prefer_cached_urls, clear_expired_files, read_file_bytes_cached
+from .file_cache import (
+    is_url_cached,
+    prefer_cached_urls,
+    clear_expired_files,
+    read_file_bytes_cached,
+    enforce_cache_size_budget,
+)
 from .daily_store import (
     _wife_state,
     _wife_origin,
@@ -258,7 +265,7 @@ __all__ = [
     'NTE_DETAIL_CDN_BASE', 'ROLE_MAP_JSON_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
     'CircuitBreaker', 'HTTP_RETRIES', 'GALLERY_HTTP_TIMEOUT_SECONDS', 'IMAGE_HTTP_TIMEOUT_SECONDS',
     'IMAGE_ACQUIRE_TIMEOUT_SECONDS', 'CIRCUIT_FAILURE_THRESHOLD', 'CIRCUIT_COOLDOWN_SECONDS',
-    'STATUS_MIN_RECOMPUTE_SECONDS', 'DAILY_RECORD_RETENTION_DAYS',
+    'STATUS_MIN_RECOMPUTE_SECONDS', 'DAILY_RECORD_RETENTION_DAYS', 'GALLERY_CACHE_MAX_MB',
     'loads_role_map', 'write_role_map', 'migrate_legacy_text_map',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
@@ -428,6 +435,14 @@ async def _prune_old_daily_records() -> None:
         logger.info(f'{LOG_PREFIX} 已清理 {removed} 条 {cutoff} 之前的每日记录')
 
 
+def _gallery_cache_max_bytes() -> int:
+    try:
+        max_mb = int(_cfg('DailyWifeGalleryCacheMaxMB'))
+    except (TypeError, ValueError):
+        max_mb = GALLERY_CACHE_MAX_MB
+    return max(0, max_mb) * 1024 * 1024
+
+
 def _record_retention_days() -> int:
     try:
         return int(_cfg('DailyWifeRecordRetentionDays'))
@@ -457,12 +472,21 @@ async def _cache_maintenance_once() -> None:
         for key, task in tuple(mapping.items()):
             if task.done() or task.cancelled():
                 mapping.pop(key, None)
+    gallery_cache_root = _gallery_image_cache_root()
     await run_blocking(
         clear_expired_files,
-        _gallery_image_cache_root(),
+        gallery_cache_root,
         30 * 24 * 60 * 60,
         CACHE_MAINTENANCE_FILE_LIMIT,
     )
+    # 兜底：按天过期之外再加一层总容量上限，避免 URL 会变时把磁盘吃满
+    evicted = await run_blocking(
+        enforce_cache_size_budget,
+        gallery_cache_root,
+        _gallery_cache_max_bytes(),
+    )
+    if evicted:
+        logger.info(f'{LOG_PREFIX} 图库缓存超出容量上限，已淘汰 {evicted} 个最旧文件')
     await run_blocking(
         clear_expired_files,
         _custom_upload_data_root() / 'group_member_avatar_cache',

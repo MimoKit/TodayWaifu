@@ -61,6 +61,12 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '仅图库模式生效，限时限量且可被取消',
         True,
     ),
+    'DailyWifeGalleryCacheMaxMB': GsIntConfig(
+        '图库缓存容量上限(MB)',
+        '本地图库图片缓存的总容量上限，超出后自动淘汰最旧的文件；设为 0 表示不限制',
+        512,
+        102400,
+    ),
     'DailyWifeRecordRetentionDays': GsIntConfig(
         '每日记录保留天数',
         '超过该天数的每日老婆记录会被定期清理，避免数据表随天数无限增长；设为 0 表示永久保留',
