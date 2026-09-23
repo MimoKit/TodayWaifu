@@ -40,7 +40,7 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('async def _load_pgr_wife_candidates()', gallery)
         self.assertIn("_cfg('DailyWifePgrGalleryApiUrl')", gallery)
         self.assertIn('_parse_pgr_gallery_candidates(payload)', gallery)
-        self.assertIn('return await asyncio.to_thread(_load_pgr_local_candidates)', gallery)
+        self.assertIn('return await run_blocking(_load_pgr_local_candidates)', gallery)
         self.assertIn('await _load_pgr_wife_candidates()', source)
         self.assertIn("record.image.startswith(('http://', 'https://'))", source)
         self.assertIn('await _send_role_image(', source)

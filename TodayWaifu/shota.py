@@ -14,7 +14,6 @@ from .shared import (
     _cfg,
     json,
     logger,
-    asyncio,
     shota_sv,
     _user_key,
     _daily_rng,
@@ -29,6 +28,7 @@ from .shared import (
     _http_get_with_retry,
     _send_shota_result_image,
 )
+from .executor import run_blocking
 from .image_input import image_hash_id
 from .source_cache import AsyncSourceCache
 
@@ -149,7 +149,7 @@ async def _roll_shota_record(
     try:
         image_urls = await _SHOTA_SOURCE_CACHE.get(
             custom_url,
-            lambda: asyncio.to_thread(_fetch_shota_image_urls_sync, custom_url),
+            lambda: run_blocking(_fetch_shota_image_urls_sync, custom_url),
         )
     except RuntimeError as exc:
         logger.warning(f'{LOG_PREFIX} 远程正太接口失败: {exc}')

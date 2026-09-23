@@ -22,7 +22,6 @@ from .shared import (
     time,
     logger,
     shutil,
-    asyncio,
     loli_sv,
     _user_key,
     _daily_rng,
@@ -42,6 +41,7 @@ from .shared import (
     _http_get_with_retry,
     _send_loli_result_image,
 )
+from .executor import run_blocking
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -255,7 +255,7 @@ async def _roll_loli_record(
         try:
             image_urls = await _LOLI_SOURCE_CACHE.get(
                 custom_url,
-                lambda: asyncio.to_thread(_fetch_loli_image_urls_sync, custom_url),
+                lambda: run_blocking(_fetch_loli_image_urls_sync, custom_url),
             )
         except RuntimeError as exc:
             remote_error = str(exc)
@@ -272,7 +272,7 @@ async def _roll_loli_record(
                 None,
             )
 
-    images = await asyncio.to_thread(_loli_image_paths)
+    images = await run_blocking(_loli_image_paths)
     if not images:
         return None, remote_error or '暂无图片'
     image = _daily_rng(ev, user_key, 'loli').choice(images)
@@ -381,7 +381,7 @@ async def _send_upload_loli(bot: Bot, ev: Event) -> None:
     saved: list[Path] = []
     failed = 0
     for i, ref in enumerate(refs, 1):
-        path = await asyncio.to_thread(_save_loli_image, ref, i)
+        path = await run_blocking(_save_loli_image, ref, i)
         if path is None:
             failed += 1
         else:
@@ -398,7 +398,7 @@ async def _send_upload_loli(bot: Bot, ev: Event) -> None:
 
 
 async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
-    image_map = await asyncio.to_thread(_loli_image_map)
+    image_map = await run_blocking(_loli_image_map)
     if not image_map:
         return await _send_loli_text(bot, '本地还没有萝莉图片，使用「上传萝莉图片」添加图片。')
     nodes: list[Message | str] = []
@@ -412,16 +412,16 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
     hash_id = str(ev.text or '').strip().lower()
     if not hash_id:
         logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发删除全部萝莉图片命令')
-        count = await asyncio.to_thread(_delete_loli_images)
+        count = await run_blocking(_delete_loli_images)
         return await _send_loli_text(bot, f'已删除全部萝莉图片，共 {count} 张。')
     if not re.fullmatch(r'[0-9a-f]{8}', hash_id):
         return await _send_loli_text(bot, '请提供 8 位图片ID，例如：删除萝莉图片 abcd1234\n不加ID则删除全部')
-    image_map = await asyncio.to_thread(_loli_image_map)
+    image_map = await run_blocking(_loli_image_map)
     path = image_map.get(hash_id)
     if path is None:
         return await _send_loli_text(bot, f'未找到图片ID：{hash_id}')
     try:
-        await asyncio.to_thread(path.unlink)
+        await run_blocking(path.unlink)
     except OSError as exc:
         logger.warning(f'{LOG_PREFIX} 删除萝莉图片失败: {path} -> {exc}')
         return await _send_loli_text(bot, f'删除失败：{hash_id}')

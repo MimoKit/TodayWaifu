@@ -1,7 +1,6 @@
 """Normal wife gallery loader and cache."""
 from __future__ import annotations
 
-import asyncio
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 
@@ -13,6 +12,7 @@ from .shared import (
     logger,
     _fetch_gallery_payload_from_url_sync,
 )
+from .executor import run_blocking
 from .payloads import GalleryPayload
 from .source_cache import AsyncSourceCache
 
@@ -82,7 +82,7 @@ async def _load_normal_wife_candidates() -> tuple[tuple[RoleCandidate, ...] | No
     try:
         payload = await _NORMAL_GALLERY_CACHE.get(
             api_url,
-            lambda: asyncio.to_thread(_fetch_gallery_payload_from_url_sync, api_url),
+            lambda: run_blocking(_fetch_gallery_payload_from_url_sync, api_url),
         )
         candidates = _parse_normal_gallery_candidates(payload)
         return candidates, None

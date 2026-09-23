@@ -30,6 +30,7 @@ from .state import (
     _IMAGE_DOWNLOAD_SEMAPHORE,
 )
 from .domain import RoleCandidate
+from .executor import run_blocking
 from .payloads import GalleryPayload
 from .constants import (
     LOG_PREFIX,
@@ -75,7 +76,7 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
     if api_url:
         try:
             async def load_remote() -> tuple[RoleCandidate, ...]:
-                payload = await asyncio.to_thread(_fetch_gallery_payload_from_url_sync, api_url)
+                payload = await run_blocking(_fetch_gallery_payload_from_url_sync, api_url)
                 candidates = _parse_pgr_gallery_candidates(payload)
                 if not candidates:
                     raise RuntimeError('战双远程图库没有可用角色。')
@@ -84,7 +85,7 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
             return await _PGR_CANDIDATE_CACHE.get(api_url, load_remote)
         except (RuntimeError, OSError, TimeoutError) as exc:
             logger.warning(f'{LOG_PREFIX} 读取战双远程图库失败，回退本地图库: {exc}')
-    return await asyncio.to_thread(_load_pgr_local_candidates)
+    return await run_blocking(_load_pgr_local_candidates)
 
 
 def _gallery_api_url() -> str:
@@ -237,7 +238,7 @@ def _download_image_sync(url: str) -> bytes:
 async def _download_image(url: str) -> bytes:
     """下载图库图片；按 URL 哈希落盘缓存，并合并相同 URL 的并发下载。"""
     cache_root = _gallery_image_cache_root()
-    cached = await asyncio.to_thread(read_url_cache, cache_root, url)
+    cached = await run_blocking(read_url_cache, cache_root, url)
     if cached is not None:
         logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {url}')
         return cached
@@ -246,11 +247,11 @@ async def _download_image(url: str) -> bytes:
     if task is None:
         async def download() -> bytes:
             async with _IMAGE_DOWNLOAD_SEMAPHORE:
-                second_cached = await asyncio.to_thread(read_url_cache, cache_root, url)
+                second_cached = await run_blocking(read_url_cache, cache_root, url)
                 if second_cached is not None:
                     return second_cached
-                data = await asyncio.to_thread(_download_image_sync, url)
-                await asyncio.to_thread(write_url_cache, cache_root, url, data)
+                data = await run_blocking(_download_image_sync, url)
+                await run_blocking(write_url_cache, cache_root, url, data)
                 return data
         task = asyncio.create_task(download())
         _IMAGE_INFLIGHT[url] = task
@@ -267,7 +268,7 @@ async def _fallback_to_local_candidates(
     fallback_error: str,
 ) -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     """图库接口失败后的兜底：优先回退本地图片目录，其次使用本地上传候选。"""
-    local_candidates, local_error = await asyncio.to_thread(_load_local_candidates, role_mode)
+    local_candidates, local_error = await run_blocking(_load_local_candidates, role_mode)
     if local_candidates:
         logger.warning(f'{LOG_PREFIX} 图库接口不可用，已回退本地图片目录。')
         return local_candidates, None
@@ -288,20 +289,20 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
         return cached[1], None
 
     if source == 'local':
-        candidates, error = await asyncio.to_thread(_load_local_candidates, role_mode)
+        candidates, error = await run_blocking(_load_local_candidates, role_mode)
         if error or not candidates:
             return None, error
         CANDIDATE_CACHE[cache_key] = (now, candidates)
         return candidates, None
 
-    custom_candidates = await asyncio.to_thread(_load_custom_upload_candidates) if role_mode == 'wife' else ()
+    custom_candidates = await run_blocking(_load_custom_upload_candidates) if role_mode == 'wife' else ()
     try:
         role_map = _load_mode_role_map(role_mode)
         if not role_map and not custom_candidates:
             return None, f'没有找到鸣潮{_role_map_title(role_mode)}角色 ID 对照表。'
         candidates = ()
         if role_map:
-            payload = await asyncio.to_thread(_fetch_gallery_payload_sync)
+            payload = await run_blocking(_fetch_gallery_payload_sync)
             candidates = _parse_role_candidates(payload, role_mode, role_map)
             gallery_role_names = {_normalize_role_name(c.name) for c in candidates}
             gallery_role_ids = {rid for c in candidates for rid in c.role_ids}
@@ -310,7 +311,7 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
                 for rid, rname in role_map.items()
             )
             if missing_in_gallery:
-                local_candidates, _ = await asyncio.to_thread(_load_local_candidates, role_mode)
+                local_candidates, _ = await run_blocking(_load_local_candidates, role_mode)
                 if local_candidates:
                     supplement_candidates: list[RoleCandidate] = []
                     for lc in local_candidates:
@@ -375,7 +376,7 @@ async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
     if task is None:
         async def load() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
             async with _CANDIDATE_LOAD_SEMAPHORE:
-                candidates, error = await asyncio.to_thread(_load_nte_local_candidates)
+                candidates, error = await run_blocking(_load_nte_local_candidates)
                 if error or not candidates:
                     return None, error
                 CANDIDATE_CACHE[cache_key] = (time.time(), candidates)

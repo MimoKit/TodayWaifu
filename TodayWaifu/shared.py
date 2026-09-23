@@ -132,6 +132,7 @@ from .senders import (
 from .storage import read_json_dict
 from .targets import _get_event_target_user_id
 from .delivery import _safe_send, _send_loli_text, _send_shota_text
+from .executor import run_blocking, shutdown_blocking_executor
 from .payloads import PendingGift, DailyContext, GalleryPayload, RoleRecordValue, PendingCustomRoleDelete
 from .constants import (
     BASE_DIR,
@@ -410,13 +411,13 @@ async def _cache_maintenance_once() -> None:
         for key, task in tuple(mapping.items()):
             if task.done() or task.cancelled():
                 mapping.pop(key, None)
-    await asyncio.to_thread(
+    await run_blocking(
         clear_expired_files,
         _gallery_image_cache_root(),
         30 * 24 * 60 * 60,
         CACHE_MAINTENANCE_FILE_LIMIT,
     )
-    await asyncio.to_thread(
+    await run_blocking(
         clear_expired_files,
         _custom_upload_data_root() / 'group_member_avatar_cache',
         MEMBER_AVATAR_CACHE_SECONDS,
@@ -452,3 +453,9 @@ async def _stop_cache_maintenance_on_shutdown() -> None:
         return
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
+
+
+@on_core_shutdown
+async def _stop_blocking_executor_on_shutdown() -> None:
+    """释放插件专用线程池，避免热重载时线程泄漏。"""
+    shutdown_blocking_executor()

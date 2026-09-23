@@ -18,6 +18,7 @@ from gsuid_core.utils.database.models import CoreUser
 from .paths import _user_key, _daily_rng, _custom_upload_data_root
 from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT, _GROUP_DISPLAY_NAME_CACHE
 from .domain import WifeRecord, MemberCandidate
+from .executor import run_blocking
 from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
 
 
@@ -215,7 +216,7 @@ async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCan
     task = _MEMBER_AVATAR_INFLIGHT.get(member.user_id)
     if task is None:
         task = asyncio.create_task(
-            asyncio.to_thread(_resolve_member_avatar, member.user_id, member.avatar)
+            run_blocking(_resolve_member_avatar, member.user_id, member.avatar)
         )
         _MEMBER_AVATAR_INFLIGHT[member.user_id] = task
     try:

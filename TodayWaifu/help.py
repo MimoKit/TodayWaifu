@@ -23,6 +23,7 @@ from .shared import (
     _safe_send,
     register_help,
 )
+from .executor import run_blocking
 from ..daily_wife_config import DailyWifeShowConfig
 
 # 资源签名：路径、mtime_ns、大小；缺失时为 None
@@ -139,7 +140,7 @@ async def _render_help(
     pm: int,
 ) -> str:
     async def render() -> str:
-        icon, data, extra = await asyncio.to_thread(
+        icon, data, extra = await run_blocking(
             _build_help_inputs,
             plugin_icon_path,
             custom_banner_bg_path,

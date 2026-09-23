@@ -13,7 +13,6 @@ from .shared import (
     time,
     logger,
     random,
-    asyncio,
     _cfg_bool,
     _user_key,
     _daily_rng,
@@ -41,6 +40,7 @@ from .shared import (
     _get_other_daily_wife_name,
     _invalidate_candidate_cache,
 )
+from .executor import run_blocking
 from .image_input import image_hash_id, read_image_bytes, collect_image_refs
 from .folder_gallery import find_named_role_directory
 
@@ -94,7 +94,7 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
     saved: list[Path] = []
     failed = 0
     for index, image_ref in enumerate(image_refs, 1):
-        path = await asyncio.to_thread(_save_pgr_image, role_dir, image_ref, index)
+        path = await run_blocking(_save_pgr_image, role_dir, image_ref, index)
         if path is None:
             failed += 1
         else:

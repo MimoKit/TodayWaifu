@@ -163,6 +163,10 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
         fake_time = MagicMock()
         fake_time.time.return_value = 1000.0
 
+        async def fake_run_blocking(func, *args):
+            # 测试里不需要真的线程池，直接同步执行，保持原有语义
+            return func(*args)
+
         globals_dict = {
             'RoleCandidate': _FakeRoleCandidate,
             'CANDIDATE_CACHE': {},
@@ -171,6 +175,7 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             'logger': fake_logger,
             'time': fake_time,
             'asyncio': asyncio,
+            'run_blocking': fake_run_blocking,
             '_image_source': lambda: 'gallery',
             '_role_mode': lambda mode: mode,
             '_role_map_title': lambda mode: '老婆',

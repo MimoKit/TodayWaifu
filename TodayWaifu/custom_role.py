@@ -1,8 +1,6 @@
 """TodayWaifu - custom_role module."""
 from __future__ import annotations
 
-import asyncio
-
 from .shared import (
     LOG_PREFIX,
     IMAGE_EXTENSIONS,
@@ -33,6 +31,7 @@ from .shared import (
     _writable_role_pile_root,
     _invalidate_candidate_cache,
 )
+from .executor import run_blocking
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -279,7 +278,7 @@ def _save_upload_image_ref(role_dir: Path, role_id: str, source: str, index: int
 
 async def _send_create_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
-    role_id, created, error = await asyncio.to_thread(
+    role_id, created, error = await run_blocking(
         _create_or_get_custom_role,
         role_name,
     )
@@ -304,7 +303,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | No
     if not image_refs:
         return await _safe_send(bot, f'请同时发送图片和命令，例如：上传老婆图片 {role_name}')
 
-    role_id, created, error = await asyncio.to_thread(
+    role_id, created, error = await run_blocking(
         _create_or_get_custom_role,
         role_name,
     )
@@ -315,7 +314,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | No
     saved: list[Path] = []
     failed = 0
     for index, image_ref in enumerate(image_refs, 1):
-        path = await asyncio.to_thread(_save_upload_image_ref, role_dir, role_id, image_ref, index)
+        path = await run_blocking(_save_upload_image_ref, role_dir, role_id, image_ref, index)
         if path is None:
             failed += 1
         else:
@@ -340,7 +339,7 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | No
 
 async def _send_custom_wife_image_list(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
-    entries = await asyncio.to_thread(_custom_role_image_entries, role_name)
+    entries = await run_blocking(_custom_role_image_entries, role_name)
     if entries is None:
         return await _safe_send(bot, '未找到这个自定义老婆，请先使用：创建老婆 角色名')
 
@@ -357,7 +356,7 @@ async def _send_custom_wife_image_list(bot: Bot, ev: Event) -> list[str] | None:
 
 async def _send_request_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None:
     role_name = _clean_upload_role_name(ev.regex_dict.get('role') or ev.text, strip_wife_suffix=True)
-    role_id, role_name, images, error = await asyncio.to_thread(
+    role_id, role_name, images, error = await run_blocking(
         _resolve_custom_role_for_delete,
         role_name,
     )
@@ -386,7 +385,7 @@ async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str
         _clear_pending_custom_role_delete(ev)
         return await _safe_send(bot, '待删除记录无效，请重新发起删除。')
 
-    deleted_count = await asyncio.to_thread(_delete_custom_role, role_id)
+    deleted_count = await run_blocking(_delete_custom_role, role_id)
     _clear_pending_custom_role_delete(ev)
     await _safe_send(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
 
@@ -400,7 +399,7 @@ async def _send_cancel_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str]
 
 async def _send_delete_custom_wife_image(bot: Bot, ev: Event) -> list[str] | None:
     role_name, hash_id = _parse_delete_custom_image_text(ev.text)
-    role_id, role_name, image_path, error = await asyncio.to_thread(
+    role_id, role_name, image_path, error = await run_blocking(
         _resolve_custom_image_for_delete,
         role_name,
         hash_id,
@@ -411,7 +410,7 @@ async def _send_delete_custom_wife_image(bot: Bot, ev: Event) -> list[str] | Non
         return await _safe_send(bot,f'【{role_name}】未找到图片ID：{hash_id}')
 
     try:
-        await asyncio.to_thread(image_path.unlink)
+        await run_blocking(image_path.unlink)
     except OSError as exc:
         logger.warning(f'{LOG_PREFIX} 删除自定义老婆图片失败: {image_path} -> {exc}')
         return await _safe_send(bot,f'【{role_name}】图片删除失败：{hash_id}')
