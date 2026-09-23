@@ -30,6 +30,85 @@ def _daily_context_lock(ev: Event) -> asyncio.Lock:
 _LAST_CONTEXT_DAY: str | None = None
 
 
+# ── 写合并 ────────────────────────────────────────────────────────────────────
+# GsCore 默认 SQLite，所有写都要排一个**进程级单写者闸门**，实测吞吐约 250 写/秒
+# （约 4ms/次）。零点高峰每个用户一次抽签就是一次写，逐条提交会把闸门压满，
+# 而命令协程在等这次写时仍然占着 Core 的命令并发额度。
+#
+# 这里把同一瞬间（同一个事件循环回合）到达的写入合并成**一条多值 upsert**，
+# 所有调用方 await 同一个 task，因此：
+#   - 落库时机不变（调用方仍然等到真正提交完成才返回），不牺牲持久性
+#   - 异常自然向所有等待者传播，不需要额外的 future 广播
+#   - 闸门压力按合并倍数摊薄（25 个群同时抽签 = 1 次提交而不是 25 次）
+_PendingRow = tuple[str, str, str, str, str, 'RoleRecordValue | bool | None']
+
+
+class _WriteBatch:
+    __slots__ = ('rows', 'deletes', 'task')
+
+    def __init__(self) -> None:
+        self.rows: dict[tuple[str, str, str, str, str], 'RoleRecordValue | bool | None'] = {}
+        self.deletes: set[tuple[str, str, str, str, str]] = set()
+        self.task: asyncio.Task[None] | None = None
+
+    def add(self, key: tuple[str, str, str, str, str], value: 'RoleRecordValue | bool | None') -> None:
+        self.rows[key] = value
+        self.deletes.discard(key)
+
+    def drop(self, key: tuple[str, str, str, str, str]) -> None:
+        self.rows.pop(key, None)
+        self.deletes.add(key)
+
+    def ensure_task(self) -> asyncio.Task[None]:
+        if self.task is None:
+            self.task = asyncio.create_task(_flush_write_batch(self))
+            self.task.add_done_callback(_consume_batch_exception)
+        return self.task
+
+
+_PENDING_BATCH: _WriteBatch | None = None
+
+
+def _consume_batch_exception(task: asyncio.Task[None]) -> None:
+    """取回异常，避免调用方被取消时出现 'exception was never retrieved'。"""
+    if not task.cancelled():
+        task.exception()
+
+
+def _current_batch() -> _WriteBatch:
+    global _PENDING_BATCH
+    if _PENDING_BATCH is None:
+        _PENDING_BATCH = _WriteBatch()
+    return _PENDING_BATCH
+
+
+async def _flush_write_batch(batch: _WriteBatch) -> None:
+    global _PENDING_BATCH
+    # 让出一个事件循环回合，把这一瞬间到达的写入都收进同一批
+    await asyncio.sleep(0)
+    # 下面两步之间**不能有 await**：先摘掉当前批（之后到达的写开新批），
+    # 再同步快照，否则会漏掉在快照与摘除之间加入的行
+    if _PENDING_BATCH is batch:
+        _PENDING_BATCH = None
+    rows = [
+        (day, bot_id, group_id, bucket, user_key, value)
+        for (day, bot_id, group_id, bucket, user_key), value in batch.rows.items()
+    ]
+    deletes = list(batch.deletes)
+    if deletes:
+        await DailyWifeRecord.delete_rows(deletes)
+    if rows:
+        await DailyWifeRecord.upsert_rows(rows)
+
+
+async def flush_pending_writes() -> None:
+    """把当前待提交的写入立即落库（关停与测试用）。"""
+    batch = _PENDING_BATCH
+    if batch is None or batch.task is None:
+        return
+    await asyncio.gather(batch.task, return_exceptions=True)
+
+
 def _roll_over_context_day(day: str) -> int:
     """日期翻转时立即回收上一天的上下文快照，返回回收数量。
 
@@ -84,16 +163,33 @@ async def _load_daily_context(ev: Event) -> DailyContext:
             _CONTEXT_REGISTRY.inflight.pop(key, None)
 
 
+async def _submit_writes(
+    ev: Event,
+    records: list[tuple[str, str, RoleRecordValue | bool | None]] | None = None,
+    deletes: list[tuple[str, str]] | None = None,
+) -> None:
+    """把写入并入当前批次并等待提交完成。
+
+    `_current_batch()` / `add()` / `ensure_task()` 三步之间**没有 await**，
+    因此在这个事件循环回合内是原子的：不会出现「行已加入但没进这一批」的丢失。
+    """
+    key = _daily_context_key(ev)
+    batch = _current_batch()
+    for bucket, user_key, value in records or ():
+        batch.add((key.day, key.bot_id, key.group_id, bucket, str(user_key)), value)
+    for bucket, user_key in deletes or ():
+        batch.drop((key.day, key.bot_id, key.group_id, bucket, str(user_key)))
+    await batch.ensure_task()
+
+
 async def _save_daily_records(
     ev: Event,
     records: list[tuple[str, str, RoleRecordValue | bool | None]],
     deletes: list[tuple[str, str]] | None = None,
 ) -> None:
-    """在一个事务中定向提交少量记录，并同步当前上下文缓存。"""
+    """提交少量记录（与同一瞬间的其它写入合并成一次事务），并同步当前上下文缓存。"""
     key = _daily_context_key(ev)
-    await DailyWifeRecord.upsert_records(
-        key.day, key.bot_id, key.group_id, records, deletes
-    )
+    await _submit_writes(ev, records, deletes)
     context = await _load_daily_context(ev)
     for bucket, user_key, value in records:
         context.setdefault(bucket, {})[str(user_key)] = value
@@ -108,12 +204,8 @@ async def _save_daily_records(
 async def _save_daily_record(
     ev: Event, bucket: str, user_key: str, value: RoleRecordValue | bool | None
 ) -> None:
-    """提交单条记录，成功后才更新内存快照。"""
-    day = _today_key()
-    bot_id, _, group_id = _context_key(ev).partition(':')
-    await DailyWifeRecord.upsert_record(
-        day, bot_id, group_id or 'direct', bucket, user_key, value
-    )
+    """提交单条记录（与同一瞬间的其它写入合并成一次事务），成功后才更新内存快照。"""
+    await _submit_writes(ev, [(bucket, user_key, value)])
     context = await _load_daily_context(ev)
     context.setdefault(bucket, {})[user_key] = value
     _CONTEXT_REGISTRY.put(_daily_context_key(ev), context, _CONTEXT_REGISTRY.generation(_daily_context_key(ev)))
@@ -121,12 +213,8 @@ async def _save_daily_record(
 
 
 async def _delete_daily_record(ev: Event, bucket: str, user_key: str) -> None:
-    """删除单条记录，成功后才同步内存快照。"""
-    day = _today_key()
-    bot_id, _, group_id = _context_key(ev).partition(':')
-    await DailyWifeRecord.delete_record(
-        day, bot_id, group_id or 'direct', bucket, user_key
-    )
+    """删除单条记录（与同一瞬间的其它写入合并成一次事务），成功后才同步内存快照。"""
+    await _submit_writes(ev, deletes=[(bucket, user_key)])
     context = await _load_daily_context(ev)
     bucket_data = context.get(bucket)
     if isinstance(bucket_data, dict):
@@ -333,3 +421,11 @@ async def _get_existing_daily_record(ev: Event, user_id: str | int, kind: str = 
 
 async def _get_existing_daily_wife_record(ev: Event, user_id: str | int) -> WifeRecord | None:
     return await _get_existing_daily_record(ev, user_id, 'wife')
+
+
+def pending_write_count() -> int:
+    """当前批次里待提交的写入条数（可观测性用）。"""
+    batch = _PENDING_BATCH
+    if batch is None:
+        return 0
+    return len(batch.rows) + len(batch.deletes)

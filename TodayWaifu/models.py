@@ -292,6 +292,72 @@ class DailyWifeRecord(BaseModel, table=True):
 
     @classmethod
     @with_session
+    async def upsert_rows(
+        cls,
+        session: AsyncSession,
+        rows: list[tuple[str, str, str, str, str, RoleRecordValue | bool | None]],
+    ) -> None:
+        """把**多个上下文**的记录合并成一条多值 upsert。
+
+        GsCore 默认用 SQLite，所有写都要排一个进程级单写者闸门
+        （`utils/database/write_gate.py`），实测闸门吞吐只有约 250 写/秒。
+        零点高峰每个用户一次抽签就是一次写，逐条提交会把闸门压满。
+        这里让同一瞬间到达的写入共用一次事务，把闸门压力按合并倍数摊薄。
+
+        rows 的每项是 `(day, bot_id, group_id, bucket, user_key, value)`。
+        """
+        values = []
+        for day, bot_id, group_id, bucket, user_key, value in rows:
+            row = cls._row_from_value(day, bot_id, group_id, bucket, str(user_key), value)
+            values.append(
+                {
+                    'day': day,
+                    'bot_id': bot_id,
+                    'group_id': group_id,
+                    'bucket': bucket,
+                    'user_id': str(user_key),
+                    'name': row.name,
+                    'display_name': row.display_name,
+                    'image': row.image,
+                    'record_type': row.record_type,
+                    'state': row.state,
+                    'origin': row.origin,
+                    'updated_at': row.updated_at,
+                    'payload': row.payload,
+                }
+            )
+
+        if not values:
+            return
+        statement = sqlite_insert(cls).values(values)
+        update_columns = _conflict_update_columns(statement)
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
+
+    @classmethod
+    @with_session
+    async def delete_rows(
+        cls,
+        session: AsyncSession,
+        rows: list[tuple[str, str, str, str, str]],
+    ) -> None:
+        """批量删除多个上下文的记录（与 `upsert_rows` 同一批事务使用）。"""
+        for day, bot_id, group_id, bucket, user_key in rows:
+            await session.execute(
+                delete(cls)
+                .where(cls.day == day)
+                .where(cls.bot_id == bot_id)
+                .where(cls.group_id == group_id)
+                .where(cls.bucket == bucket)
+                .where(cls.user_id == str(user_key))
+            )
+
+    @classmethod
+    @with_session
     async def upsert_context(
         cls,
         session: AsyncSession,

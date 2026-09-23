@@ -198,6 +198,7 @@ from .daily_store import (
     _save_daily_context,
     _save_daily_records,
     _delete_daily_record,
+    flush_pending_writes,
     _get_existing_daily_record,
     _get_other_daily_wife_name,
     _get_existing_daily_wife_record,
@@ -281,7 +282,7 @@ __all__ = [
     '_daily_context_lock',
     '_load_daily_context', '_save_daily_context',
     '_save_daily_records',
-    '_save_daily_record', '_delete_daily_record',
+    '_save_daily_record', '_delete_daily_record', 'flush_pending_writes',
     '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
     '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
@@ -507,7 +508,11 @@ async def _stop_cache_maintenance_on_shutdown() -> None:
 
 @on_core_shutdown
 async def _stop_blocking_executor_on_shutdown() -> None:
-    """释放插件专用线程池，避免热重载时线程泄漏。"""
+    """关停前把待提交的每日记录写入落库，再释放线程池。"""
+    try:
+        await flush_pending_writes()
+    except SQLAlchemyError as exc:
+        logger.warning(f'{LOG_PREFIX} 关停前写入待提交记录失败: {exc}')
     shutdown_blocking_executor()
 
 
