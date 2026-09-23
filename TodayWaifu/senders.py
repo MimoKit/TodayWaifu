@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from base64 import b64encode
 from pathlib import Path
+from dataclasses import dataclass
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -129,7 +130,7 @@ async def _acquire_gallery_image(image_url: str) -> bytes:
         ) from exc
 
 
-async def _send_role_image(
+async def _deliver_role_image(
     bot: Bot,
     role: RoleCandidate,
     image_url: str,
@@ -159,9 +160,6 @@ async def _send_role_image(
         # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
         image = await run_blocking(read_file_bytes_cached, Path(image_url))
 
-    # 数据已就绪、图片尚未发送：此处注入 AI 可读摘要
-    _ai_return_draw(kind, role.name, text)
-
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -172,7 +170,7 @@ async def _send_role_image(
     await _safe_send(bot, messages if len(messages) > 1 else messages[0])
 
 
-async def _send_daily_result_image(
+async def _deliver_daily_result_image(
     bot: Bot,
     role: RoleCandidate,
     image: str,
@@ -182,16 +180,16 @@ async def _send_daily_result_image(
     kind: str,
 ) -> None:
     if kind == 'shota':
-        await _send_shota_result_image(bot, image, text, user_id, is_group, kind)
+        await _deliver_shota_result_image(bot, image, text, user_id, is_group, kind)
         return
     if kind != 'loli':
-        await _send_role_image(bot, role, image, text, user_id, is_group, kind)
+        await _deliver_role_image(bot, role, image, text, user_id, is_group, kind)
         return
 
-    await _send_loli_result_image(bot, image, text, user_id, is_group, kind)
+    await _deliver_loli_result_image(bot, image, text, user_id, is_group, kind)
 
 
-async def _send_loli_result_image(
+async def _deliver_loli_result_image(
     bot: Bot,
     image: str | bytes,
     text: str,
@@ -199,9 +197,6 @@ async def _send_loli_result_image(
     is_group: bool,
     kind: str = 'loli',
 ) -> None:
-    # 数据已就绪、图片尚未发送：此处注入 AI 可读摘要（loli 与 shota 共用本函数）
-    _ai_return_draw(kind, '', text)
-
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -224,6 +219,167 @@ async def _send_loli_result_image(
     await _safe_send(bot, messages)
 
 
+_deliver_shota_result_image = _deliver_loli_result_image
+
+
+# ── 图片投递队列 ──────────────────────────────────────────────────────────────
+# 框架 `bot.py` 的 `_process` 是「先拿命令并发额度、再跑协程」，额度在协程结束
+# 时才归还。所以只要命令协程还在等图库下载，它就一直占着 Core 的
+# `CommandSemaphore` 名额；25 个名额被占满后 `_process` 直接停止消费队列，
+# 该 bot 上**所有插件**的命令一起卡住。
+#
+# 因此把「下载 + 编码 + 发送」整段搬到插件自己的有界队列里，命令协程只做入队
+# 就返回（微秒级），Core 的命令额度立刻归还。用户拿到的图片晚一点点到，
+# 但整个 Core 不会被一个插件的网络等待拖死。
+IMAGE_DELIVERY_QUEUE_MAX = 512
+
+
+IMAGE_DELIVERY_WORKERS = 8
+
+
+@dataclass(frozen=True)
+class _ImageJob:
+    bot: Bot
+    role: RoleCandidate
+    image: str | bytes
+    text: str | None
+    user_id: str | int | None
+    is_group: bool
+    kind: str
+    loli_style: bool
+
+
+_IMAGE_DELIVERY_QUEUE: asyncio.Queue[_ImageJob] = asyncio.Queue(maxsize=IMAGE_DELIVERY_QUEUE_MAX)
+
+
+_IMAGE_DELIVERY_TASKS: list[asyncio.Task[None]] = []
+
+
+async def _image_delivery_worker() -> None:
+    while True:
+        job = await _IMAGE_DELIVERY_QUEUE.get()
+        try:
+            if job.loli_style:
+                await _deliver_loli_result_image(
+                    job.bot, job.image, job.text or '', job.user_id, job.is_group, job.kind
+                )
+            else:
+                await _deliver_role_image(
+                    job.bot, job.role, str(job.image), job.text, job.user_id, job.is_group, job.kind
+                )
+        except asyncio.CancelledError:
+            raise
+        except (OSError, RuntimeError, TimeoutError, ValueError, TypeError) as exc:
+            logger.warning(f'{LOG_PREFIX} 图片投递失败({job.kind}): {exc}')
+        finally:
+            _IMAGE_DELIVERY_QUEUE.task_done()
+
+
+def start_image_delivery_workers() -> None:
+    """启动投递 worker（幂等）。维护循环也会调用，用于拉起意外退出的 worker。"""
+    while len(_IMAGE_DELIVERY_TASKS) < IMAGE_DELIVERY_WORKERS:
+        _IMAGE_DELIVERY_TASKS.append(asyncio.create_task(_image_delivery_worker()))
+
+
+async def stop_image_delivery_workers() -> None:
+    tasks = list(_IMAGE_DELIVERY_TASKS)
+    _IMAGE_DELIVERY_TASKS.clear()
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def _prune_image_delivery_workers() -> None:
+    """丢掉已结束的 worker 并补足数量，避免一次意外让投递能力永久下降。"""
+    _IMAGE_DELIVERY_TASKS[:] = [task for task in _IMAGE_DELIVERY_TASKS if not task.done()]
+    start_image_delivery_workers()
+
+
+def image_delivery_backlog() -> int:
+    """队列积压量（可观测性用）。"""
+    return _IMAGE_DELIVERY_QUEUE.qsize()
+
+
+async def _enqueue_image_job(job: _ImageJob) -> bool:
+    """入队并立即返回；队列满时退回「只发文字」，绝不阻塞命令协程。"""
+    try:
+        _IMAGE_DELIVERY_QUEUE.put_nowait(job)
+        return True
+    except asyncio.QueueFull:
+        logger.warning(f'{LOG_PREFIX} 图片投递队列已满({IMAGE_DELIVERY_QUEUE_MAX})，本次只发送文字')
+        if job.loli_style:
+            await _send_loli_text(job.bot, job.text or '')
+        else:
+            await _safe_send(job.bot, job.text or '当前请求过多，请稍后再试。')
+        return False
+
+
+async def _send_role_image(
+    bot: Bot,
+    role: RoleCandidate,
+    image_url: str,
+    text: str | None = None,
+    user_id: str | int | None = None,
+    is_group: bool = True,
+    kind: str = 'wife',
+) -> None:
+    """投递一次角色图发送；入队后立即返回，真正的下载与发送由后台 worker 完成。"""
+    _ai_return_draw(kind, role.name, text)
+    await _enqueue_image_job(
+        _ImageJob(
+            bot=bot,
+            role=role,
+            image=image_url,
+            text=text,
+            user_id=user_id,
+            is_group=is_group,
+            kind=kind,
+            loli_style=False,
+        )
+    )
+
+
+async def _send_daily_result_image(
+    bot: Bot,
+    role: RoleCandidate,
+    image: str,
+    text: str,
+    user_id: str,
+    is_group: bool,
+    kind: str,
+) -> None:
+    if kind in ('loli', 'shota'):
+        await _send_loli_result_image(bot, image, text, user_id, is_group, kind)
+        return
+    await _send_role_image(bot, role, image, text, user_id, is_group, kind)
+
+
+async def _send_loli_result_image(
+    bot: Bot,
+    image: str | bytes,
+    text: str,
+    user_id: str | int | None,
+    is_group: bool,
+    kind: str = 'loli',
+) -> None:
+    """投递一次萝莉/正太图发送（loli 与 shota 共用）。"""
+    _ai_return_draw(kind, '', text)
+    await _enqueue_image_job(
+        _ImageJob(
+            bot=bot,
+            role=RoleCandidate(name='', role_ids=(), images=()),
+            image=image,
+            text=text,
+            user_id=user_id,
+            is_group=is_group,
+            kind=kind,
+            loli_style=True,
+        )
+    )
+
+
+# 正太与萝莉共用同一套投递逻辑
 _send_shota_result_image = _send_loli_result_image
 
 

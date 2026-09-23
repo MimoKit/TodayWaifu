@@ -32,9 +32,11 @@ from .constants import LOG_PREFIX
 def collect_metrics() -> dict[str, int | bool]:
     """采集当前运行时指标（只读，不产生副作用）。"""
     from .gallery import gallery_circuit_state
+    from .senders import image_delivery_backlog
 
     circuit_open, retry_after = gallery_circuit_state()
     return {
+        'image_delivery_backlog': image_delivery_backlog(),
         'inflight_image_downloads': len(_IMAGE_INFLIGHT),
         'inflight_candidate_loads': len(_CANDIDATE_INFLIGHT),
         'candidate_cache_entries': len(CANDIDATE_CACHE),

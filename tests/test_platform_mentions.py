@@ -131,7 +131,7 @@ class PlatformMentionTests(unittest.TestCase):
 
     def test_result_image_senders_keep_personal_message_segments(self) -> None:
         source = (ROOT / 'TodayWaifu' / 'senders.py').read_text(encoding='utf-8')
-        for function_name in ('_send_role_image', '_send_loli_result_image', '_send_local_image'):
+        for function_name in ('_deliver_role_image', '_deliver_loli_result_image', '_send_local_image'):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
             block = source[start:next_function if next_function >= 0 else None]

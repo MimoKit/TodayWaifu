@@ -37,18 +37,21 @@ class ResultImageSenderTests(unittest.TestCase):
         source = (ROOT / "TodayWaifu" / "senders.py").read_text(encoding="utf-8")
         self.assertIn("def _ai_return_draw(", source)
 
+        # 摘要在**入队时刻**注入：后台 worker 发送时已经没有请求上下文了
         role_fn = source[
             source.index("async def _send_role_image("):
             source.index("async def _send_daily_result_image(")
         ]
         self.assertIn("_ai_return_draw(kind, role.name, text)", role_fn)
 
-        loli_fn = source[source.index("async def _send_loli_result_image("):source.index("_send_shota_result_image = ")]
+        loli_fn = source[
+            source.index("async def _send_loli_result_image("):source.index("async def _send_local_image(")
+        ]
         self.assertIn("_ai_return_draw(kind, '', text)", loli_fn)
 
     def test_loli_sender_downloads_remote_images_before_building_segment(self) -> None:
         source = (ROOT / "TodayWaifu" / "senders.py").read_text(encoding="utf-8")
-        function_start = source.index("async def _send_loli_result_image(")
+        function_start = source.index("async def _deliver_loli_result_image(")
         function_end = source.index("async def _send_local_image(", function_start)
         function = source[function_start:function_end]
 

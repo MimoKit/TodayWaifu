@@ -126,10 +126,13 @@ from .senders import (
     _send_role_image,
     _send_local_image,
     _is_valid_image_ref,
+    image_delivery_backlog,
     _send_loli_result_image,
     _image_message_from_path,
     _send_daily_result_image,
     _send_shota_result_image,
+    stop_image_delivery_workers,
+    start_image_delivery_workers,
 )
 from .storage import read_json_dict
 from .targets import _get_event_target_user_id
@@ -291,6 +294,7 @@ __all__ = [
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text', '_send_shota_text',
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image', '_send_shota_result_image',
     '_send_role_image', '_image_message', '_image_message_from_path',
+    'image_delivery_backlog', 'start_image_delivery_workers', 'stop_image_delivery_workers',
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
@@ -463,6 +467,9 @@ async def _cache_maintenance_once() -> None:
         MEMBER_AVATAR_CACHE_SECONDS,
         CACHE_MAINTENANCE_FILE_LIMIT,
     )
+    from .senders import _prune_image_delivery_workers
+
+    _prune_image_delivery_workers()
     from .metrics import log_metrics
 
     log_metrics()
@@ -506,10 +513,11 @@ async def _stop_blocking_executor_on_shutdown() -> None:
 
 @on_core_start_before(priority=-60)
 async def _start_gallery_prefetch_on_startup() -> None:
-    """启动零点前图库预热循环（把 00:00 的抽签变成纯缓存命中）。"""
+    """启动零点前图库预热循环与图片投递 worker。"""
     global _PREFETCH_TASK
     from .prefetch import _prefetch_loop
 
+    start_image_delivery_workers()
     if _PREFETCH_TASK is None or _PREFETCH_TASK.done():
         _PREFETCH_TASK = asyncio.create_task(_prefetch_loop())
 
@@ -519,7 +527,7 @@ async def _stop_gallery_prefetch_on_shutdown() -> None:
     global _PREFETCH_TASK
     task = _PREFETCH_TASK
     _PREFETCH_TASK = None
-    if task is None or task.done():
-        return
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
+    if task is not None and not task.done():
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    await stop_image_delivery_workers()
