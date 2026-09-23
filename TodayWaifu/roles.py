@@ -36,7 +36,7 @@ from .constants import (
     _cfg_bool,
     _image_source,
 )
-from .file_cache import read_file_text_cached
+from .file_cache import prefer_cached_urls, read_file_text_cached
 from .folder_gallery import scan_named_role_directories
 from .role_map_store import loads_role_map
 
@@ -45,11 +45,18 @@ def _pick_role_record(
     candidates: tuple['RoleCandidate', ...],
     rng: random.Random,
 ) -> 'WifeRecord | None':
+    """随机挑一个角色，并在该角色的图片里优先挑**已在磁盘缓存中**的那张。
+
+    零点前预热只暖每个角色的前几张图，而这里原来是 `rng.choice(role.images)`：
+    角色有 10 张图、只暖 2 张的话命中率只有 20%，剩下 80% 照样在零点走网络。
+    优先从已缓存的图里挑，预热的命中率就变成 100%（仍然随机，只是随机范围
+    收敛到已缓存的图；一张都没缓存时退回全量，行为与原来完全一致）。
+    """
     if not candidates:
         return None
 
     role = rng.choice(candidates)
-    return WifeRecord.from_role(role, rng.choice(role.images))
+    return WifeRecord.from_role(role, rng.choice(prefer_cached_urls(role.images)))
 
 
 def _load_role_map(path: Path, section: str | None = None) -> dict[str, str]:

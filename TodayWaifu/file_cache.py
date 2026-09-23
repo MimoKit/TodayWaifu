@@ -67,10 +67,45 @@ def url_hash_cache_path(cache_root: Path, url: str) -> Path:
     return cache_root / digest
 
 
+# ── 已缓存 URL 索引 ───────────────────────────────────────────────────────────
+# 零点前预热只会暖每个角色的前几张图，而抽签是 `rng.choice(role.images)`：
+# 角色有 10 张图、只暖 2 张的话命中率只有 20%，剩下 80% 照样在零点走网络。
+# 这里维护一个「磁盘上已经有哪张图」的内存索引，抽签时优先从中挑选，
+# 让预热的命中率变成 100%（仍然随机，只是随机范围收敛到已缓存的图）。
+_CACHED_URL_HASHES: set[str] = set()
+
+# 索引只用于「优先挑缓存」，丢了不影响正确性，所以用一个很粗的上限即可
+CACHED_URL_INDEX_MAX = 50000
+
+
+def _remember_cached_url(url: str) -> None:
+    if len(_CACHED_URL_HASHES) >= CACHED_URL_INDEX_MAX:
+        # 溢出就整体丢弃：只是失去提示，会退回全量图片，不影响正确性
+        _CACHED_URL_HASHES.clear()
+    _CACHED_URL_HASHES.add(hashlib.sha256(url.encode('utf-8')).hexdigest())
+
+
+def is_url_cached(url: str) -> bool:
+    """该 URL 的图片是否已在磁盘缓存里（纯内存查询，无 I/O）。"""
+    return hashlib.sha256(url.encode('utf-8')).hexdigest() in _CACHED_URL_HASHES
+
+
+def prefer_cached_urls(urls: tuple[str, ...]) -> tuple[str, ...]:
+    """优先返回已缓存的 URL；一张都没缓存时返回原列表。"""
+    cached = tuple(url for url in urls if is_url_cached(url))
+    return cached or urls
+
+
+def clear_cached_url_index() -> None:
+    """清空索引（测试与调试用）。"""
+    _CACHED_URL_HASHES.clear()
+
+
 def read_url_cache(cache_root: Path, url: str) -> Optional[bytes]:
     path = url_hash_cache_path(cache_root, url)
     try:
         if path.is_file() and path.stat().st_size > 0:
+            _remember_cached_url(url)
             return path.read_bytes()
     except OSError:
         return None
@@ -92,6 +127,7 @@ def clear_expired_files(cache_root: Path, max_age_seconds: float, limit: int = 1
             try:
                 if path.stat().st_mtime < cutoff:
                     path.unlink()
+                    _CACHED_URL_HASHES.discard(path.name)
                     removed += 1
             except OSError:
                 continue
@@ -120,6 +156,12 @@ def write_url_cache(cache_root: Path, url: str, data: bytes) -> bool:
         finally:
             if temporary.exists():
                 temporary.unlink()
+        _remember_cached_url(url)
         return True
     except OSError:
         return False
+
+
+def cached_url_count() -> int:
+    """索引里记录的已缓存 URL 数量（可观测性用，非磁盘真实文件数）。"""
+    return len(_CACHED_URL_HASHES)

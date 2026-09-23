@@ -181,7 +181,7 @@ from .constants import (
     _daily_bucket_name,
     _daily_kind_metadata,
 )
-from .file_cache import clear_expired_files, read_file_bytes_cached
+from .file_cache import is_url_cached, prefer_cached_urls, clear_expired_files, read_file_bytes_cached
 from .daily_store import (
     _wife_state,
     _wife_origin,
@@ -300,7 +300,7 @@ __all__ = [
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
     'DailyWifeRecord', '_daily_data_lock', '_migrate_legacy_wife_data',
-    'read_file_bytes_cached',
+    'read_file_bytes_cached', 'is_url_cached', 'prefer_cached_urls',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
     'daily_nte_wife_sv', 'daily_wife_sv',
