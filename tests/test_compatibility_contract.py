@@ -72,6 +72,7 @@ class CompatibilityContractTests(unittest.TestCase):
         for text in (
             "get_res_path('TodayWaifu')",
             "daily_wife_data.json",
+            "custom_role_map.json",
             "custom_role_map.txt",
             "custom_role_pile",
             "loli_images",

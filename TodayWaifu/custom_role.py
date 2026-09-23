@@ -5,7 +5,6 @@ import asyncio
 
 from .shared import (
     LOG_PREFIX,
-    ROLE_MAP_RE,
     IMAGE_EXTENSIONS,
     CUSTOM_ROLE_ID_START,
     UPLOAD_IMAGE_MAX_BYTES,
@@ -26,6 +25,7 @@ from .shared import (
     _context_key,
     _load_role_map,
     custom_role_sv,
+    write_role_map,
     image_upload_sv,
     _can_upload_images,
     _normalize_role_name,
@@ -64,11 +64,9 @@ def _next_custom_role_id(role_map: dict[str, str], pile_root: Path) -> str:
     return str(role_id)
 
 
-def _append_role_map_line(path: Path, role_id: str, role_name: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = path.read_text(encoding='utf-8') if path.is_file() else ''
-    prefix = '' if not text or text.endswith('\n') else '\n'
-    path.write_text(f'{text}{prefix}{role_id}：{role_name}\n', encoding='utf-8')
+def _write_custom_role_map(path: Path, role_map: dict[str, str]) -> None:
+    """原子写回自定义老婆对照表 JSON。"""
+    write_role_map(path, role_map)
 
 
 def _clean_upload_role_name(raw: str, strip_wife_suffix: bool = False) -> str:
@@ -94,7 +92,8 @@ def _create_or_get_custom_role(role_name: str) -> tuple[str, bool, str | None]:
         return role_id, False, None
 
     role_id = _next_custom_role_id(role_map, pile_root)
-    _append_role_map_line(map_path, role_id, role_name)
+    role_map[role_id] = role_name
+    _write_custom_role_map(map_path, role_map)
     (pile_root / role_id).mkdir(parents=True, exist_ok=True)
     _invalidate_candidate_cache()
     logger.info(f'{LOG_PREFIX} 创建自定义老婆角色: {role_name} -> {role_id}')
@@ -162,16 +161,10 @@ def _remove_custom_role_map_ids(role_ids: tuple[str, ...]) -> None:
     if not map_path.is_file():
         return
     role_id_set = {str(role_id) for role_id in role_ids}
-    kept: list[str] = []
-    for line in map_path.read_text(encoding='utf-8').splitlines():
-        match = ROLE_MAP_RE.match(line)
-        if match and match.group(1) in role_id_set:
-            continue
-        kept.append(line)
-    text = '\n'.join(kept)
-    if text:
-        text += '\n'
-    map_path.write_text(text, encoding='utf-8')
+    role_map = _load_role_map(map_path)
+    kept = {key: value for key, value in role_map.items() if key not in role_id_set}
+    if len(kept) != len(role_map):
+        _write_custom_role_map(map_path, kept)
 
 
 def _custom_role_delete_confirm_key(ev: Event) -> str:

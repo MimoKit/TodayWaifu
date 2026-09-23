@@ -11,13 +11,8 @@ from ..daily_wife_config import DailyWifeConfig
 BASE_DIR = Path(__file__).parent.parent
 
 
-WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
-
-
-HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
-
-
-NTE_ROLE_MAP_PATH = BASE_DIR / 'nte_role_id_map.txt'
+# 内置角色对照表：单文件按模式分节，替代旧版 wife/husband/nte_role_id_map.txt
+ROLE_MAP_JSON_PATH = BASE_DIR / 'role_id_map.json'
 
 
 LEGACY_ROLE_MAP_PATH = BASE_DIR / 'role_id_map.txt'

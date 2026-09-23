@@ -5,9 +5,7 @@ from pathlib import Path
 from gsuid_core.data_store import get_res_path
 
 BASE_DIR = Path(__file__).parent.parent
-WIFE_ROLE_MAP_PATH = BASE_DIR / 'wife_role_id_map.txt'
-HUSBAND_ROLE_MAP_PATH = BASE_DIR / 'husband_role_id_map.txt'
-NTE_ROLE_MAP_PATH = BASE_DIR / 'nte_role_id_map.txt'
+ROLE_MAP_JSON_PATH = BASE_DIR / 'role_id_map.json'
 LEGACY_ROLE_MAP_PATH = BASE_DIR / 'role_id_map.txt'
 HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 PGR_WIFE_DIR_NAME = 'pgr_wife'
@@ -19,7 +17,7 @@ def data_root() -> Path:
 
 
 def role_upload_map() -> Path:
-    return data_root() / 'custom_role_map.txt'
+    return data_root() / 'custom_role_map.json'
 
 
 def role_upload_root() -> Path:

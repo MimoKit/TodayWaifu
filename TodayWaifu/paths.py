@@ -14,15 +14,14 @@ from gsuid_core.data_store import get_res_path
 from .constants import (
     BASE_DIR,
     LOG_PREFIX,
-    NTE_ROLE_MAP_PATH,
     PGR_WIFE_DIR_NAME,
-    WIFE_ROLE_MAP_PATH,
+    ROLE_MAP_JSON_PATH,
     LOLI_IMAGE_DIR_NAME,
     LEGACY_ROLE_MAP_PATH,
-    HUSBAND_ROLE_MAP_PATH,
     _cfg,
     _daily_kind_metadata,
 )
+from .role_map_store import migrate_legacy_text_map
 from .daily_repository import ContextKey
 
 
@@ -44,26 +43,21 @@ def _role_map_title(mode: str) -> str:
 
 
 def _resolve_role_map_path(mode: str = 'wife') -> Path | None:
+    """定位角色对照表：优先用户配置路径，其次内置合并 JSON，最后兼容旧 TXT 残留。"""
     role_mode = _role_mode(mode)
     if role_mode == 'nte':
         configured = _configured_path('DailyWifeNteRoleMapPath')
-        candidates = [configured, NTE_ROLE_MAP_PATH]
-        for path in candidates:
-            if path and path.is_file():
-                logger.debug(f'{LOG_PREFIX} 成功定位异环角色对照表文件: {path}')
-                return path
-        logger.warning(f'{LOG_PREFIX} 未能找到异环角色对照表文件')
-        return None
-
-    configured = _configured_path(
-        'DailyWifeHusbandRoleMapPath' if role_mode == 'husband' else 'DailyWifeWifeRoleMapPath'
-    )
+    elif role_mode == 'husband':
+        configured = _configured_path('DailyWifeHusbandRoleMapPath')
+    else:
+        configured = _configured_path('DailyWifeWifeRoleMapPath')
     legacy_configured = _configured_path('DailyWifeRoleMapPath') if role_mode == 'wife' else None
-    primary_builtin = HUSBAND_ROLE_MAP_PATH if role_mode == 'husband' else WIFE_ROLE_MAP_PATH
+
+    # 内置 role_id_map.json 是唯一内置来源；后面几项只服务于老安装残留与用户自备文件
     candidates = [
         configured,
         legacy_configured,
-        primary_builtin,
+        ROLE_MAP_JSON_PATH,
         LEGACY_ROLE_MAP_PATH,
         BASE_DIR.parent / ('鸣潮老公面板id对照角色.txt' if role_mode == 'husband' else '鸣潮老婆面板id对照角色.txt'),
         Path.cwd() / ('鸣潮老公面板id对照角色.txt' if role_mode == 'husband' else '鸣潮老婆面板id对照角色.txt'),
@@ -81,7 +75,27 @@ def _custom_upload_data_root() -> Path:
 
 
 def _custom_upload_role_map_path() -> Path:
+    return _custom_upload_data_root() / 'custom_role_map.json'
+
+
+def _legacy_custom_upload_role_map_path() -> Path:
+    """旧版用户上传对照表路径，仅用于一次性迁移到 JSON。"""
     return _custom_upload_data_root() / 'custom_role_map.txt'
+
+
+# 进程内一次性标记：旧 TXT 自定义对照表只尝试迁移一次
+_CUSTOM_ROLE_MAP_MIGRATED = False
+
+
+def _migrate_custom_role_map() -> None:
+    """把用户上传的旧 TXT 对照表一次性迁移为 JSON，读写两条路径都会先调用。"""
+    global _CUSTOM_ROLE_MAP_MIGRATED
+    if _CUSTOM_ROLE_MAP_MIGRATED:
+        return
+    _CUSTOM_ROLE_MAP_MIGRATED = True
+    json_path = _custom_upload_role_map_path()
+    if migrate_legacy_text_map(_legacy_custom_upload_role_map_path(), json_path):
+        logger.info(f'{LOG_PREFIX} 自定义老婆对照表已从 TXT 迁移为 JSON: {json_path}')
 
 
 def _custom_upload_role_pile_root() -> Path:
@@ -93,6 +107,7 @@ def _loli_image_root() -> Path:
 
 
 def _writable_role_map_path() -> Path:
+    _migrate_custom_role_map()
     path = _custom_upload_role_map_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path

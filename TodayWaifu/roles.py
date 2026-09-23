@@ -13,6 +13,7 @@ from .paths import (
     _role_map_title,
     _resolve_role_map_path,
     _resolve_role_pile_root,
+    _migrate_custom_role_map,
     _nte_static_resource_roots,
     _custom_upload_role_map_path,
     _custom_upload_role_pile_root,
@@ -25,7 +26,6 @@ from .domain import WifeRecord, RoleCandidate
 from .payloads import RoleAccumulator, NamedRoleAccumulator
 from .constants import (
     LOG_PREFIX,
-    ROLE_MAP_RE,
     IMAGE_EXTENSIONS,
     CACHE_TTL_SECONDS,
     EXCLUDED_ROLE_NAMES,
@@ -38,6 +38,7 @@ from .constants import (
 )
 from .file_cache import read_file_text_cached
 from .folder_gallery import scan_named_role_directories
+from .role_map_store import loads_role_map
 
 
 def _pick_role_record(
@@ -51,26 +52,20 @@ def _pick_role_record(
     return WifeRecord.from_role(role, rng.choice(role.images))
 
 
-def _load_role_map(path: Path) -> dict[str, str]:
-    result: dict[str, str] = {}
-    # 角色对照表按 mtime 缓存文件内容，文件变更后自动失效，避免每次抽签都读盘
+def _load_role_map(path: Path, section: str | None = None) -> dict[str, str]:
+    """读取角色对照表（JSON 或旧 TXT），按 mtime 缓存文件内容避免每次抽签读盘。"""
     try:
         text = read_file_text_cached(path)
     except OSError:
-        return result
-    for line in text.splitlines():
-        match = ROLE_MAP_RE.match(line)
-        if not match:
-            continue
-        role_id, role_name = match.groups()
-        role_name = role_name.strip()
-        if role_name:
-            result[role_id] = role_name
+        return {}
+    result = loads_role_map(text, section)
     logger.debug(f'{LOG_PREFIX} 加载了 {len(result)} 个角色 ID 映射关系')
     return result
 
 
 def _load_custom_upload_role_map() -> dict[str, str]:
+    """读取用户上传的自定义老婆对照表；首次读取时把旧 TXT 迁移为 JSON。"""
+    _migrate_custom_role_map()
     map_path = _custom_upload_role_map_path()
     return _load_role_map(map_path) if map_path.is_file() else {}
 
@@ -199,7 +194,9 @@ def _merge_role_candidates(
 
 def _load_mode_role_map(mode: str = 'wife') -> dict[str, str]:
     role_map_path = _resolve_role_map_path(mode)
-    return _load_role_map(role_map_path) if role_map_path else {}
+    if role_map_path is None:
+        return {}
+    return _load_role_map(role_map_path, _role_mode(mode))
 
 
 def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
@@ -224,7 +221,7 @@ def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
         pile_root = Path("dummy_non_existent_path")
 
     try:
-        role_map = _load_role_map(role_map_path)
+        role_map = _load_role_map(role_map_path, role_mode)
         if role_mode == 'wife':
             role_map.update(_load_custom_upload_role_map())
         candidates = _collect_role_candidates(role_map, pile_root, default_pile_root, upload_pile_root)
@@ -244,7 +241,7 @@ def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
         return None, '没有找到异环角色 ID 对照表。'
 
     try:
-        role_map = _load_role_map(role_map_path)
+        role_map = _load_role_map(role_map_path, 'nte')
     except OSError as exc:
         logger.exception(f'{LOG_PREFIX} 读取异环角色对照表失败: {exc}')
         return None, '读取异环角色 ID 对照表失败。'

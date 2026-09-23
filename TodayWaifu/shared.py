@@ -142,8 +142,8 @@ from .constants import (
     LOLICONAPP_TAGS,
     IMAGE_EXTENSIONS,
     CACHE_TTL_SECONDS,
-    NTE_ROLE_MAP_PATH,
     LOLICONAPP_API_URL,
+    ROLE_MAP_JSON_PATH,
     EXCLUDED_ROLE_NAMES,
     LOLI_IMAGE_DIR_NAME,
     NTE_DETAIL_CDN_BASE,
@@ -193,6 +193,7 @@ from .invalidation import _invalidate_candidate_cache
 from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
 from .upload_access import can_upload_images, normalized_user_ids
+from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
 from .daily_repository import ContextKey, ContextRegistry
 from ..daily_wife_config import DailyWifeConfig
 
@@ -237,7 +238,8 @@ __all__ = [
     'MemberCandidate', 'Message', 'MessageSegment', 'Path', 'Plugins',
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'RoleRecordValue', 'SV',
     'PendingCustomRoleDelete', 'PendingGift', 'GalleryPayload',
-    'NTE_DETAIL_CDN_BASE', 'NTE_ROLE_MAP_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
+    'NTE_DETAIL_CDN_BASE', 'ROLE_MAP_JSON_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
+    'loads_role_map', 'write_role_map', 'migrate_legacy_text_map',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
     '_collect_role_candidates', '_configured_path', '_context_key',

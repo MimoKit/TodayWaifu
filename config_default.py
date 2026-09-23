@@ -32,17 +32,17 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeRoleMapPath': GsStrConfig(
         '角色 ID 对照表路径',
-        '留空时使用插件内置 wife_role_id_map.txt',
+        '留空时使用插件内置 role_id_map.json 的 wife 节',
         '',
     ),
     'DailyWifeWifeRoleMapPath': GsStrConfig(
         '老婆角色 ID 对照表路径',
-        '留空时回退旧配置项「角色 ID 对照表路径」，再回退插件内置 wife_role_id_map.txt',
+        '留空时回退旧配置项「角色 ID 对照表路径」，再回退插件内置 role_id_map.json 的 wife 节',
         '',
     ),
     'DailyWifeHusbandRoleMapPath': GsStrConfig(
         '老公角色 ID 对照表路径',
-        '留空时使用插件内置 husband_role_id_map.txt',
+        '留空时使用插件内置 role_id_map.json 的 husband 节',
         '',
     ),
     'DailyWifeGalleryApiUrl': GsStrConfig(
@@ -99,7 +99,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeNteRoleMapPath': GsStrConfig(
         '异环角色 ID 对照表路径',
-        '留空时使用插件内置 nte_role_id_map.txt',
+        '留空时使用插件内置 role_id_map.json 的 nte 节',
         '',
     ),
     'DailyWifeNteCustomPanelPath': GsStrConfig(

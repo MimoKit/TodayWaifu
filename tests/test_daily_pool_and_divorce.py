@@ -1,4 +1,5 @@
 import ast
+import json
 import unittest
 from typing import Any
 from pathlib import Path
@@ -27,11 +28,8 @@ def _extract_function(path: Path, name: str, globals_dict: dict[str, Any]):
 
 class NteRosterTests(unittest.TestCase):
     def test_builtin_nte_map_contains_all_current_non_protagonist_women(self) -> None:
-        names = {
-            line.split('：', 1)[1].strip()
-            for line in (ROOT / 'nte_role_id_map.txt').read_text(encoding='utf-8-sig').splitlines()
-            if '：' in line
-        }
+        role_map = json.loads((ROOT / 'role_id_map.json').read_text(encoding='utf-8'))
+        names = set(role_map['nte'].values())
         self.assertEqual(
             names,
             {
