@@ -71,6 +71,7 @@ from .roles import (
     _normalize_role_name,
     _gallery_mode_enabled,
     _load_local_candidates,
+    _scan_local_candidates,
     _collect_role_candidates,
     _load_pgr_local_candidates,
 )
@@ -276,7 +277,7 @@ __all__ = [
     '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
     '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
-    '_load_group_member_candidates', '_load_local_candidates', '_load_role_map',
+    '_load_group_member_candidates', '_load_local_candidates', '_scan_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
     '_daily_context_lock',

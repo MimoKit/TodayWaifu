@@ -207,7 +207,29 @@ def _load_mode_role_map(mode: str = 'wife') -> dict[str, str]:
 
 
 def _load_local_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+    """加载本地图片候选，带 TTL 缓存。
+
+    这是 `rglob` 全量目录扫描，很贵。图库挂掉时**每次**发送失败都会走
+    `_find_local_role_image` 回退到这里，没有缓存就等于图库一挂就把插件
+    线程池铺满目录扫描。上传图片时 `_invalidate_candidate_cache` 会主动失效。
+    """
     role_mode = _role_mode(mode)
+    cache_key = f'local:{role_mode}'
+    now = time.time()
+    cached = CANDIDATE_CACHE.get(cache_key)
+    if cached is not None and now - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1]
+
+    result = _scan_local_candidates(role_mode)
+    # 只缓存成功结果：失败往往是「目录暂时不可用」，不该被缓存住
+    if result[0]:
+        CANDIDATE_CACHE[cache_key] = (now, result)
+    return result
+
+
+def _scan_local_candidates(
+    role_mode: str,
+) -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     title = _role_map_title(role_mode)
     logger.debug(f'{LOG_PREFIX} 开始从本地加载{title}角色候选列表...')
     role_map_path = _resolve_role_map_path(role_mode)
