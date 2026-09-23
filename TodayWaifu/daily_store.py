@@ -26,9 +26,39 @@ def _daily_context_lock(ev: Event) -> asyncio.Lock:
     return _CONTEXT_REGISTRY.lock_for(_daily_context_key(ev))
 
 
+# 最近一次见到的日期，用于在翻转瞬间立即回收上一天的上下文快照
+_LAST_CONTEXT_DAY: str | None = None
+
+
+def _roll_over_context_day(day: str) -> int:
+    """日期翻转时立即回收上一天的上下文快照，返回回收数量。
+
+    不这么做的话，零点到凌晨 1 点之间内存里会同时躺着两天的全部活跃群上下文，
+    对几千个群的 bot 是几百 MB 级的额外占用与 GC 压力。
+    """
+    global _LAST_CONTEXT_DAY
+    if _LAST_CONTEXT_DAY == day:
+        return 0
+    previous = _LAST_CONTEXT_DAY
+    _LAST_CONTEXT_DAY = day
+    if previous is None:
+        return 0
+
+    dropped = _CONTEXT_REGISTRY.drop_stale_days(day)
+    stale_keys = [key for key in _DAILY_CONTEXT_CACHE if not key.startswith(f'{day}:')]
+    for key in stale_keys:
+        _DAILY_CONTEXT_CACHE.pop(key, None)
+    logger.info(
+        f'{LOG_PREFIX} 日期从 {previous} 翻转到 {day}，已回收 {dropped} 个上下文快照'
+        f'（兼容缓存另有 {len(stale_keys)} 条）'
+    )
+    return dropped
+
+
 async def _load_daily_context(ev: Event) -> DailyContext:
     """按上下文 hydrate 一次每日快照；数据库失败直接向调用方传播。"""
     key = _daily_context_key(ev)
+    _roll_over_context_day(key.day)
     cached = _CONTEXT_REGISTRY.get(key)
     if cached is not None:
         return cached

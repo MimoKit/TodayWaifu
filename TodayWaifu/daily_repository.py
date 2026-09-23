@@ -64,6 +64,29 @@ class ContextRegistry:
         self._generations[key] = self.generation(key) + 1
         self.cache.pop(key, None)
 
+    def drop_stale_days(self, current_day: str) -> int:
+        """日期翻转时立即丢弃非当天的上下文快照，返回丢弃数量。
+
+        快照按 `(day, bot, group)` 缓存整群记录。若只靠维护循环回收（默认间隔 1 小时），
+        零点到凌晨 1 点之间内存里会同时躺着**两天 × 全部活跃群**的上下文。
+
+        **只动快照，不动锁**：翻转瞬间可能仍有协程持有前一天 key 的锁，
+        此时回收锁会让两个协程拿到不同的锁对象、同时进入临界区。
+        锁留给维护循环在一小时后回收，那时已经没有协程还在用前一天的 key。
+        """
+        dropped = 0
+        for key in tuple(self.cache):
+            if key.day != current_day:
+                self.cache.pop(key, None)
+                # 递增而不是删除 generation：让滞后的 hydrate 无法把上一天的快照
+                # 重新发布回来（generation 比较会拒绝它）
+                self._generations[key] = self.generation(key) + 1
+                dropped += 1
+        for key, task in tuple(self.inflight.items()):
+            if task.done():
+                self.inflight.pop(key, None)
+        return dropped
+
     def prune(self, current_day: str) -> None:
         for key in tuple(self.cache):
             if key.day != current_day:
