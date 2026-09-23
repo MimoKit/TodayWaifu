@@ -6,6 +6,7 @@ from .shared import (
     IMAGE_EXTENSIONS,
     CACHE_TTL_SECONDS,
     UPLOAD_IMAGE_MAX_BYTES,
+    GALLERY_HTTP_TIMEOUT_SECONDS,
     Bot,
     Path,
     Event,
@@ -199,7 +200,7 @@ def _parse_loli_image_urls(payload: GalleryPayload) -> tuple[str, ...]:
 
 def _fetch_loli_image_urls_sync(api_url: str) -> tuple[str, ...]:
     try:
-        body = _http_get_with_retry(api_url, timeout=15)
+        body = _http_get_with_retry(api_url, timeout=GALLERY_HTTP_TIMEOUT_SECONDS)
     except HTTPError as exc:
         if exc.code == 403:
             raise RuntimeError(

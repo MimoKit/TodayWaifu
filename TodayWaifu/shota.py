@@ -4,6 +4,7 @@ from __future__ import annotations
 from .shared import (
     LOG_PREFIX,
     CACHE_TTL_SECONDS,
+    GALLERY_HTTP_TIMEOUT_SECONDS,
     Bot,
     Event,
     URLError,
@@ -101,7 +102,7 @@ def _fetch_shota_image_urls_sync(api_url: str) -> tuple[str, ...]:
     if not normalized_url:
         raise RuntimeError('未配置正太图库接口地址。')
     try:
-        body = _http_get_with_retry(normalized_url, timeout=15)
+        body = _http_get_with_retry(normalized_url, timeout=GALLERY_HTTP_TIMEOUT_SECONDS)
     except HTTPError as exc:
         if exc.code == 403:
             raise RuntimeError(

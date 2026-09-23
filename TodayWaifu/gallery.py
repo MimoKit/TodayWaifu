@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import json
 import time
+import random
 import asyncio
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from gsuid_core.logger import logger
@@ -34,15 +36,24 @@ from .executor import run_blocking
 from .payloads import GalleryPayload
 from .constants import (
     LOG_PREFIX,
+    HTTP_RETRIES,
     CACHE_TTL_SECONDS,
+    RETRY_JITTER_SECONDS,
     DEFAULT_GALLERY_API_URL,
+    RETRY_MAX_DELAY_SECONDS,
+    CIRCUIT_COOLDOWN_SECONDS,
     MAX_IMAGE_RESPONSE_BYTES,
+    RETRY_BASE_DELAY_SECONDS,
+    CIRCUIT_FAILURE_THRESHOLD,
+    IMAGE_HTTP_TIMEOUT_SECONDS,
     MAX_GALLERY_RESPONSE_BYTES,
+    GALLERY_HTTP_TIMEOUT_SECONDS,
     _cfg,
     _cfg_bool,
     _image_source,
 )
 from .file_cache import read_url_cache, write_url_cache
+from .circuit_breaker import CircuitBreaker
 
 
 def _pgr_gallery_api_url() -> str:
@@ -116,35 +127,65 @@ def _http_get(url: str, *, timeout: int = 15, max_bytes: int = MAX_GALLERY_RESPO
         return b''.join(chunks)
 
 
+# 按主机熔断：图库整体挂掉时不再让每个用户都打满重试链
+_HTTP_BREAKER = CircuitBreaker(
+    failure_threshold=CIRCUIT_FAILURE_THRESHOLD,
+    cooldown_seconds=CIRCUIT_COOLDOWN_SECONDS,
+)
+
+
+def _circuit_key(url: str) -> str:
+    return urlparse(url).netloc or url
+
+
+def _retry_delay(attempt: int) -> float:
+    """指数退避 + 抖动，避免所有失败请求在同一时刻重试形成同步脉冲。"""
+    base = RETRY_BASE_DELAY_SECONDS * (2 ** attempt)
+    return min(base, RETRY_MAX_DELAY_SECONDS) + random.uniform(0, RETRY_JITTER_SECONDS)
+
+
 def _http_get_with_retry(
     url: str,
     *,
-    timeout: int = 15,
-    retries: int = 3,
-    delay: float = 5,
+    timeout: int = GALLERY_HTTP_TIMEOUT_SECONDS,
+    retries: int = HTTP_RETRIES,
     max_bytes: int = MAX_GALLERY_RESPONSE_BYTES,
 ) -> bytes:
-    """请求远程图库接口，失败或超时时重试 `retries` 次，每次间隔 `delay` 秒。
+    """请求远程资源，失败或超时时按指数退避重试 `retries` 次。
 
-    401/403 属于认证或授权错误，重试无意义，直接抛出。
+    401/403 属于认证或授权错误，重试无意义，直接抛出（也不喂给熔断器，
+    因为那是配置问题而不是上游故障）。连续失败达到阈值后熔断一段时间，
+    期间直接快速失败，不再打网络。
     """
-    last_exc: Exception | None = None
+    key = _circuit_key(url)
+    if not _HTTP_BREAKER.allow(key):
+        raise RuntimeError(
+            f'图库接口连续失败，已熔断 {_HTTP_BREAKER.retry_after(key):.0f} 秒后重试。'
+        )
+
+    last_exc: Exception = RuntimeError(f'请求 {url} 失败。')
     for attempt in range(retries + 1):
         try:
-            return _http_get(url, timeout=timeout, max_bytes=max_bytes)
+            body = _http_get(url, timeout=timeout, max_bytes=max_bytes)
         except HTTPError as exc:
             if exc.code in {401, 403}:
                 raise
             last_exc = exc
         except (URLError, TimeoutError, OSError) as exc:
             last_exc = exc
+        else:
+            _HTTP_BREAKER.record_success(key)
+            return body
         if attempt < retries:
+            delay = _retry_delay(attempt)
             logger.warning(
-                f'{LOG_PREFIX} 请求远程图库失败(第{attempt + 1}/{retries}次重试): {url}，'
-                f'{int(delay)} 秒后重试: {last_exc}'
+                f'{LOG_PREFIX} 请求远程资源失败(第{attempt + 1}/{retries}次重试): {url}，'
+                f'{delay:.1f} 秒后重试: {last_exc}'
             )
             time.sleep(delay)
-    raise last_exc  # type: ignore[misc]
+
+    _HTTP_BREAKER.record_failure(key)
+    raise last_exc
 
 
 def _fetch_gallery_payload_sync() -> GalleryPayload:
@@ -152,7 +193,7 @@ def _fetch_gallery_payload_sync() -> GalleryPayload:
     if not api_url:
         raise RuntimeError('未配置图库接口地址。')
     try:
-        body = _http_get_with_retry(api_url, timeout=15)
+        body = _http_get_with_retry(api_url, timeout=GALLERY_HTTP_TIMEOUT_SECONDS)
     except HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError('图库账号或密码不正确，接口返回 401。') from exc
@@ -172,7 +213,7 @@ def _fetch_gallery_payload_sync() -> GalleryPayload:
 
 
 def _fetch_gallery_payload_from_url_sync(url: str) -> GalleryPayload:
-    body = _http_get_with_retry(url, timeout=15)
+    body = _http_get_with_retry(url, timeout=GALLERY_HTTP_TIMEOUT_SECONDS)
     try:
         payload = json.loads(body.decode('utf-8'))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -224,7 +265,9 @@ def _parse_role_candidates(
 
 def _download_image_sync(url: str) -> bytes:
     try:
-        return _http_get_with_retry(url, timeout=20, max_bytes=MAX_IMAGE_RESPONSE_BYTES)
+        return _http_get_with_retry(
+            url, timeout=IMAGE_HTTP_TIMEOUT_SECONDS, max_bytes=MAX_IMAGE_RESPONSE_BYTES
+        )
     except HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError('图库账号或密码不正确，图片返回 401。') from exc

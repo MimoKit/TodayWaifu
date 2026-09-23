@@ -138,6 +138,7 @@ from .constants import (
     BASE_DIR,
     LOG_PREFIX,
     ROLE_MAP_RE,
+    HTTP_RETRIES,
     HELP_ICON_PATH,
     LOLI_MOBILE_UA,
     LOLICONAPP_TAGS,
@@ -153,11 +154,16 @@ from .constants import (
     LIST_FORWARD_THRESHOLD,
     UPLOAD_IMAGE_MAX_BYTES,
     DEFAULT_GALLERY_API_URL,
+    CIRCUIT_COOLDOWN_SECONDS,
     LOLI_DOWNLOAD_LOG_PREFIX,
     MAX_IMAGE_RESPONSE_BYTES,
+    CIRCUIT_FAILURE_THRESHOLD,
+    IMAGE_HTTP_TIMEOUT_SECONDS,
     MAX_GALLERY_RESPONSE_BYTES,
     MEMBER_AVATAR_CACHE_SECONDS,
     CACHE_MAINTENANCE_FILE_LIMIT,
+    GALLERY_HTTP_TIMEOUT_SECONDS,
+    IMAGE_ACQUIRE_TIMEOUT_SECONDS,
     CACHE_MAINTENANCE_INTERVAL_SECONDS,
     CUSTOM_ROLE_DELETE_CONFIRM_SECONDS,
     _cfg,
@@ -195,6 +201,7 @@ from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
 from .upload_access import can_upload_images, normalized_user_ids
 from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
+from .circuit_breaker import CircuitBreaker
 from .daily_repository import ContextKey, ContextRegistry
 from ..daily_wife_config import DailyWifeConfig
 
@@ -240,6 +247,8 @@ __all__ = [
     'ROLE_MAP_RE', 'Request', 'RoleCandidate', 'RoleRecordValue', 'SV',
     'PendingCustomRoleDelete', 'PendingGift', 'GalleryPayload',
     'NTE_DETAIL_CDN_BASE', 'ROLE_MAP_JSON_PATH', 'UPLOAD_IMAGE_MAX_BYTES', 'URLError', 'WifeRecord',
+    'CircuitBreaker', 'HTTP_RETRIES', 'GALLERY_HTTP_TIMEOUT_SECONDS', 'IMAGE_HTTP_TIMEOUT_SECONDS',
+    'IMAGE_ACQUIRE_TIMEOUT_SECONDS', 'CIRCUIT_FAILURE_THRESHOLD', 'CIRCUIT_COOLDOWN_SECONDS',
     'loads_role_map', 'write_role_map', 'migrate_legacy_text_map',
     'MAX_GALLERY_RESPONSE_BYTES', 'MAX_IMAGE_RESPONSE_BYTES',
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',

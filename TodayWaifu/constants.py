@@ -54,6 +54,34 @@ MAX_IMAGE_RESPONSE_BYTES = 10 * 1024 * 1024
 IMAGE_ACQUIRE_TIMEOUT_SECONDS = 6.0
 
 
+# 远程请求策略：重试次数越少越好。原来的 retries=3 + 固定 5 秒间隔会把一次失败
+# 放大成 4 倍请求量，且最坏占用 95 秒，是零点高峰的主要放大器。
+HTTP_RETRIES = 1
+
+
+GALLERY_HTTP_TIMEOUT_SECONDS = 8
+
+
+IMAGE_HTTP_TIMEOUT_SECONDS = 8
+
+
+# 指数退避 + 抖动：避免所有失败请求在同一时刻一起重试形成同步脉冲
+RETRY_BASE_DELAY_SECONDS = 1.0
+
+
+RETRY_MAX_DELAY_SECONDS = 4.0
+
+
+RETRY_JITTER_SECONDS = 0.5
+
+
+# 连续失败达到阈值后熔断，冷却期内直接快速失败、不打网络
+CIRCUIT_FAILURE_THRESHOLD = 5
+
+
+CIRCUIT_COOLDOWN_SECONDS = 30.0
+
+
 LIST_FORWARD_THRESHOLD = 10
 
 
