@@ -52,7 +52,7 @@ class ResultImageSenderTests(unittest.TestCase):
         function_end = source.index("async def _send_local_image(", function_start)
         function = source[function_start:function_end]
 
-        self.assertIn("image_ref = await _download_image(image)", function)
+        self.assertIn("image_ref = await _acquire_gallery_image(image)", function)
         self.assertNotIn(
             "if image.startswith(('http://', 'https://')):\n            image_ref = image",
             function,

@@ -48,6 +48,12 @@ MAX_GALLERY_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_IMAGE_RESPONSE_BYTES = 10 * 1024 * 1024
 
 
+# 单次命令等待图库图片的上限。命令协程会一直占着 Core 的命令并发额度
+# （CommandSemaphore），等太久会让 bot 的 _process 停止消费队列，拖死整个 Core。
+# 超时只放弃等待，底层下载继续跑完并写盘，下次请求直接命中缓存。
+IMAGE_ACQUIRE_TIMEOUT_SECONDS = 6.0
+
+
 LIST_FORWARD_THRESHOLD = 10
 
 

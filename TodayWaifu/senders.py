@@ -1,6 +1,7 @@
 """TodayWaifu 的结果图片发送。"""
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from gsuid_core.bot import Bot
@@ -14,7 +15,12 @@ from .domain import RoleCandidate
 from .gallery import _download_image
 from .delivery import _safe_send, _send_loli_text
 from .executor import run_blocking
-from .constants import LOG_PREFIX, _cfg, _daily_item_title
+from .constants import (
+    LOG_PREFIX,
+    IMAGE_ACQUIRE_TIMEOUT_SECONDS,
+    _cfg,
+    _daily_item_title,
+)
 from .file_cache import read_file_bytes_cached
 
 
@@ -69,6 +75,33 @@ async def _find_local_role_image(role: RoleCandidate, kind: str) -> str | None:
     return None
 
 
+class _ImageAcquireTimeout(RuntimeError):
+    """图库图片获取超时；继承 RuntimeError 以复用既有的回退分支。"""
+
+
+async def _acquire_gallery_image(image_url: str) -> bytes:
+    """获取图库图片字节，超时即放弃等待。
+
+    超时只放弃「等待」，**不取消底层下载任务**：`asyncio.shield` 让
+    `_download_image` 的内部任务继续在插件线程池里跑完并写入磁盘缓存，
+    下一个请求直接命中。若直接用 `wait_for` 包住，取消会顺着 `await task`
+    传递下去把下载也掐断，缓存永远暖不起来。
+
+    这样命令协程最多占用 Core 的命令并发额度 `IMAGE_ACQUIRE_TIMEOUT_SECONDS` 秒，
+    而不是被重试链拖到几十秒 —— 后者会让 bot 的 `_process` 停止消费队列，
+    导致**整个 Core 所有命令**一起卡住。
+    """
+    try:
+        return await asyncio.wait_for(
+            asyncio.shield(_download_image(image_url)),
+            timeout=IMAGE_ACQUIRE_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise _ImageAcquireTimeout(
+            f'图库响应超时（超过 {IMAGE_ACQUIRE_TIMEOUT_SECONDS:.0f} 秒），请稍后再试。'
+        ) from exc
+
+
 async def _send_role_image(
     bot: Bot,
     role: RoleCandidate,
@@ -81,7 +114,7 @@ async def _send_role_image(
     is_gallery_image = image_url.startswith(('http://', 'https://'))
     if is_gallery_image:
         try:
-            image: bytes = await _download_image(image_url)
+            image: bytes = await _acquire_gallery_image(image_url)
         except RuntimeError as exc:
             logger.warning(f'{LOG_PREFIX} 下载图库图片失败: {exc}')
             local_image = await _find_local_role_image(role, kind)
@@ -150,7 +183,7 @@ async def _send_loli_result_image(
     if isinstance(image, str):
         if image.startswith(('http://', 'https://')):
             try:
-                image_ref = await _download_image(image)
+                image_ref = await _acquire_gallery_image(image)
             except RuntimeError as exc:
                 logger.warning(f'{LOG_PREFIX} 下载萝莉图片失败: {exc}')
                 await _send_loli_text(bot, str(exc))
