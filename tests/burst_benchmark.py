@@ -3,10 +3,11 @@
 **这个脚本不能在本地跑**，它需要真实的 gsuid_core 环境。用法：
 
     cd <gsuid_core 仓库根>
-    .venv/bin/python plugins/TodayWaifu/tests/burst_benchmark.py <plugin_parent_dir> [并发数] [warm]
+    .venv/bin/python plugins/TodayWaifu/tests/burst_benchmark.py <plugin_parent_dir> [并发数] [warm] [db]
 
 `plugin_parent_dir` 是**包含** `TodayWaifu` 包的那一层目录（通常是 `plugins/`）。
-加 `warm` 参数会先灌满磁盘缓存，模拟 23:50 预热之后的 00:00。
+可选参数：`warm` 先灌满磁盘缓存（模拟 23:50 预热之后的 00:00）；
+`db` 把真实的一次 `upsert_record` 写库也算进命令路径。
 
 它替代了原来的 `peak_benchmark.py` —— 那个只测内存里 `AsyncSourceCache` 的
 并发合并（100 个协程打同一个 key，`loader_calls=1`），根本没有复现零点场景，
@@ -23,14 +24,25 @@
   4. `all_images_delivered_seconds` 用户视角的完成时刻（吞吐），
      用来确认延迟优化没有以牺牲吞吐为代价。
 
-200 并发、冷缓存、0.5s/张图库的实测（真机 4 核）：
+注意：用 `db` 时必须让 `prepare_db()` 复刻框架真实的 SQLite 初始化
+（WAL + `synchronous=NORMAL`）。漏掉会测成 `journal_mode=delete` +
+`synchronous=FULL`，每次提交都 fsync，写入延迟被高估好几倍。
 
-    指标                   修复前        修复后       预热命中
+真机 4 核、200 并发、冷缓存、0.5s/张图库的实测：
+
+    指标                   修复前        修复后       修复后+预热
     命令占用额度 max       2081.6 ms     0.1 ms       0.2 ms
     无关命令等待额度 max   11410.8 ms    0.0 ms       0.0 ms
     命令延迟 p99           13033.4 ms    0.0 ms       0.2 ms
     其他插件阻塞 IO 等待   493.0 ms      17.9 ms      13.1 ms
     全部 200 张图送达      13.10 s       12.87 s      0.43 s
+
+带上真实写库（`db`）后，剩下的瓶颈是框架的 SQLite 单写者闸门：
+
+    指标                   修复前        修复后
+    命令占用额度 max       2123.9 ms     195.8 ms
+    无关命令等待额度 max   11455.2 ms    825.8 ms
+    全部 200 张图送达      13.10 s       12.93 s
 """
 from __future__ import annotations
 
@@ -98,7 +110,39 @@ def percentile(values: list[float], ratio: float) -> float:
     return ordered[index]
 
 
-async def run(n_draws: int, plugin_parent: str, warm: bool = False) -> dict[str, float]:
+async def prepare_db() -> object:
+    """把框架的数据库层指向一个临时 SQLite，建好 dailywiferecord 表。
+
+    GsCore 默认 db_type 就是 SQLite，且所有写都要排一个**进程级单写者闸门**，
+    所以命令路径里的那次 upsert 必须一起压。
+    """
+    from sqlmodel import SQLModel
+    from sqlalchemy import event
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from TodayWaifu.TodayWaifu import models as M
+    from gsuid_core.utils.database import base_models as BM
+
+    db_path = Path(tempfile.mkdtemp()) / 'bench.db'
+    # 必须复刻框架真实的 SQLite 初始化（base_models.py:165-226）：
+    # WAL + synchronous=NORMAL。漏掉的话测到的是 journal_mode=delete +
+    # synchronous=FULL（每次提交都 fsync），会把写入延迟高估好几倍。
+    BM._enable_sqlite_wal(str(db_path))
+    engine = create_async_engine(f'sqlite+aiosqlite:///{db_path}')
+    event.listens_for(engine.sync_engine, 'connect')(BM._set_sqlite_connect_pragmas)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    BM.engine = engine
+    BM.async_maker = maker
+    BM._db_type = 'sqlite'
+    BM._db_initialized = True
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            lambda c: SQLModel.metadata.create_all(c, tables=[M.DailyWifeRecord.__table__])
+        )
+    return M
+
+
+async def run(n_draws: int, plugin_parent: str, warm: bool = False, with_db: bool = False) -> dict[str, float]:
     sys.path.insert(0, plugin_parent)
     from TodayWaifu.TodayWaifu import gallery as G, senders as S
 
@@ -111,6 +155,17 @@ async def run(n_draws: int, plugin_parent: str, warm: bool = False) -> dict[str,
     has_workers = hasattr(S, 'start_image_delivery_workers')
     if has_workers:
         S.start_image_delivery_workers()
+
+    if with_db:
+        from gsuid_core.models import Event
+        from TodayWaifu.TodayWaifu import daily_store as store
+
+        await prepare_db()
+        events = [
+            Event(bot_id='bot1', user_id=f'u{i}', group_id='g1', real_bot_id='bot1')
+            for i in range(n_draws)
+        ]
+        record_value = {'name': '今汐', 'role_ids': ['1304'], 'image': 'x', 'record_type': 'role'}
 
     sent: list[int] = []
 
@@ -156,6 +211,8 @@ async def run(n_draws: int, plugin_parent: str, warm: bool = False) -> dict[str,
         async with sem:                       # 命令协程占用 Core 并发额度
             # 进入临界区之后才是「命令真正占用额度」的时长 —— 这才是拖死 Core 的量
             entered = time.perf_counter()
+            if with_db:
+                await store._save_daily_record(events[index], 'wives', f'u{index}', record_value)
             await S._send_role_image(
                 bot, roles[index], urls[index], '文字', index, True, 'wife'
             )
@@ -181,6 +238,7 @@ async def run(n_draws: int, plugin_parent: str, warm: bool = False) -> dict[str,
     return {
         'draws': n_draws,
         'warm_cache': warm,
+        'with_db_write': with_db,
         'default_executor_threads': workers,
         'drain_seconds': round(drain, 2),
         'all_images_delivered_seconds': round(deliver_seconds, 2),
@@ -201,10 +259,10 @@ async def run(n_draws: int, plugin_parent: str, warm: bool = False) -> dict[str,
 def main() -> int:
     plugin_parent = sys.argv[1]
     n_draws = int(sys.argv[2]) if len(sys.argv) > 2 else 200
-    warm = len(sys.argv) > 3 and sys.argv[3] == 'warm'
+    flags = set(sys.argv[3:])
     server = start_server()
     try:
-        result = asyncio.run(run(n_draws, plugin_parent, warm))
+        result = asyncio.run(run(n_draws, plugin_parent, 'warm' in flags, 'db' in flags))
     finally:
         server.shutdown()
     print(json.dumps(result, ensure_ascii=False, indent=2))
