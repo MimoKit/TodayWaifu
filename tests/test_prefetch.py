@@ -109,11 +109,26 @@ class PrefetchBoundednessTests(unittest.TestCase):
 
     def test_prefetch_never_raises_out_of_the_loop(self) -> None:
         source = PREFETCH.read_text(encoding='utf-8')
-        loop = source[source.index('async def _prefetch_loop('):]
+        runner = source[
+            source.index('async def _run_prefetch_once('):source.index('async def _prefetch_loop(')
+        ]
         # 不允许 except Exception（skill 红线），但必须有具体异常兜底
-        self.assertNotIn('except Exception', loop)
-        self.assertIn('except asyncio.CancelledError', loop)
-        self.assertIn('except (OSError, RuntimeError, TimeoutError, ValueError)', loop)
+        self.assertNotIn('except Exception', runner)
+        self.assertIn('except asyncio.CancelledError', runner)
+        self.assertIn('except (OSError, RuntimeError, TimeoutError, ValueError)', runner)
+
+    def test_prefetch_runs_once_shortly_after_startup(self) -> None:
+        """重启可能发生在零点之后，那时缓存未必完整，必须补跑一次。"""
+        source = PREFETCH.read_text(encoding='utf-8')
+        loop = source[source.index('async def _prefetch_loop('):]
+        self.assertIn('await asyncio.sleep(PREFETCH_STARTUP_DELAY_SECONDS)', loop)
+        self.assertIn('await _run_prefetch_once()', loop)
+
+    def test_startup_delay_is_small_but_not_zero(self) -> None:
+        values = self._constants()
+        delay = values['PREFETCH_STARTUP_DELAY_SECONDS']
+        self.assertGreater(delay, 0, '不能为 0，否则和 Core 启动抢资源')
+        self.assertLessEqual(delay, 600, '也不能太久，否则重启后长时间没有预热')
 
 
 class PrefetchLifecycleTests(unittest.TestCase):

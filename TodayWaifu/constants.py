@@ -94,6 +94,11 @@ PREFETCH_MINUTE = 50
 PREFETCH_MAX_SECONDS = 10 * 60
 
 
+# 启动后多久补跑一次预热。重启可能发生在零点之后，那时缓存未必完整；
+# 已缓存的图会被跳过，所以补跑通常很便宜。
+PREFETCH_STARTUP_DELAY_SECONDS = 60
+
+
 # 状态页聚合的最小重算间隔：每次写入都失效会让控制台轮询次次打全表聚合
 STATUS_MIN_RECOMPUTE_SECONDS = 30.0
 

@@ -23,6 +23,7 @@ from .constants import (
     PREFETCH_HOUR,
     PREFETCH_MINUTE,
     PREFETCH_MAX_SECONDS,
+    PREFETCH_STARTUP_DELAY_SECONDS,
     _cfg_bool,
     _image_source,
 )
@@ -118,21 +119,30 @@ def seconds_until_prefetch(now: datetime | None = None) -> float:
     return (target - current).total_seconds()
 
 
+async def _run_prefetch_once() -> None:
+    started = time.monotonic()
+    try:
+        stats = await _prefetch_once()
+    except asyncio.CancelledError:
+        raise
+    except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+        logger.warning(f'{LOG_PREFIX} 图库预热失败: {exc}')
+        return
+    logger.info(
+        f'{LOG_PREFIX} 图库预热完成，耗时 {time.monotonic() - started:.1f} 秒: '
+        f'角色 {stats["roles"]}，新下载 {stats["downloaded"]}，'
+        f'已缓存 {stats["cached"]}，失败 {stats["failed"]}'
+    )
+
+
 async def _prefetch_loop() -> None:
+    # 启动后先补跑一次：重启可能发生在零点之后，那时缓存未必完整。
+    # 已缓存的图会被直接跳过，所以这次补跑通常很便宜。
+    await asyncio.sleep(PREFETCH_STARTUP_DELAY_SECONDS)
+    await _run_prefetch_once()
+
     while True:
         delay = seconds_until_prefetch()
         logger.debug(f'{LOG_PREFIX} 下次图库预热将在 {delay / 60:.1f} 分钟后开始')
         await asyncio.sleep(delay)
-        started = time.monotonic()
-        try:
-            stats = await _prefetch_once()
-        except asyncio.CancelledError:
-            raise
-        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
-            logger.warning(f'{LOG_PREFIX} 图库预热失败: {exc}')
-            continue
-        logger.info(
-            f'{LOG_PREFIX} 图库预热完成，耗时 {time.monotonic() - started:.1f} 秒: '
-            f'角色 {stats["roles"]}，新下载 {stats["downloaded"]}，'
-            f'已缓存 {stats["cached"]}，失败 {stats["failed"]}'
-        )
+        await _run_prefetch_once()
