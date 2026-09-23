@@ -58,6 +58,7 @@ from .shared import (
     _load_group_display_names,
     _get_other_daily_wife_name,
 )
+from .disabled_card import send_feature_disabled_notice
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
@@ -593,7 +594,7 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
 
 async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
     if not _marry_member_enabled():
-        return
+        return await send_feature_disabled_notice(bot, 'marry_member')
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群友命令')
     if not ev.group_id:
         return await _safe_send(bot,'这个命令只能在群聊里使用。')
@@ -683,7 +684,7 @@ async def daily_wife_full(bot: Bot, ev: Event) -> None:
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event) -> None:
     if not _cfg_bool('DailyWifeNteEnabled', False):
-        return
+        return await send_feature_disabled_notice(bot, 'nte')
     await _send_daily_wife(bot, ev, mode='nte', specified_name=str(ev.text or '').strip())
 
 
@@ -700,7 +701,7 @@ async def daily_nte_wife_prefix(bot: Bot, ev: Event) -> None:
 )
 async def daily_nte_wife_full(bot: Bot, ev: Event) -> None:
     if not _cfg_bool('DailyWifeNteEnabled', False):
-        return
+        return await send_feature_disabled_notice(bot, 'nte')
     await _send_daily_wife(bot, ev, mode='nte', specified_name='')
 
 
@@ -812,7 +813,7 @@ async def assign_wife_usage(bot: Bot, ev: Event) -> None:
 )
 async def daily_husband_prefix(bot: Bot, ev: Event) -> None:
     if not _husband_available():
-        return
+        return await send_feature_disabled_notice(bot, 'husband')
     specified_name = str(ev.text or '').strip()
     if specified_name == '列表':
         return await _send_wife_list(bot, ev, mode='husband')
@@ -832,7 +833,7 @@ async def daily_husband_prefix(bot: Bot, ev: Event) -> None:
 )
 async def daily_husband_full(bot: Bot, ev: Event) -> None:
     if not _husband_available():
-        return
+        return await send_feature_disabled_notice(bot, 'husband')
     await _send_daily_wife(bot, ev, mode='husband', specified_name='')
 
 
@@ -849,7 +850,7 @@ async def daily_husband_full(bot: Bot, ev: Event) -> None:
 )
 async def daily_husband_list(bot: Bot, ev: Event) -> None:
     if not _husband_available():
-        return
+        return await send_feature_disabled_notice(bot, 'husband')
     await _send_wife_list(bot, ev, mode='husband')
 
 

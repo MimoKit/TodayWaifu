@@ -35,6 +35,7 @@ from .shared import (
     _get_existing_daily_record,
 )
 from .payloads import PendingGift
+from .disabled_card import send_feature_disabled_notice
 
 GIFT_CONFIRM_TIMEOUT_SECONDS = 60
 GIFT_PENDING_MAX_ENTRIES = 4096
@@ -138,9 +139,9 @@ def clear_pending_gifts_for_user(ev: Event, user_id: str) -> None:
 async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     if kind == 'husband' and not _husband_available():
-        return
+        return await send_feature_disabled_notice(bot, 'husband')
     if not _gift_enabled(kind):
-        return
+        return await send_feature_disabled_notice(bot, f'gift_{kind}')
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起送{title}')
 
     target_user_id = _get_event_target_user_id(ev)
@@ -207,9 +208,9 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     _clear_pending_gift(ev, target_user_id, kind)
 
     if kind == 'husband' and not _husband_available():
-        return
+        return await send_feature_disabled_notice(bot, 'husband')
     if not _gift_enabled(kind):
-        return
+        return await send_feature_disabled_notice(bot, f'gift_{kind}')
 
     giver_record = await _get_existing_daily_record(ev, giver_id, kind)
     if giver_record is None:
