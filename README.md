@@ -1,4 +1,4 @@
-# TodayWaifu
+﻿# TodayWaifu
 
 <p align="center">
   <a href="https://github.com/MimoKit/TodayWaifu"><img src="./ICON.png" width="160" alt="TodayWaifu ICON"></a>
@@ -41,10 +41,6 @@ git clone https://github.com/MimoKit/TodayWaifu
 ```
 
 ## 丨快速上手
-
-> [!TIP]
-> 插件的「功能未开启」提示卡片使用 playwright 渲染。已执行过 `playwright install chromium`，
-> 或系统里装有 Chrome / Edge / Chromium / Brave 任意一款浏览器即可出图；都没有时会自动降级为文字提示。
 
 安装完成后，在聊天窗口发送以下指令即可获取完整的可视化帮助图：
 

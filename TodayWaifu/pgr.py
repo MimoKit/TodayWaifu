@@ -42,7 +42,6 @@ from .shared import (
     _invalidate_candidate_cache,
 )
 from .image_input import image_hash_id, read_image_bytes, collect_image_refs
-from .disabled_card import send_feature_disabled_notice
 from .folder_gallery import find_named_role_directory
 
 
@@ -201,7 +200,7 @@ async def _send_daily_pgr_wife(
     specified_name: str = '',
 ) -> None:
     if not _cfg_bool('DailyWifePgrEnabled', True):
-        return await send_feature_disabled_notice(bot, 'pgr')
+        return
 
     is_master = _is_master(ev)
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master

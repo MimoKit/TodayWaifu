@@ -50,7 +50,6 @@ from .image_input import (
     image_suffix_from_source,
 )
 from .source_cache import AsyncSourceCache
-from .disabled_card import send_feature_disabled_notice
 
 _LOLI_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 
@@ -446,7 +445,7 @@ async def _send_delete_loli(bot: Bot, ev: Event) -> None:
 )
 async def daily_loli(bot: Bot, ev: Event) -> None:
     if not _loli_enabled():  # noqa: F405
-        return await send_feature_disabled_notice(bot, 'loli')
+        return
     await _send_loli_image(bot, ev)
 
 

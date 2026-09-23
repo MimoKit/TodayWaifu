@@ -31,7 +31,6 @@ from .shared import (
 )
 from .image_input import image_hash_id
 from .source_cache import AsyncSourceCache
-from .disabled_card import send_feature_disabled_notice
 
 _SHOTA_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 
@@ -251,5 +250,5 @@ async def _send_shota_image(bot: Bot, ev: Event) -> None:
 )
 async def daily_shota(bot: Bot, ev: Event) -> None:
     if not _shota_enabled():
-        return await send_feature_disabled_notice(bot, 'shota')
+        return
     await _send_shota_image(bot, ev)

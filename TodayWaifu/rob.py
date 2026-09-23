@@ -33,7 +33,6 @@ from .shared import (
     _get_existing_daily_record,
 )
 from .payloads import RoleRecordValue
-from .disabled_card import send_feature_disabled_notice
 
 
 def _rob_enabled(kind: str) -> bool:
@@ -78,9 +77,9 @@ async def _send_rob_result_image(
 async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     if kind == 'husband' and not _husband_available():
-        return await send_feature_disabled_notice(bot, 'husband')
+        return
     if not _rob_enabled(kind):
-        return await send_feature_disabled_notice(bot, f'rob_{kind}')
+        return
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 发起抢{title}')
 
     target_user_id = _get_event_target_user_id(ev)
