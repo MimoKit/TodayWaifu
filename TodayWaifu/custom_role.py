@@ -28,6 +28,7 @@ from .shared import (
     _can_upload_images,
     _normalize_role_name,
     _writable_role_map_path,
+    _image_message_from_path,
     _writable_role_pile_root,
     _invalidate_candidate_cache,
 )
@@ -350,7 +351,7 @@ async def _send_custom_wife_image_list(bot: Bot, ev: Event) -> list[str] | None:
     nodes: list[Message | str] = []
     for hash_id, path in images:
         nodes.append(f'{role_name} 老婆图片ID：{hash_id}')
-        nodes.append(MessageSegment.image(path))
+        nodes.append(await _image_message_from_path(path))
     await _safe_send(bot, MessageSegment.node(nodes))
 
 

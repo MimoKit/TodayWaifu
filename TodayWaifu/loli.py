@@ -41,6 +41,7 @@ from .shared import (
     _save_daily_records,
     _http_get_with_retry,
     _send_loli_result_image,
+    _image_message_from_path,
 )
 from .executor import run_blocking
 from .image_input import (
@@ -405,7 +406,7 @@ async def _send_loli_image_list(bot: Bot, ev: Event) -> None:
     nodes: list[Message | str] = []
     for hash_id, path in image_map.items():
         nodes.append(f'萝莉图片ID：{hash_id}')
-        nodes.append(MessageSegment.image(path))
+        nodes.append(await _image_message_from_path(path))
     await _safe_send(bot, MessageSegment.node(nodes))
 
 

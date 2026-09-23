@@ -122,10 +122,12 @@ from .members import (
     _resolve_member_candidate_avatar,
 )
 from .senders import (
+    _image_message,
     _send_role_image,
     _send_local_image,
     _is_valid_image_ref,
     _send_loli_result_image,
+    _image_message_from_path,
     _send_daily_result_image,
     _send_shota_result_image,
 )
@@ -285,7 +287,7 @@ __all__ = [
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text', '_send_shota_text',
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image', '_send_shota_result_image',
-    '_send_role_image',
+    '_send_role_image', '_image_message', '_image_message_from_path',
     '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
     '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',

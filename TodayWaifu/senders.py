@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+from base64 import b64encode
 from pathlib import Path
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Message
-from gsuid_core.segment import MessageSegment
+from gsuid_core.segment import IS_UPLOAD, MessageSegment
 from gsuid_core.ai_core.trigger_bridge import ai_return
 
 from .roles import _load_local_candidates
@@ -79,6 +80,32 @@ class _ImageAcquireTimeout(RuntimeError):
     """图库图片获取超时；继承 RuntimeError 以复用既有的回退分支。"""
 
 
+def _encode_base64_ref(data: bytes) -> str:
+    """把图片字节编码成 `base64://` 引用（在线程池里调用）。"""
+    return f'base64://{b64encode(data).decode()}'
+
+
+async def _image_message(data: bytes) -> Message:
+    """把图片字节转成消息段，base64 编码在插件线程池里完成。
+
+    框架的 `MessageSegment.image(bytes)` 会**在事件循环上**同步执行
+    `b64encode(...).decode()`：实测 2MB 图约 8.8ms、10MB 图约 47.7ms，
+    25 个命令并发时就是几百毫秒的串行阻塞，整个 Core 一起卡。
+    预先编码成 `base64://` 再传入，框架（`IS_UPLOAD` 为假时）会原样透传，
+    事件循环上不再有任何编码开销。
+
+    `EnablePicSrv` 打开时框架需要原始字节做图床上传，这时只能把字节交给框架。
+    """
+    if IS_UPLOAD:
+        return MessageSegment.image(data)
+    return MessageSegment.image(await run_blocking(_encode_base64_ref, data))
+
+
+async def _image_message_from_path(path: Path) -> Message:
+    """从本地文件构造图片消息段；读盘与编码都在线程池里完成。"""
+    return await _image_message(await run_blocking(read_file_bytes_cached, path))
+
+
 async def _acquire_gallery_image(image_url: str) -> bytes:
     """获取图库图片字节，超时即放弃等待。
 
@@ -141,7 +168,7 @@ async def _send_role_image(
         messages.append('\n')
     if text:
         messages.append(text)
-    messages.append(MessageSegment.image(image))
+    messages.append(await _image_message(image))
     await _safe_send(bot, messages if len(messages) > 1 else messages[0])
 
 
@@ -193,7 +220,7 @@ async def _send_loli_result_image(
             image_ref = await run_blocking(read_file_bytes_cached, Path(image))
     else:
         image_ref = image
-    messages.append(MessageSegment.image(image_ref))
+    messages.append(await _image_message(image_ref))
     await _safe_send(bot, messages)
 
 
@@ -223,7 +250,7 @@ async def _send_local_image(
                 return
         else:
             image_bytes = await run_blocking(read_file_bytes_cached, Path(image_url))
-            messages.append(MessageSegment.image(image_bytes))
+            messages.append(await _image_message(image_bytes))
 
     if not messages:
         await _safe_send(bot, missing_hint)

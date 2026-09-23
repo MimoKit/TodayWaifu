@@ -135,7 +135,10 @@ class PlatformMentionTests(unittest.TestCase):
             start = source.index(f'async def {function_name}(')
             next_function = source.find('\nasync def ', start + 1)
             block = source[start:next_function if next_function >= 0 else None]
-            self.assertIn('MessageSegment.image(', block)
+            # 图片段必须经 _image_message 构造：它在插件线程池里做 base64，
+            # 避免框架的 MessageSegment.image(bytes) 在事件循环上同步编码大图
+            self.assertIn('await _image_message(', block)
+            self.assertNotIn('MessageSegment.image(image', block)
 
     def test_personal_compatibility_is_not_removed(self) -> None:
         combined = '\n'.join(
