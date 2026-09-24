@@ -139,15 +139,18 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(filtered, (role1,))
 
     def test_normal_gallery_api_url_default(self) -> None:
+        # 配置项已合并为统一的 DailyWifeApiUrl，默认地址取自 DEFAULT_GALLERY_BASE_URL
         globals_dict = {
             '_cfg': lambda key: '',
+            'DEFAULT_GALLERY_BASE_URL': 'https://twfapi.xlinxc.cn',
         }
         get_url = _extract_function(NORMAL_WIFE_PATH, '_normal_gallery_api_url', globals_dict)
-        self.assertEqual(get_url(), 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')
+        self.assertEqual(get_url(), 'https://twfapi.xlinxc.cn/api/ceshi/roles')
 
     def test_normal_gallery_api_url_custom(self) -> None:
         globals_dict = {
-            '_cfg': lambda key: 'https://custom.api.test/roles' if key == 'DailyWifeNormalGalleryApiUrl' else '',
+            '_cfg': lambda key: 'https://custom.api.test/roles' if key == 'DailyWifeApiUrl' else '',
+            'DEFAULT_GALLERY_BASE_URL': 'https://twfapi.xlinxc.cn',
         }
         get_url = _extract_function(NORMAL_WIFE_PATH, '_normal_gallery_api_url', globals_dict)
         self.assertEqual(get_url(), 'https://custom.api.test/roles')

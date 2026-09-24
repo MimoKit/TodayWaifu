@@ -13,7 +13,8 @@ class PgrFeatureSourceTests(unittest.TestCase):
 
         self.assertIn("'DailyWifePgrEnabled'", config)
         self.assertIn("'DailyWifePgrGalleryPath'", config)
-        self.assertIn("'DailyWifePgrGalleryApiUrl'", config)
+        # 战双图库地址已并入统一的 DailyWifeApiUrl
+        self.assertIn("'DailyWifeApiUrl'", config)
         self.assertIn("'DailyWifePgrTextTemplate'", config)
         self.assertIn("'DailyWifeImageUploadWhitelist'", config)
         self.assertTrue(

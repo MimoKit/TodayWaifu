@@ -32,7 +32,8 @@ class InteractionConfigSourceTests(unittest.TestCase):
                     if isinstance(key, ast.Constant) and isinstance(key.value, str):
                         keys.add(key.value)
         expected = {
-            'DailyWifeLoliApiUrl',
+            # 萝莉图库地址已并入统一的 DailyWifeApiUrl
+            'DailyWifeApiUrl',
             'DailyHusbandRobEnabled',
             'DailyHusbandRobSuccessTemplate',
             'DailyHusbandGiftEnabled',

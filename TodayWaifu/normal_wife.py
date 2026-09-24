@@ -10,6 +10,7 @@ from .shared import (
     RoleCandidate,
     _cfg,
     logger,
+    DEFAULT_GALLERY_BASE_URL,
     _fetch_gallery_payload_from_url_sync,
 )
 from .executor import run_blocking

@@ -27,8 +27,8 @@
         "expr": "GsStrConfig('老公角色 ID 对照表路径', '留空时使用插件内置 role_id_map.json 的 husband 节', '')"
       },
       {
-        "key": "DailyWifeGalleryApiUrl",
-        "expr": "GsStrConfig('图库接口地址', '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担', 'https://img.mimokit.dpdns.org/api/xwuid/roles')"
+        "key": "DailyWifeApiUrl",
+        "expr": "GsStrConfig('图库接口统一地址', '今日老婆全套图库接口统一地址，默认使用 https://twfapi.xlinxc.cn。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担', 'https://twfapi.xlinxc.cn')"
       },
       {
         "key": "DailyWifeNormalEnabled",
@@ -51,28 +51,12 @@
         "expr": "GsIntConfig('每个角色预热图片数', '预热时每个角色最多下载几张图。数值越大命中率越高、占用带宽越多；设为 0 可只保留开关效果', 2, 20)"
       },
       {
-        "key": "DailyWifeNormalGalleryApiUrl",
-        "expr": "GsStrConfig('普通老婆图库地址', '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌', 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles')"
-      },
-      {
         "key": "DailyWifeNormalTextTemplate",
         "expr": "GsStrConfig('今日普通老婆文字模板', '可用变量：{name} 角色名，{role_id} 作品名', '你今天的老婆是来自{role_id}的{name}！')"
       },
       {
-        "key": "DailyWifeLoliApiUrl",
-        "expr": "GsStrConfig('今日萝莉接口地址', 'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库', 'https://loli.mimokit.dpdns.org')"
-      },
-      {
-        "key": "DailyShotaGalleryApiUrl",
-        "expr": "GsStrConfig('今日正太接口地址', 'GET 返回正太角色图库 JSON（roles[].role_ids/images[].url）；访问时复用图库访问令牌', 'https://zt.mimokit.dpdns.org')"
-      },
-      {
-        "key": "DailyWifePgrGalleryApiUrl",
-        "expr": "GsStrConfig('战双图库接口地址', 'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。', 'https://pgr.mimokit.dpdns.org/api/xwuid/roles')"
-      },
-      {
         "key": "DailyWifeGalleryToken",
-        "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取；留空则不携带令牌', '')"
+        "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌', '')"
       },
       {
         "key": "DailyWifeImageUploadWhitelist",
