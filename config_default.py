@@ -363,3 +363,99 @@ APPEARANCE_CONFIG_DEFAULT: Dict[str, GSC] = {
         10,
     ),
 }
+
+
+# QQ 官方机器人：独立成页，由 DailyWifeQQBotConfig 承载（见 daily_wife_config.py）。
+# 官方机器人（qqgroup / qqguild）发不出本地图片，必须先把结果图上传到公网图床，
+# 再用 Markdown 引用。整块默认关闭，关闭时发送路径与普通平台完全一致。
+#
+# 注意：**不做平台自动检测**。是否走官方机器人链路完全由本页开关决定，
+# 不嗅探 bot_id 前缀，避免「在官方平台上但没配图床」导致静默降级。
+QQBOT_CONFIG_DEFAULT: Dict[str, GSC] = {
+    'DailyWifeQQBotEnabled': GsBoolConfig(
+        '启用 QQ 官方机器人模式',
+        '开启后，结果图改为「上传图床 + Markdown」发送，并支持内联按钮；'
+        '其它平台不受影响。关闭则与普通平台完全一致。本插件不自动检测平台，仅由此开关决定',
+        False,
+    ),
+    'DailyWifeQQBotImageHost': GsStrConfig(
+        '图片外链后端',
+        '选择 cos 使用腾讯云对象存储，选择 cnb 使用 CNB，选择 off 不启用图床',
+        'cos',
+        options=['cos', 'cnb', 'off'],
+    ),
+    'DailyWifeQQBotKeyboard': GsBoolConfig(
+        '结果附带内联按钮',
+        '开启后「娶群友」结果下方附带「摸头 / 离婚 / 今日老婆 / 今日萝莉」按钮',
+        True,
+    ),
+    'DailyWifeQQBotAtUser': GsBoolConfig(
+        'Markdown 中艾特触发者',
+        '开启后在 Markdown 正文开头加 <@用户ID>，仅群聊生效',
+        True,
+    ),
+    '_DividerCos': GsDivider('腾讯云 COS', ''),
+    'DailyWifeCosRegion': GsStrConfig(
+        'COS 地域',
+        '存储桶所在地域，例如 ap-guangzhou、ap-shanghai',
+        'ap-guangzhou',
+    ),
+    'DailyWifeCosBucket': GsStrConfig(
+        'COS 存储桶',
+        '格式为「桶名-APPID」，例如 qqbot-1436882375',
+        '',
+    ),
+    'DailyWifeCosSecretId': GsStrConfig(
+        'COS SecretId',
+        '腾讯云 API 密钥 SecretId；与 SecretKey 一并留空则不启用 COS',
+        '',
+    ),
+    'DailyWifeCosSecretKey': GsStrConfig(
+        'COS SecretKey',
+        '腾讯云 API 密钥 SecretKey，仅保存在你自己的运行配置中，不会随插件分发',
+        '',
+    ),
+    'DailyWifeCosPathPrefix': GsStrConfig(
+        'COS 路径前缀',
+        '对象键前缀，便于把插件图片与桶内其它文件分开，留空则直接放根目录',
+        'todaywaifu',
+    ),
+    'DailyWifeCosPublicBase': GsStrConfig(
+        'COS 公网访问前缀',
+        '留空使用默认 https://<桶名>.cos.<地域>.myqcloud.com；绑定了 CDN 或自定义域名时填这里',
+        '',
+    ),
+    'DailyWifeCosTimeout': GsIntConfig(
+        'COS 上传超时(秒)',
+        '单次上传的超时时间，网络较差时可适当调大',
+        20,
+        120,
+    ),
+    '_DividerCnb': GsDivider('CNB', ''),
+    'DailyWifeCnbApiBase': GsStrConfig(
+        'CNB API 地址',
+        '选择 cnb 后端时使用，一般无需修改',
+        'https://api.cnb.cool',
+    ),
+    'DailyWifeCnbPublicBase': GsStrConfig(
+        'CNB 公共地址',
+        '选择 cnb 后端时用于拼接图片公开地址，一般无需修改',
+        'https://cnb.cool',
+    ),
+    'DailyWifeCnbRepo': GsStrConfig(
+        'CNB 仓库',
+        '选择 cnb 后端时使用，格式为「组织名/仓库名」',
+        '',
+    ),
+    'DailyWifeCnbToken': GsStrConfig(
+        'CNB 令牌',
+        '选择 cnb 后端时使用，需要目标仓库的图片上传权限',
+        '',
+    ),
+    '_DividerMeme': GsDivider('表情包', ''),
+    'DailyWifeMemeGeneratorUrl': GsStrConfig(
+        '表情包后端地址',
+        '「摸头」按钮使用的 meme-generator 后端根地址，留空则「摸头」不可用',
+        '',
+    ),
+}
