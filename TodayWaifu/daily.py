@@ -614,7 +614,6 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         text,
         ev.user_id,
         ev.group_id is not None,
-        with_keyboard=True,
     )
 
 

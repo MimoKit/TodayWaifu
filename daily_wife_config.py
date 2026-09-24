@@ -5,7 +5,7 @@ from pathlib import Path
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.gs_config import StringConfig
 
-from .config_default import CONFIG_DEFAULT, QQBOT_CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
+from .config_default import CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
 
 # 配置文件放在 GsCore data 目录下，避免插件升级/卸载时丢失
 CONFIG_PATH = get_res_path('TodayWaifu') / 'config.json'
@@ -80,11 +80,3 @@ DailyWifeShowConfig = StringConfig(
 # 手动补回正确值，确保 webconsole 能关联到本插件的配置
 DailyWifeConfig.plugin_name = 'TodayWaifu'
 DailyWifeShowConfig.plugin_name = 'TodayWaifu'
-
-# 第三页：QQ 官方机器人专用配置。独立文件，便于单独备份/清理密钥。
-DailyWifeQQBotConfig = StringConfig(
-    '今日老婆QQBot配置',
-    get_res_path('TodayWaifu') / 'qqbot_config.json',
-    QQBOT_CONFIG_DEFAULT,
-)
-DailyWifeQQBotConfig.plugin_name = 'TodayWaifu'

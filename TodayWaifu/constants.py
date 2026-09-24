@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .payloads import ConfigValue
 from .kind_metadata import DailyKindMetadata, daily_kind_metadata
-from ..daily_wife_config import DailyWifeConfig, DailyWifeQQBotConfig
+from ..daily_wife_config import DailyWifeConfig
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -213,40 +213,6 @@ def _cfg_probability(key: str, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         value = default
     return max(0.0, min(1.0, value))
-
-
-def _cfg_int(key: str, default: int) -> int:
-    try:
-        return int(_cfg(key))
-    except (TypeError, ValueError):
-        return default
-
-
-def _qqbot_cfg(key: str) -> ConfigValue:
-    """读取第三页「今日老婆QQBot配置」中的配置项。"""
-    return DailyWifeQQBotConfig.get_config(key).data
-
-
-def _qqbot_cfg_bool(key: str, default: bool = False) -> bool:
-    value = _qqbot_cfg(key)
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return bool(value)
-    if isinstance(value, str):
-        text = value.strip().lower()
-        if text in {'true', '1', 'yes', 'y', 'on', 'enable', 'enabled', '开启'}:
-            return True
-        if text in {'false', '0', 'no', 'n', 'off', 'disable', 'disabled', '关闭'}:
-            return False
-    return default
-
-
-def _qqbot_cfg_int(key: str, default: int) -> int:
-    try:
-        return int(_qqbot_cfg(key))
-    except (TypeError, ValueError):
-        return default
 
 
 def _image_source() -> str:

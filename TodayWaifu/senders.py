@@ -12,14 +12,6 @@ from gsuid_core.models import Message
 from gsuid_core.segment import IS_UPLOAD, MessageSegment
 from gsuid_core.ai_core.trigger_bridge import ai_return
 
-from .qqbot import (
-    QQBotImageError,
-    upload_image,
-    qqbot_enabled,
-    build_image_markdown,
-    qqbot_image_host_ready,
-    build_marry_member_keyboard,
-)
 from .roles import _load_local_candidates
 from .domain import RoleCandidate
 from .gallery import _download_image
@@ -168,9 +160,6 @@ async def _deliver_role_image(
         # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
         image = await run_blocking(read_file_bytes_cached, Path(image_url))
 
-    if await _try_qqbot_markdown_image(bot, image, text, user_id, is_group):
-        return
-
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -200,38 +189,6 @@ async def _deliver_daily_result_image(
     await _deliver_loli_result_image(bot, image, text, user_id, is_group, kind)
 
 
-async def _try_qqbot_markdown_image(
-    bot: Bot,
-    image: bytes,
-    text: str | None,
-    user_id: str | int | None,
-    is_group: bool,
-    keyboard: list[list[object]] | None = None,
-) -> bool:
-    """尝试走 QQ 官方机器人链路（上传图床 + Markdown）。
-
-    返回 True 表示已发送；False 表示调用方应回退到普通图片发送。
-
-    是否启用**只看配置开关**，不做平台自动检测：开关关闭时这里直接返回 False，
-    发送路径与普通平台逐字节一致。开关打开但图床未配置/上传失败时同样回退，
-    只打 warning，不让一次上传失败吞掉整条命令的结果。
-    """
-    if not qqbot_enabled():
-        return False
-    if not qqbot_image_host_ready():
-        logger.warning(f'{LOG_PREFIX} 已开启 QQBot 模式但图床未配置完整，回退普通发送')
-        return False
-    try:
-        image_url, size = await upload_image(image)
-        markdown = build_image_markdown(image_url, size, text, user_id, is_group)
-        message = MessageSegment.markdown(markdown, buttons=keyboard)
-        await _safe_send(bot, message)
-    except QQBotImageError as exc:
-        logger.warning(f'{LOG_PREFIX} QQBot Markdown 发送失败，回退普通图片: {exc}')
-        return False
-    return True
-
-
 async def _deliver_loli_result_image(
     bot: Bot,
     image: str | bytes,
@@ -258,8 +215,6 @@ async def _deliver_loli_result_image(
             image_ref = await run_blocking(read_file_bytes_cached, Path(image))
     else:
         image_ref = image
-    if await _try_qqbot_markdown_image(bot, image_ref, text, user_id, is_group):
-        return
     messages.append(await _image_message(image_ref))
     await _safe_send(bot, messages)
 
@@ -436,9 +391,7 @@ async def _send_local_image(
     user_id: str | int | None = None,
     is_group: bool = True,
     kind: str = 'wife',
-    with_keyboard: bool = False,
 ) -> None:
-    keyboard = build_marry_member_keyboard() if with_keyboard else None
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -453,10 +406,6 @@ async def _send_local_image(
                 return
         else:
             image_bytes = await run_blocking(read_file_bytes_cached, Path(image_url))
-            if await _try_qqbot_markdown_image(
-                bot, image_bytes, text, user_id, is_group, keyboard
-            ):
-                return
             messages.append(await _image_message(image_bytes))
 
     if not messages:
