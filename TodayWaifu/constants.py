@@ -192,26 +192,6 @@ def _cfg(key: str) -> ConfigValue:
     return DailyWifeConfig.get_config(key).data
 
 
-def _qqbot_cfg(key: str) -> ConfigValue:
-    """读取「QQ 官方机器人」独立配置页的项。"""
-    return DailyWifeQQBotConfig.get_config(key).data
-
-
-def _qqbot_cfg_bool(key: str, default: bool = False) -> bool:
-    value = _qqbot_cfg(key)
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return bool(value)
-    if isinstance(value, str):
-        text = value.strip().lower()
-        if text in {'true', '1', 'yes', 'y', 'on', 'enable', 'enabled', '开启'}:
-            return True
-        if text in {'false', '0', 'no', 'n', 'off', 'disable', 'disabled', '关闭'}:
-            return False
-    return default
-
-
 def _cfg_bool(key: str, default: bool = False) -> bool:
     value = _cfg(key)
     if isinstance(value, bool):
