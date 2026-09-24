@@ -28,8 +28,10 @@ def invalidate_normal_gallery_cache() -> None:
 
 
 def _normal_gallery_api_url() -> str:
-    url = str(_cfg('DailyWifeNormalGalleryApiUrl') or _cfg('DailyWifeRandomGalleryApiUrl') or '').strip()
-    return url or 'https://ceshi.mimokit.dpdns.org/api/ceshi/roles'
+    url = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifeNormalGalleryApiUrl') or _cfg('DailyWifeRandomGalleryApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    if '/ceshi/' in url or url.endswith('/roles'):
+        return url
+    return f'{url}/api/ceshi/roles'
 
 
 def _parse_normal_gallery_candidates(

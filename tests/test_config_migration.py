@@ -42,19 +42,17 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(
             forced_urls,
             {
-                'DailyWifeGalleryApiUrl': 'https://img.mimokit.dpdns.org/api/xwuid/roles',
-                'DailyWifeLoliApiUrl': 'https://loli.mimokit.dpdns.org',
+                'DailyWifeApiUrl': 'https://twfapi.xlinxc.cn',
             },
         )
 
     def test_first_start_overwrites_empty_and_custom_values_once(self) -> None:
         migration = _migration_module()
         with TemporaryDirectory() as directory:
-            marker = Path(directory) / '.remote_urls_v2_migrated'
+            marker = Path(directory) / '.remote_urls_v3_migrated'
             config = SimpleNamespace(
                 config={
-                    'DailyWifeGalleryApiUrl': SimpleNamespace(data='https://custom.example.test/gallery'),
-                    'DailyWifeLoliApiUrl': SimpleNamespace(data=''),
+                    'DailyWifeApiUrl': SimpleNamespace(data='https://custom.example.test/gallery'),
                 },
                 write_count=0,
             )
@@ -64,36 +62,38 @@ class ConfigMigrationTests(unittest.TestCase):
 
             config.write_config = write_config
             namespace = {
+                'CONFIG_PATH': marker.parent / 'config.json',
                 'DailyWifeConfig': config,
                 '_FORCED_URL_MIGRATION_MARKER': marker,
                 '_FORCED_REMOTE_URLS': {
-                    'DailyWifeGalleryApiUrl': 'https://img.mimokit.dpdns.org/api/xwuid/roles',
-                    'DailyWifeLoliApiUrl': 'https://loli.mimokit.dpdns.org',
+                    'DailyWifeApiUrl': 'https://twfapi.xlinxc.cn',
                 },
+                '_LEGACY_KEYS_TO_REMOVE': [
+                    'DailyWifeGalleryApiUrl',
+                    'DailyWifeNormalGalleryApiUrl',
+                    'DailyWifeLoliApiUrl',
+                    'DailyShotaGalleryApiUrl',
+                    'DailyWifePgrGalleryApiUrl',
+                    'DailyWifeRandomGalleryApiUrl',
+                ],
             }
             code = compile(migration, '<config-migration>', 'exec')
             exec(code, namespace)
 
             self.assertEqual(
-                config.config['DailyWifeGalleryApiUrl'].data,
-                'https://img.mimokit.dpdns.org/api/xwuid/roles',
-            )
-            self.assertEqual(
-                config.config['DailyWifeLoliApiUrl'].data,
-                'https://loli.mimokit.dpdns.org',
+                config.config['DailyWifeApiUrl'].data,
+                'https://twfapi.xlinxc.cn',
             )
             self.assertEqual(config.write_count, 1)
             self.assertTrue(marker.is_file())
 
-            config.config['DailyWifeGalleryApiUrl'].data = 'https://later.example.test/gallery'
-            config.config['DailyWifeLoliApiUrl'].data = ''
+            config.config['DailyWifeApiUrl'].data = 'https://later.example.test/gallery'
             exec(code, namespace)
 
             self.assertEqual(
-                config.config['DailyWifeGalleryApiUrl'].data,
+                config.config['DailyWifeApiUrl'].data,
                 'https://later.example.test/gallery',
             )
-            self.assertEqual(config.config['DailyWifeLoliApiUrl'].data, '')
             self.assertEqual(config.write_count, 1)
 
 

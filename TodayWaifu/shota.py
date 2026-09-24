@@ -28,6 +28,7 @@ from .shared import (
     _save_daily_records,
     _http_get_with_retry,
     _send_shota_result_image,
+    DEFAULT_GALLERY_BASE_URL,
 )
 from .executor import run_blocking
 from .image_input import image_hash_id
@@ -138,11 +139,18 @@ def _shota_unavailable_text(record_data: RoleRecordValue) -> str | None:
     return None
 
 
+def _shota_api_url() -> str:
+    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyShotaGalleryApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    if base.endswith('/shota') or base.endswith('/zt'):
+        return base
+    return f'{base}/shota'
+
+
 async def _roll_shota_record(
     ev: Event,
     user_key: str,
 ) -> tuple[WifeRecord | None, str | None]:
-    custom_url = str(_cfg('DailyShotaGalleryApiUrl') or 'https://zt.mimokit.dpdns.org').strip()
+    custom_url = _shota_api_url()
     if not custom_url:
         return None, '未配置正太图库接口地址。'
 

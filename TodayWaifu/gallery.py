@@ -39,6 +39,7 @@ from .constants import (
     HTTP_RETRIES,
     CACHE_TTL_SECONDS,
     RETRY_JITTER_SECONDS,
+    DEFAULT_GALLERY_BASE_URL,
     DEFAULT_GALLERY_API_URL,
     RETRY_MAX_DELAY_SECONDS,
     CIRCUIT_COOLDOWN_SECONDS,
@@ -57,7 +58,12 @@ from .circuit_breaker import CircuitBreaker
 
 
 def _pgr_gallery_api_url() -> str:
-    return str(_cfg('DailyWifePgrGalleryApiUrl') or '').strip()
+    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifePgrGalleryApiUrl') or '').strip().rstrip('/')
+    if not base:
+        return ''
+    if '/pgr/' in base or base.endswith('/roles'):
+        return base
+    return f'{base}/api/pgr/roles'
 
 
 def _parse_pgr_gallery_candidates(payload: GalleryPayload) -> tuple[RoleCandidate, ...]:
@@ -100,7 +106,10 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
 
 
 def _gallery_api_url() -> str:
-    return str(_cfg('DailyWifeGalleryApiUrl') or DEFAULT_GALLERY_API_URL).strip()
+    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifeGalleryApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    if base.endswith('/roles'):
+        return base
+    return f'{base}/api/xwuid/roles'
 
 
 def _request_headers() -> dict[str, str]:

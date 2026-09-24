@@ -45,10 +45,10 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '留空时使用插件内置 role_id_map.json 的 husband 节',
         '',
     ),
-    'DailyWifeGalleryApiUrl': GsStrConfig(
-        '图库接口地址',
-        '图库角色立绘接口地址，默认使用 https://img.mimokit.dpdns.org/api/xwuid/roles。启用图库即表示已知晓图片内容风险并自行承担',
-        'https://img.mimokit.dpdns.org/api/xwuid/roles',
+    'DailyWifeApiUrl': GsStrConfig(
+        '图库接口统一地址',
+        '今日老婆全套图库接口统一地址，默认使用 https://twfapi.xlinxc.cn。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担',
+        'https://twfapi.xlinxc.cn',
     ),
     'DailyWifeNormalEnabled': GsBoolConfig(
         '启用普通老婆',
@@ -79,34 +79,14 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         2,
         20,
     ),
-    'DailyWifeNormalGalleryApiUrl': GsStrConfig(
-        '普通老婆图库地址',
-        '普通老婆远程图库接口地址，返回 roles[].role_ids/name/images[].url；访问时复用图库访问令牌',
-        'https://ceshi.mimokit.dpdns.org/api/ceshi/roles',
-    ),
     'DailyWifeNormalTextTemplate': GsStrConfig(
         '今日普通老婆文字模板',
         '可用变量：{name} 角色名，{role_id} 作品名',
         '你今天的老婆是来自{role_id}的{name}！',
     ),
-    'DailyWifeLoliApiUrl': GsStrConfig(
-        '今日萝莉接口地址',
-        'GET 返回与今日老婆同构的 JSON（roles[].role_ids/images[].url），留空则改用本地萝莉图库',
-        'https://loli.mimokit.dpdns.org',
-    ),
-    'DailyShotaGalleryApiUrl': GsStrConfig(
-        '今日正太接口地址',
-        'GET 返回正太角色图库 JSON（roles[].role_ids/images[].url）；访问时复用图库访问令牌',
-        'https://zt.mimokit.dpdns.org',
-    ),
-    'DailyWifePgrGalleryApiUrl': GsStrConfig(
-        '战双图库接口地址',
-        'GET 返回战双角色图库 JSON；接口不可用时回退本地战双图库。',
-        'https://pgr.mimokit.dpdns.org/api/xwuid/roles',
-    ),
     'DailyWifeGalleryToken': GsStrConfig(
         '图库访问令牌',
-        '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取；留空则不携带令牌',
+        '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
         '',
     ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(
@@ -381,5 +361,100 @@ APPEARANCE_CONFIG_DEFAULT: Dict[str, GSC] = {
         '控制帮助图每组展示数量，默认 4，可按需要调整',
         4,
         10,
+    ),
+}
+
+
+# QQ 官方机器人：独立成页，由 DailyWifeQQBotConfig 承载（见 daily_wife_config.py）。
+# 官方机器人（qqgroup / qqguild）发不出本地图片，必须先把结果图上传到公网图床，
+# 再用 Markdown 引用。整块默认关闭，关闭时发送路径与普通平台完全一致。
+QQBOT_CONFIG_DEFAULT: Dict[str, GSC] = {
+    'DailyWifeQQBotEnabled': GsBoolConfig(
+        '启用 QQBot 模式',
+        '开启后，QQ 官方机器人发送结果图时改走「上传图床 + Markdown」并支持内联按钮；'
+        '其它平台不受影响。关闭则与普通平台完全一致',
+        False,
+    ),
+    'DailyWifeQQBotImageHost': GsStrConfig(
+        '图片外链后端',
+        '选择 cos 使用腾讯云对象存储，选择 cnb 使用 CNB，选择 off 不启用图床',
+        'cos',
+        options=['cos', 'cnb', 'off'],
+    ),
+    'DailyWifeQQBotKeyboard': GsBoolConfig(
+        '结果附带内联按钮',
+        '开启后「娶群友」结果下方附带「摸头 / 离婚 / 今日老婆 / 今日萝莉」按钮',
+        True,
+    ),
+    'DailyWifeQQBotAtUser': GsBoolConfig(
+        'Markdown 中艾特触发者',
+        '开启后在 Markdown 正文开头加 <@用户ID>，仅群聊生效',
+        True,
+    ),
+    'DailyWifeQQBotMarkdownList': GsBoolConfig(
+        '列表使用 Markdown 引用块',
+        '开启后「老婆列表」在 QQ 官方机器人上以 Markdown 引用块发送，避免转发消息不被支持',
+        True,
+    ),
+    'DailyWifeCosRegion': GsStrConfig(
+        'COS 地域',
+        '存储桶所在地域，例如 ap-guangzhou、ap-shanghai',
+        'ap-guangzhou',
+    ),
+    'DailyWifeCosBucket': GsStrConfig(
+        'COS 存储桶',
+        '格式为「桶名-APPID」，例如 qqbot-1436882375',
+        '',
+    ),
+    'DailyWifeCosSecretId': GsStrConfig(
+        'COS SecretId',
+        '腾讯云 API 密钥 SecretId；与 SecretKey 一并留空则不启用 COS',
+        '',
+    ),
+    'DailyWifeCosSecretKey': GsStrConfig(
+        'COS SecretKey',
+        '腾讯云 API 密钥 SecretKey，仅保存在你自己的运行配置中，不会随插件分发',
+        '',
+    ),
+    'DailyWifeCosPathPrefix': GsStrConfig(
+        'COS 路径前缀',
+        '对象键前缀，便于把插件图片与桶内其它文件分开，留空则直接放根目录',
+        'todaywaifu',
+    ),
+    'DailyWifeCosPublicBase': GsStrConfig(
+        'COS 公网访问前缀',
+        '留空使用默认 https://<桶名>.cos.<地域>.myqcloud.com；绑定了 CDN 或自定义域名时填这里',
+        '',
+    ),
+    'DailyWifeCosTimeout': GsIntConfig(
+        'COS 上传超时(秒)',
+        '单次上传的超时时间，网络较差时可适当调大',
+        20,
+        120,
+    ),
+    'DailyWifeCnbApiBase': GsStrConfig(
+        'CNB API 地址',
+        '选择 cnb 后端时使用，一般无需修改',
+        'https://api.cnb.cool',
+    ),
+    'DailyWifeCnbPublicBase': GsStrConfig(
+        'CNB 公共地址',
+        '选择 cnb 后端时用于拼接图片公开地址，一般无需修改',
+        'https://cnb.cool',
+    ),
+    'DailyWifeCnbRepo': GsStrConfig(
+        'CNB 仓库',
+        '选择 cnb 后端时使用，格式为「组织名/仓库名」',
+        '',
+    ),
+    'DailyWifeCnbToken': GsStrConfig(
+        'CNB 令牌',
+        '选择 cnb 后端时使用，需要目标仓库的图片上传权限',
+        '',
+    ),
+    'DailyWifeMemeGeneratorUrl': GsStrConfig(
+        '表情包后端地址',
+        '「摸头」按钮使用的 meme-generator 后端根地址，留空则「摸头」不可用',
+        '',
     ),
 }
