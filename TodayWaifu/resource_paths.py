@@ -30,3 +30,8 @@ def pgr_root() -> Path:
 
 def loli_root() -> Path:
     return data_root() / LOLI_IMAGE_DIR_NAME
+
+
+def role_quotes_path() -> Path:
+    return data_root() / 'role_quotes.json'
+

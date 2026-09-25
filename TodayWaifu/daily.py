@@ -31,6 +31,7 @@ from .shared import (
     husband_list_sv,
     marry_member_sv,
     specify_wife_sv,
+    _can_assign_wife,
     _load_candidates,
     _send_role_image,
     daily_husband_sv,
@@ -60,7 +61,7 @@ from .shared import (
 )
 
 
-def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
+def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> str:
     if mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
         template = str(_cfg('DailyWifeNormalTextTemplate') or '').strip()
         if not template:
@@ -74,10 +75,20 @@ def _build_text(role: RoleCandidate, mode: str = 'wife') -> str:
         template.format(
             name=role.name,
             role_id=work or ('/'.join(role.role_ids) if role.role_ids else ''),
+            user_id=user_id,
         )
     ]
+    if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', True)):
+        quote_fn = globals().get('get_role_quote')
+        if quote_fn is not None:
+            quote = quote_fn(role.name)
+            if quote:
+                lines.append(quote)
     if bool(_cfg('DailyWifeShowRoleId')) and mode != 'normal':
         lines.append(f'角色ID：{"/".join(role.role_ids)}')
+    # 部分平台没有数字 QQ 号，群友只能复制这串 ID 来抢，故单独留开关
+    if user_id and bool(_cfg('DailyWifeShowUserId')) and mode != 'normal':
+        lines.append(f'你的ID：{user_id}')
     return '\n'.join(lines)
 
 
@@ -89,10 +100,10 @@ def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
     return template.format(name=member.name, user_id=member.user_id)
 
 
-def _record_text(record: WifeRecord, mode: str = 'wife') -> str:
+def _record_text(record: WifeRecord, mode: str = 'wife', user_id: str = '') -> str:
     if record.record_type == 'member':
         return _build_member_text(record.to_member())
-    return _build_text(record.to_role(), mode)
+    return _build_text(record.to_role(), mode, user_id)
 
 
 async def _ensure_daily_wife_record(
@@ -282,7 +293,11 @@ async def _send_record_image(
     user_id: str | int | None = None,
     is_group: bool = True,
 ) -> None:
-    text = _record_text(record, mode) if bool(_cfg('DailyWifeSendText')) else None
+    text = (
+        _record_text(record, mode, str(user_id or ''))
+        if bool(_cfg('DailyWifeSendText'))
+        else None
+    )
     if record.record_type == 'member':
         await _send_local_image(
             bot,
@@ -543,8 +558,8 @@ def _find_assignable_wife(candidates: tuple[RoleCandidate, ...], role_name: str)
 
 async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起主人分配老婆命令')
-    if not _is_master(ev):
-        return await _safe_send(bot, '只有机器人主人可以分配老婆。')
+    if not _can_assign_wife(ev):
+        return await _safe_send(bot, '只有机器人主人或分配老婆白名单用户可以分配老婆。')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:

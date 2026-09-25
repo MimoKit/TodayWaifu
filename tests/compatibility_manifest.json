@@ -119,12 +119,28 @@
         "expr": "GsBoolConfig('显示角色 ID', '开启后文字说明会额外附带一行\"角色ID：xxx\"', False)"
       },
       {
+        "key": "DailyWifeImageMaxSizeMB",
+        "expr": "GsIntConfig('角色图片最大体积(MB)', '发送角色立绘/图库图片前自动压缩的最大体积上限（MB），超出时转为 JPEG 压缩至该大小以内；设为 0 表示不压缩。适用于 QQ 官方机器人等对图片体积有严格限制的协议端', 2, 50)"
+      },
+      {
+        "key": "DailyWifeSendRoleQuote",
+        "expr": "GsBoolConfig('发送角色剧情与对话台词', '开启后抽取今日老婆时，在文字后附带角色剧情或对话台词', True)"
+      },
+      {
+        "key": "DailyWifeShowUserId",
+        "expr": "GsBoolConfig('显示触发者 ID', '开启后文字说明额外附带一行“你的ID：xxx”，方便 QQ 官方机器人等平台的群友复制 OpenID 进行抢老婆/送老婆', False)"
+      },
+      {
         "key": "DailyWifeDebugMode",
         "expr": "GsBoolConfig('主人 Debug 模式', '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试', False)"
       },
       {
         "key": "_DividerAssignWife",
         "expr": "GsDivider('分配老婆', '')"
+      },
+      {
+        "key": "DailyWifeAssignWhitelist",
+        "expr": "GsListStrConfig('分配老婆白名单', '允许使用分配老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-分配老婆”服务中配置', [])"
       },
       {
         "key": "DailyWifeSpecifyWhitelist",

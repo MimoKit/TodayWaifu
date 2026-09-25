@@ -145,7 +145,11 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
-        return await _safe_send(bot, '要送给谁？请艾特对方或在命令后面写对方 QQ。')
+        return await _safe_send(
+            bot,
+            '要送给谁？请艾特对方，或在命令后面写对方 QQ。\n'
+            'QQ 官方机器人等没有 QQ 号的平台，可直接粘贴对方的用户 ID。',
+        )
 
     giver_id = _user_key(ev)
     if target_user_id == giver_id:

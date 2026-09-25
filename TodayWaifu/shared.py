@@ -160,9 +160,9 @@ from .constants import (
     EXCLUDED_ROLE_KEYWORDS,
     LIST_FORWARD_THRESHOLD,
     UPLOAD_IMAGE_MAX_BYTES,
-    DEFAULT_GALLERY_BASE_URL,
     DEFAULT_GALLERY_API_URL,
     CIRCUIT_COOLDOWN_SECONDS,
+    DEFAULT_GALLERY_BASE_URL,
     LOLI_DOWNLOAD_LOG_PREFIX,
     MAX_IMAGE_RESPONSE_BYTES,
     CIRCUIT_FAILURE_THRESHOLD,
@@ -216,7 +216,7 @@ from .daily_store import (
 from .invalidation import _invalidate_candidate_cache
 from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
-from .upload_access import can_upload_images, normalized_user_ids
+from .upload_access import can_upload_images, normalized_user_ids, can_use_whitelisted_feature
 from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
 from .circuit_breaker import CircuitBreaker
 from .daily_repository import ContextKey, ContextRegistry
@@ -230,7 +230,7 @@ Plugins(
 
 help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
-assign_wife_sv = SV('今日老婆-主人分配', pm=1, priority=2)
+assign_wife_sv = SV('今日老婆-分配老婆', priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
@@ -283,7 +283,7 @@ __all__ = [
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
-    '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
+    '_can_assign_wife', '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
     '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_scan_local_candidates', '_load_role_map',
@@ -342,10 +342,19 @@ def _can_upload_images(ev: Event) -> bool:
     )
 
 
+def _can_assign_wife(ev: Event) -> bool:
+    return _is_master(ev) or can_use_whitelisted_feature(
+        ev.user_id,
+        (),
+        _cfg('DailyWifeAssignWhitelist'),
+    )
+
+
 def _can_specify_wife(ev: Event) -> bool:
     return _is_master(ev) or str(ev.user_id) in normalized_user_ids(
         _cfg('DailyWifeSpecifyWhitelist')
     )
+
 
 
 async def _migrate_legacy_wife_data() -> int:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from .shared import (
     LOG_PREFIX,
     CACHE_TTL_SECONDS,
+    DEFAULT_GALLERY_BASE_URL,
     GALLERY_HTTP_TIMEOUT_SECONDS,
     Bot,
     Event,
@@ -28,7 +29,6 @@ from .shared import (
     _save_daily_records,
     _http_get_with_retry,
     _send_shota_result_image,
-    DEFAULT_GALLERY_BASE_URL,
 )
 from .executor import run_blocking
 from .image_input import image_hash_id
