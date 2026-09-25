@@ -213,6 +213,7 @@ from .daily_store import (
     _get_existing_daily_wife_record,
     _mark_all_daily_records_divorced,
 )
+from .role_quotes import get_role_quote
 from .invalidation import _invalidate_candidate_cache
 from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
@@ -284,6 +285,7 @@ __all__ = [
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
     '_can_assign_wife', '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
+    'get_role_quote',
     '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
     '_load_group_member_candidates', '_load_local_candidates', '_scan_local_candidates', '_load_role_map',

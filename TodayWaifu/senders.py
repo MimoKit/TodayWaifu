@@ -90,7 +90,13 @@ def _encode_base64_ref(data: bytes) -> str:
 
 
 def _shrink_image_sync(image: bytes | bytearray) -> bytes:
-    """图片超过配置阈值时转压为 JPEG 字节，压不动或非动图失败则原样返回。"""
+    """图片超过配置阈值时转压为 WebP 字节，压不动或非动图失败则原样返回。
+
+    用 WebP 而不是 JPEG：同画质下体积小得多（同一张图实测 WebP q85 约 141KB，
+    JPEG q85 约 467KB），而且支持 alpha —— 立绘大多是带透明通道的 PNG，
+    转 JPEG 会把透明区域压成黑底。
+    运行环境的 Pillow 若没编 WebP，则退回 JPEG。
+    """
     limit_mb = int(_cfg('DailyWifeImageMaxSizeMB') or 0)
     limit = limit_mb * 1024 * 1024
     if limit <= 0:
@@ -100,19 +106,36 @@ def _shrink_image_sync(image: bytes | bytearray) -> bytes:
     if len(raw) <= limit:
         return raw
 
+    webp_ok = 'WEBP' in Image.SAVE
     try:
         with Image.open(io.BytesIO(raw)) as opened:
             if bool(getattr(opened, 'is_animated', False)):
                 return raw
-            working = opened.convert('RGB')
-    except (OSError, ValueError, TypeError):
+            has_alpha = opened.mode in ('RGBA', 'LA', 'PA') or (
+                opened.mode == 'P' and 'transparency' in opened.info
+            )
+            if webp_ok:
+                # WebP 支持 alpha，保留透明通道
+                working = opened.convert('RGBA' if has_alpha else 'RGB')
+            elif has_alpha:
+                # 退回 JPEG 时 alpha 会丢，合成到白底，避免透明区域变黑
+                rgba = opened.convert('RGBA')
+                working = Image.new('RGB', rgba.size, (255, 255, 255))
+                working.paste(rgba, mask=rgba.split()[-1])
+            else:
+                working = opened.convert('RGB')
+    except Exception:
+        # 解码失败（含 DecompressionBombError）一律原样返回，不影响发送
         return raw
 
     for max_side in (1920, 1600, 1280, 1024, 800, 640):
         working.thumbnail((max_side, max_side))
         for quality in (85, 75, 65, 55, 45):
             buffer = io.BytesIO()
-            working.save(buffer, format='JPEG', quality=quality, optimize=True)
+            if webp_ok:
+                working.save(buffer, format='WEBP', quality=quality, method=4)
+            else:
+                working.save(buffer, format='JPEG', quality=quality, optimize=True)
             data = buffer.getvalue()
             if len(data) <= limit:
                 logger.info(
@@ -121,7 +144,6 @@ def _shrink_image_sync(image: bytes | bytearray) -> bytes:
                 )
                 return data
     return raw
-
 
 
 async def _image_message(data: bytes) -> Message:

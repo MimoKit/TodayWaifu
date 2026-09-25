@@ -156,7 +156,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeImageMaxSizeMB': GsIntConfig(
         '角色图片最大体积(MB)',
         (
-            '发送角色立绘/图库图片前自动压缩的最大体积上限（MB），超出时转为 JPEG 压缩至该大小以内；'
+            '发送角色立绘/图库图片前自动压缩的最大体积上限（MB），超出时转为 WebP 压缩至该大小以内；'
             '设为 0 表示不压缩。适用于 QQ 官方机器人等对图片体积有严格限制的协议端'
         ),
         2,

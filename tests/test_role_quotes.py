@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / "TodayWaifu" / "daily.py"
-DATA_FILE = Path(__file__).resolve().parents[4] / "data" / "TodayWaifu" / "role_quotes.json"
+DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "TodayWaifu" / "role_quotes.json"
 ROLE_QUOTES_PATH = ROOT / "TodayWaifu" / "role_quotes.py"
 
 
@@ -53,6 +53,7 @@ class _FakeKindMetadata:
     text_template_default: str = "你今天的老婆是{name}"
 
 
+@unittest.skipUnless(DATA_FILE.is_file(), "缺少 data/TodayWaifu/role_quotes.json，跳过台词库测试")
 class RoleQuotesTests(unittest.TestCase):
     def setUp(self) -> None:
         self.data = json.loads(DATA_FILE.read_text(encoding="utf-8"))

@@ -26,6 +26,7 @@ from .shared import (
     wife_list_sv,
     daily_wife_sv,
     assign_wife_sv,
+    get_role_quote,
     _filter_by_mode,
     _record_to_dict,
     husband_list_sv,
@@ -79,11 +80,9 @@ def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> s
         )
     ]
     if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', True)):
-        quote_fn = globals().get('get_role_quote')
-        if quote_fn is not None:
-            quote = quote_fn(role.name)
-            if quote:
-                lines.append(quote)
+        quote = get_role_quote(role.name)
+        if quote:
+            lines.append(quote)
     if bool(_cfg('DailyWifeShowRoleId')) and mode != 'normal':
         lines.append(f'角色ID：{"/".join(role.role_ids)}')
     # 部分平台没有数字 QQ 号，群友只能复制这串 ID 来抢，故单独留开关

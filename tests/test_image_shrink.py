@@ -52,7 +52,7 @@ class ImageShrinkTests(unittest.TestCase):
         self.assertIsInstance(result, bytes)
         self.assertLessEqual(len(result), self.limit_mb * 1024 * 1024)
         with Image.open(io.BytesIO(result)) as image:
-            self.assertEqual(image.format, 'JPEG')
+            self.assertEqual(image.format, 'WEBP')
             self.assertLessEqual(max(image.size), 1920)
 
     def test_broken_payload_is_returned_untouched(self) -> None:
