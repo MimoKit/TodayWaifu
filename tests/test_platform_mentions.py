@@ -61,6 +61,7 @@ class PlatformMentionTests(unittest.TestCase):
             {
                 '_normalise_target_user_id',
                 '_target_user_id_from_text',
+                '_self_user_ids',
                 '_iter_event_messages',
                 '_get_event_target_user_id',
             }
@@ -95,6 +96,7 @@ class PlatformMentionTests(unittest.TestCase):
             {
                 '_normalise_target_user_id',
                 '_target_user_id_from_text',
+                '_self_user_ids',
                 '_iter_event_messages',
                 '_get_event_target_user_id',
             }

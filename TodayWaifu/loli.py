@@ -6,6 +6,7 @@ from .shared import (
     IMAGE_EXTENSIONS,
     CACHE_TTL_SECONDS,
     UPLOAD_IMAGE_MAX_BYTES,
+    DEFAULT_GALLERY_BASE_URL,
     GALLERY_HTTP_TIMEOUT_SECONDS,
     Bot,
     Path,
@@ -42,7 +43,6 @@ from .shared import (
     _http_get_with_retry,
     _send_loli_result_image,
     _image_message_from_path,
-    DEFAULT_GALLERY_BASE_URL,
 )
 from .executor import run_blocking
 from .image_input import (

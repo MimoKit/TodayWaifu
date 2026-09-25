@@ -1,10 +1,13 @@
 """TodayWaifu 的结果图片发送。"""
 from __future__ import annotations
 
+import io
 import asyncio
 from base64 import b64encode
 from pathlib import Path
 from dataclasses import dataclass
+
+from PIL import Image
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -86,6 +89,41 @@ def _encode_base64_ref(data: bytes) -> str:
     return f'base64://{b64encode(data).decode()}'
 
 
+def _shrink_image_sync(image: bytes | bytearray) -> bytes:
+    """图片超过配置阈值时转压为 JPEG 字节，压不动或非动图失败则原样返回。"""
+    limit_mb = int(_cfg('DailyWifeImageMaxSizeMB') or 0)
+    limit = limit_mb * 1024 * 1024
+    if limit <= 0:
+        return bytes(image)
+
+    raw = bytes(image)
+    if len(raw) <= limit:
+        return raw
+
+    try:
+        with Image.open(io.BytesIO(raw)) as opened:
+            if bool(getattr(opened, 'is_animated', False)):
+                return raw
+            working = opened.convert('RGB')
+    except (OSError, ValueError, TypeError):
+        return raw
+
+    for max_side in (1920, 1600, 1280, 1024, 800, 640):
+        working.thumbnail((max_side, max_side))
+        for quality in (85, 75, 65, 55, 45):
+            buffer = io.BytesIO()
+            working.save(buffer, format='JPEG', quality=quality, optimize=True)
+            data = buffer.getvalue()
+            if len(data) <= limit:
+                logger.info(
+                    f'{LOG_PREFIX} 图片 {len(raw) / 1048576:.1f}MB 超过阈值，'
+                    f'已压缩至 {len(data) / 1048576:.2f}MB 后发送'
+                )
+                return data
+    return raw
+
+
+
 async def _image_message(data: bytes) -> Message:
     """把图片字节转成消息段，base64 编码在插件线程池里完成。
 
@@ -160,6 +198,7 @@ async def _deliver_role_image(
         # 本地图片按 (路径, mtime) 缓存字节，避免高峰期核心反复读盘转 base64
         image = await run_blocking(read_file_bytes_cached, Path(image_url))
 
+    image = await run_blocking(_shrink_image_sync, image)
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -215,6 +254,8 @@ async def _deliver_loli_result_image(
             image_ref = await run_blocking(read_file_bytes_cached, Path(image))
     else:
         image_ref = image
+    if isinstance(image_ref, (bytes, bytearray)):
+        image_ref = await run_blocking(_shrink_image_sync, image_ref)
     messages.append(await _image_message(image_ref))
     await _safe_send(bot, messages)
 
@@ -406,6 +447,7 @@ async def _send_local_image(
                 return
         else:
             image_bytes = await run_blocking(read_file_bytes_cached, Path(image_url))
+            image_bytes = await run_blocking(_shrink_image_sync, image_bytes)
             messages.append(await _image_message(image_bytes))
 
     if not messages:

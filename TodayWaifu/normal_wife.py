@@ -7,10 +7,10 @@ from urllib.parse import urlparse
 from .shared import (
     LOG_PREFIX,
     CACHE_TTL_SECONDS,
+    DEFAULT_GALLERY_BASE_URL,
     RoleCandidate,
     _cfg,
     logger,
-    DEFAULT_GALLERY_BASE_URL,
     _fetch_gallery_payload_from_url_sync,
 )
 from .executor import run_blocking
