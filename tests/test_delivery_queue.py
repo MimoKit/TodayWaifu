@@ -99,6 +99,8 @@ class BehavioralSlotTests(unittest.TestCase):
             '_IMAGE_DELIVERY_QUEUE': asyncio.Queue(maxsize=512),
             '_send_loli_text': fake_send,
             '_safe_send': fake_send,
+            'start_image_delivery_workers': lambda: None,
+            '_prune_image_delivery_workers': lambda: None,
         }
         exec(compile(module, str(SENDERS), 'exec'), globals_dict)
 
@@ -138,6 +140,13 @@ class WorkerLifecycleTests(unittest.TestCase):
         shared = (PLUGIN / 'shared.py').read_text(encoding='utf-8')
         self.assertIn('start_image_delivery_workers()', shared)
         self.assertIn('await stop_image_delivery_workers()', shared)
+
+    def test_enqueue_revives_workers_missing_after_reload(self) -> None:
+        """重载插件只重跑 @on_core_start，句柄表被重置，入队必须自愈补足 worker。"""
+        enqueue = self.source[
+            self.source.index('async def _enqueue_image_job('):self.source.index('async def _send_role_image(')
+        ]
+        self.assertIn('_prune_image_delivery_workers()', enqueue)
 
     def test_maintenance_restarts_dead_workers(self) -> None:
         shared = (PLUGIN / 'shared.py').read_text(encoding='utf-8')
