@@ -25,6 +25,27 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'local',
         options=['local', 'gallery'],
     ),
+    'DailyWifeNteImageSource': GsStrConfig(
+        '异环老婆图片数据源',
+        '选择 local 只使用本地图片目录，本地没有图片的角色会被跳过；'
+        '选择 gallery 在本地没有图片时使用 NTEUID 官方资源地址兜底。默认 gallery',
+        'gallery',
+        options=['local', 'gallery'],
+    ),
+    'DailyWifePgrImageSource': GsStrConfig(
+        '战双老婆图片数据源',
+        '选择 local 只使用本地战双图库目录；'
+        '选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
+        'gallery',
+        options=['local', 'gallery'],
+    ),
+    'DailyLoliImageSource': GsStrConfig(
+        '萝莉图片数据源',
+        '选择 local 只使用本地萝莉图库；'
+        '选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
+        'gallery',
+        options=['local', 'gallery'],
+    ),
     'DailyWifeCustomRolePilePath': GsStrConfig(
         '本地角色图片目录',
         '图片数据源为 local 时生效。留空时自动查找 gsuid_core/data/XutheringWavesUID/custom_role_pile',
@@ -86,7 +107,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeGalleryToken': GsStrConfig(
         '图库访问令牌',
-        '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
+        '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 '
+        '(https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
         '',
     ),
     'DailyWifeImageUploadWhitelist': GsListStrConfig(

@@ -98,7 +98,8 @@ class PrefetchBoundednessTests(unittest.TestCase):
         source = PREFETCH.read_text(encoding='utf-8')
         body = source[source.index('async def _prefetch_once('):source.index('def _prefetch_modes(')]
         self.assertIn("_cfg_bool('DailyWifePrefetchEnabled', True)", body)
-        self.assertIn("_image_source() != 'gallery'", body)
+        # 图片来源按功能拆分后，预热只针对跟随图库的那些功能
+        self.assertIn("if _image_source(mode) == 'gallery'", body)
         self.assertIn('PREFETCH_MAX_SECONDS', body)
 
     def test_prefetch_skips_images_already_on_disk(self) -> None:

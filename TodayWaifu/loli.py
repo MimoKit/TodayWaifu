@@ -29,6 +29,7 @@ from .shared import (
     _daily_rng,
     _safe_send,
     _wife_state,
+    _image_source,
     _loli_enabled,
     loli_manage_sv,
     _record_to_dict,
@@ -248,7 +249,7 @@ def _loli_unavailable_text(record_data: RoleRecordValue) -> str | None:
 
 
 def _loli_api_url() -> str:
-    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifeLoliApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    base = str(_cfg('DailyWifeApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
     if base.endswith('/loli') or base.endswith('/nor18'):
         return base
     return f'{base}/loli'
@@ -258,7 +259,8 @@ async def _roll_loli_record(
     ev: Event,
     user_key: str,
 ) -> tuple[WifeRecord | None, str | None]:
-    custom_url = _loli_api_url()
+    # local 模式不请求远程接口，直接使用本地萝莉图库
+    custom_url = _loli_api_url() if _image_source('loli') == 'gallery' else ''
     remote_error: str | None = None
     if custom_url:
         logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 请求今日萝莉列表，接口: {custom_url}')

@@ -39,7 +39,8 @@ class PgrFeatureSourceTests(unittest.TestCase):
         source = (ROOT / 'TodayWaifu' / 'pgr.py').read_text(encoding='utf-8-sig')
 
         self.assertIn('async def _load_pgr_wife_candidates()', gallery)
-        self.assertIn("_cfg('DailyWifePgrGalleryApiUrl')", gallery)
+        # 战双图库地址已并入统一的 DailyWifeApiUrl，旧键 DailyWifePgrGalleryApiUrl 已删除
+        self.assertIn("_cfg('DailyWifeApiUrl')", gallery)
         self.assertIn('_parse_pgr_gallery_candidates(payload)', gallery)
         self.assertIn('return await run_blocking(_load_pgr_local_candidates)', gallery)
         self.assertIn('await _load_pgr_wife_candidates()', source)
