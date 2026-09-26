@@ -81,7 +81,8 @@ def get_role_quote(name: str) -> str:
     quote_line = f"「{selected}」"
     author_line = f"——{matched_name}"
 
-    target_width = max(len(quote_line), 18)
+    # 手机QQ群单行气泡上限约为15字宽，固定为14可确保署名紧贴右侧且不被强制换行
+    target_width = 14
     author_width = len(author_line)
     spaces = "\u3000" * max(0, target_width - author_width)
     return f"{quote_line}\n{spaces}{author_line}"

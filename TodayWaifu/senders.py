@@ -366,6 +366,8 @@ def image_delivery_backlog() -> int:
 
 async def _enqueue_image_job(job: _ImageJob) -> bool:
     """入队并立即返回；队列满时退回「只发文字」，绝不阻塞命令协程。"""
+    # 重载插件不跑 on_core_start_before，新队列没有消费者，图与文字会全部积压
+    _prune_image_delivery_workers()
     try:
         _IMAGE_DELIVERY_QUEUE.put_nowait(job)
         return True

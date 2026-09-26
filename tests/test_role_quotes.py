@@ -9,12 +9,25 @@ from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / "TodayWaifu" / "daily.py"
-DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "TodayWaifu" / "role_quotes.json"
+_CORE_DATA = ROOT.parents[2] / "data" / "TodayWaifu" / "role_quotes.json"
+_PLUGIN_DATA = ROOT / "data" / "TodayWaifu" / "role_quotes.json"
+DATA_FILE = _CORE_DATA if _CORE_DATA.is_file() else _PLUGIN_DATA
 ROLE_QUOTES_PATH = ROOT / "TodayWaifu" / "role_quotes.py"
 
 
 def _load_role_quotes_module() -> dict[str, Any]:
     tree = ast.parse(ROLE_QUOTES_PATH.read_text(encoding="utf-8-sig"))
+    tree.body = [
+        node
+        for node in tree.body
+        if not (
+            isinstance(node, ast.ImportFrom)
+            and (
+                node.module == "resource_paths"
+                or (node.level == 1 and any(a.name == "role_quotes_path" for a in node.names))
+            )
+        )
+    ]
     globals_dict: dict[str, Any] = {
         "__name__": "gsuid_core.plugins.TodayWaifu.TodayWaifu.role_quotes",
         "__package__": "gsuid_core.plugins.TodayWaifu.TodayWaifu",
