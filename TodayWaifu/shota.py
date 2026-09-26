@@ -140,7 +140,7 @@ def _shota_unavailable_text(record_data: RoleRecordValue) -> str | None:
 
 
 def _shota_api_url() -> str:
-    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyShotaGalleryApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    base = str(_cfg('DailyWifeApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
     if base.endswith('/shota') or base.endswith('/zt'):
         return base
     return f'{base}/shota'

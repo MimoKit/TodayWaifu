@@ -179,7 +179,7 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
             'time': fake_time,
             'asyncio': asyncio,
             'run_blocking': fake_run_blocking,
-            '_image_source': lambda: 'gallery',
+            '_image_source': lambda kind='wife': 'gallery',
             '_role_mode': lambda mode: mode,
             '_role_map_title': lambda mode: '老婆',
             '_load_mode_role_map': lambda mode: dict(role_map),

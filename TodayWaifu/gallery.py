@@ -57,7 +57,7 @@ from .circuit_breaker import CircuitBreaker
 
 
 def _pgr_gallery_api_url() -> str:
-    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifePgrGalleryApiUrl') or '').strip().rstrip('/')
+    base = str(_cfg('DailyWifeApiUrl') or '').strip().rstrip('/')
     if not base:
         return ''
     if '/pgr/' in base or base.endswith('/roles'):
@@ -88,6 +88,10 @@ def _parse_pgr_gallery_candidates(payload: GalleryPayload) -> tuple[RoleCandidat
 
 
 async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
+    if _image_source('pgr') == 'local':
+        # local 模式完全不碰网络：本地没图就返回空，由调用方提示用户放图
+        return await run_blocking(_load_pgr_local_candidates)
+
     api_url = _pgr_gallery_api_url()
     if api_url:
         try:
@@ -105,7 +109,7 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
 
 
 def _gallery_api_url() -> str:
-    base = str(_cfg('DailyWifeApiUrl') or _cfg('DailyWifeGalleryApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    base = str(_cfg('DailyWifeApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
     if base.endswith('/roles'):
         return base
     return f'{base}/api/xwuid/roles'
@@ -336,8 +340,8 @@ async def _fallback_to_local_candidates(
 
 
 async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
-    source = _image_source()
     role_mode = _role_mode(mode)
+    source = _image_source(role_mode)
     now = time.time()
     cache_key = f'{source}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
@@ -402,7 +406,7 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
 
 async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
-    cache_key = f'{_image_source()}:{role_mode}'
+    cache_key = f'{_image_source(role_mode)}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1], None
@@ -425,18 +429,23 @@ async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate
 
 
 async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
-    cache_key = 'local:nte'
+    source = _image_source('nte')
+    # 用 nte: 前缀而不是 local:nte，避免与 _load_local_candidates 的候选缓存互相覆盖
+    cache_key = f'nte:{source}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1], None
     task = _CANDIDATE_INFLIGHT.get(cache_key)
     if task is None:
+        generation = state._CANDIDATE_CACHE_GENERATION
         async def load() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
             async with _CANDIDATE_LOAD_SEMAPHORE:
-                candidates, error = await run_blocking(_load_nte_local_candidates)
+                candidates, error = await run_blocking(_load_nte_local_candidates, source == 'gallery')
                 if error or not candidates:
                     return None, error
                 CANDIDATE_CACHE[cache_key] = (time.time(), candidates)
+                if generation != state._CANDIDATE_CACHE_GENERATION:
+                    CANDIDATE_CACHE.pop(cache_key, None)
                 return candidates, None
         task = asyncio.create_task(load())
         _CANDIDATE_INFLIGHT[cache_key] = task
@@ -457,6 +466,12 @@ async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
         return await _load_normal_wife_candidates()
     if role_mode == 'nte':
         return await _load_nte_candidates()
+    if role_mode == 'pgr':
+        # 战双有自己的加载器；此前落到鸣潮分支必然报「找不到对照表」，预热一直空转
+        pgr_candidates = await _load_pgr_wife_candidates()
+        if not pgr_candidates:
+            return None, '战双老婆图库里还没有可用图片。'
+        return pgr_candidates, None
 
     candidates, error = await _load_wuwa_candidates(role_mode)
     if error or not candidates:

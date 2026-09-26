@@ -36,8 +36,9 @@ async def _prefetch_once() -> dict[str, int]:
     if not _cfg_bool('DailyWifePrefetchEnabled', True):
         stats['skipped'] = 1
         return stats
-    if _image_source() != 'gallery':
-        # 本地图片源没有网络下载，不需要预热
+    # 只有跟随图库的功能才需要预热，本地图片源没有网络下载
+    modes = tuple(mode for mode in _prefetch_modes() if _image_source(mode) == 'gallery')
+    if not modes:
         stats['skipped'] = 1
         return stats
 
@@ -53,7 +54,7 @@ async def _prefetch_once() -> dict[str, int]:
     cache_root = _gallery_image_cache_root()
     deadline = time.monotonic() + PREFETCH_MAX_SECONDS
 
-    for mode in _prefetch_modes():
+    for mode in modes:
         if time.monotonic() >= deadline:
             break
         try:

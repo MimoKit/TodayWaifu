@@ -137,7 +137,7 @@ async def _ensure_daily_wife_record(
         rng = _daily_rng(ev, key, salt)
         candidates, error = await _load_candidates(mode)
         if error or not candidates:
-            logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error}')
+            logger.error(f'{LOG_PREFIX} 获取候选列表失败: {error or "候选列表为空"}')
             return None
         candidates = _filter_by_mode(candidates, mode)
         if not candidates:

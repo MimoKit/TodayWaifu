@@ -215,9 +215,34 @@ def _cfg_probability(key: str, default: float = 0.0) -> float:
     return max(0.0, min(1.0, value))
 
 
-def _image_source() -> str:
-    value = str(_cfg('DailyWifeImageSource') or 'local').strip().lower()
-    return 'gallery' if value == 'gallery' else 'local'
+# 图片来源开关按功能拆分，未列出的功能继续跟随每日老婆的总开关
+_IMAGE_SOURCE_CONFIG_KEYS: dict[str, str] = {
+    'wife': 'DailyWifeImageSource',
+    'husband': 'DailyWifeImageSource',
+    'nte': 'DailyWifeNteImageSource',
+    'pgr': 'DailyWifePgrImageSource',
+    'loli': 'DailyLoliImageSource',
+}
+
+# 默认值与各功能改造前的实际行为一致，升级后不改变既有表现
+_IMAGE_SOURCE_DEFAULTS: dict[str, str] = {
+    'wife': 'local',
+    'husband': 'local',
+    'nte': 'gallery',
+    'pgr': 'gallery',
+    'loli': 'gallery',
+}
+
+
+def _image_source(kind: str = 'wife') -> str:
+    """按功能返回图片来源：local 只用本地图片，gallery 允许使用远程图片。
+
+    注意按功能名而非 role_mode 查询：萝莉的 role_mode 是 wife，两者不能混用。
+    """
+    if kind not in _IMAGE_SOURCE_CONFIG_KEYS:
+        kind = 'wife'
+    value = str(_cfg(_IMAGE_SOURCE_CONFIG_KEYS[kind]) or _IMAGE_SOURCE_DEFAULTS[kind])
+    return 'gallery' if value.strip().lower() == 'gallery' else 'local'
 
 
 def _daily_item_title(kind: str) -> str:

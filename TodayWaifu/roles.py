@@ -34,7 +34,6 @@ from .constants import (
     NTE_EXCLUDED_ROLE_NAMES,
     NTE_EXCLUDED_ROLE_KEYWORDS,
     _cfg_bool,
-    _image_source,
 )
 from .file_cache import prefer_cached_urls, read_file_text_cached
 from .folder_gallery import scan_named_role_directories
@@ -264,7 +263,9 @@ def _scan_local_candidates(
     return candidates, None
 
 
-def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
+def _load_nte_local_candidates(
+    allow_remote_fallback: bool = True,
+) -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_map_path = _resolve_role_map_path('nte')
     if role_map_path is None:
         return None, '没有找到异环角色 ID 对照表。'
@@ -322,10 +323,16 @@ def _load_nte_local_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str 
                     images = (str(default_image),)
                     break
 
-        if not images:
+        if not images and allow_remote_fallback:
             images = (f'{NTE_DETAIL_CDN_BASE}/{role_id}.png',)
+        if not images:
+            # local 模式跳过本地无图的角色，避免纯本地模式仍去请求官方资源
+            continue
         candidates.append(RoleCandidate(role_name, (role_id,), images))
 
+    if not candidates:
+        # local 模式下本地一张图都没有：必须给出原因，不能返回空候选让上层只报“没有可用角色”
+        return None, '本地没有找到可用的异环角色图片，请准备本地图片或改用 gallery 数据源。'
     logger.debug(f'{LOG_PREFIX} 成功加载异环老婆候选 {len(candidates)} 名')
     return tuple(candidates), None
 
@@ -383,10 +390,6 @@ def _loli_enabled() -> bool:
 
 def _shota_enabled() -> bool:
     return _cfg_bool('DailyShotaEnabled', True)
-
-
-def _gallery_mode_enabled() -> bool:
-    return _image_source() == 'gallery'
 
 
 def _husband_available() -> bool:
