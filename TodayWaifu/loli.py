@@ -47,6 +47,7 @@ from .shared import (
 )
 from .executor import run_blocking
 from .image_input import (
+    UPLOAD_IMAGE_MAX_PIXELS,
     image_hash_id,
     read_image_bytes,
     collect_image_refs,
@@ -122,7 +123,7 @@ def _detect_image_suffix(data: bytes, source: str) -> str:
 
 
 def _read_loli_image_bytes(source: str) -> tuple[bytes, str] | None:
-    return read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES)
+    return read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES, UPLOAD_IMAGE_MAX_PIXELS)
 
 
 def _unique_loli_path(root: Path, suffix: str, index: int) -> Path:

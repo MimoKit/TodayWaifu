@@ -60,6 +60,9 @@ def image_suffix_from_source(source: str) -> str:
 
 # Bound decompressed work as well as transport bytes, including animated images.
 MAX_IMAGE_PIXELS = 16_000_000
+# 上传者是主人或白名单用户，放宽像素上限以容纳超宽幅面（如 13670x7215 壁纸）；
+# 仍保留上限，避免解压炸弹把内存打满。
+UPLOAD_IMAGE_MAX_PIXELS = 120_000_000
 MAX_IMAGE_FRAMES = 100
 _IMAGE_FORMAT_SUFFIXES = {
     "JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp",
@@ -67,12 +70,12 @@ _IMAGE_FORMAT_SUFFIXES = {
 }
 
 
-def detect_image_suffix(data: bytes, source: str) -> str:
+def detect_image_suffix(data: bytes, source: str, max_pixels: int = MAX_IMAGE_PIXELS) -> str:
     """Validate actual image contents; a source filename is never proof of type."""
     try:
         with Image.open(BytesIO(data)) as image:
             suffix = _IMAGE_FORMAT_SUFFIXES.get(image.format or "", "")
-            if not suffix or image.width * image.height > MAX_IMAGE_PIXELS:
+            if not suffix or image.width * image.height > max_pixels:
                 return ""
             image.verify()
         # verify() alone does not decode JPEG pixels (and consumes PNG streams).
@@ -81,7 +84,7 @@ def detect_image_suffix(data: bytes, source: str) -> str:
             for frame in range(MAX_IMAGE_FRAMES):
                 image.seek(frame)
                 pixels += image.width * image.height
-                if pixels > MAX_IMAGE_PIXELS:
+                if pixels > max_pixels:
                     return ""
                 image.load()
                 try:
@@ -93,7 +96,11 @@ def detect_image_suffix(data: bytes, source: str) -> str:
         return ""
 
 
-def read_image_bytes(source: str, max_bytes: int) -> tuple[bytes, str] | None:
+def read_image_bytes(
+    source: str,
+    max_bytes: int,
+    max_pixels: int = MAX_IMAGE_PIXELS,
+) -> tuple[bytes, str] | None:
     text = str(source or "").strip()
     if not text or max_bytes <= 0:
         return None
@@ -139,7 +146,7 @@ def read_image_bytes(source: str, max_bytes: int) -> tuple[bytes, str] | None:
         return None
     if not data or len(data) > max_bytes:
         return None
-    suffix = detect_image_suffix(data, source)
+    suffix = detect_image_suffix(data, source, max_pixels)
     if suffix not in IMAGE_EXTENSIONS:
         return None
     return data, suffix

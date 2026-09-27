@@ -41,7 +41,7 @@ from .shared import (
     _invalidate_candidate_cache,
 )
 from .executor import run_blocking
-from .image_input import image_hash_id, read_image_bytes, collect_image_refs
+from .image_input import UPLOAD_IMAGE_MAX_PIXELS, image_hash_id, read_image_bytes, collect_image_refs
 from .folder_gallery import find_named_role_directory
 
 
@@ -57,7 +57,7 @@ def _unique_pgr_image_path(role_dir: Path, suffix: str, index: int) -> Path:
 
 
 def _save_pgr_image(role_dir: Path, source: str, index: int) -> Path | None:
-    image_data = read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES)
+    image_data = read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES, UPLOAD_IMAGE_MAX_PIXELS)
     if image_data is None:
         return None
     data, suffix = image_data
