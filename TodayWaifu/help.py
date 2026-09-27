@@ -35,8 +35,8 @@ HelpCacheKey = tuple[
 
 _HELP_JSON_PATH = BASE_DIR / 'help.json'
 _TEXTURE_DIR = BASE_DIR / 'texture2d'
-_BANNER_BG_PATH = BASE_DIR / 'fb93f5370f556a51db172863420aa50e.png'
-_BG_PATH = _TEXTURE_DIR / 'bj.jpg'
+_BANNER_BG_PATH = _TEXTURE_DIR / 'help_banner.png'
+_BG_PATH = _TEXTURE_DIR / 'help_bg.jpg'
 _ICON_PATH = _TEXTURE_DIR / 'icons'
 _HELP_CACHE_MAX_ENTRIES = 4
 _HELP_CACHE: OrderedDict[HelpCacheKey, str] = OrderedDict()
@@ -116,14 +116,8 @@ def _build_help_inputs(
     help_bg_path = custom_help_bg_path or _BG_PATH
     if help_bg_path.is_file():
         with Image.open(help_bg_path) as source:
-            background = source.convert('RGBA')
-            if custom_help_bg_path is None:
-                width, height = background.size
-                padded = Image.new('RGBA', (width, height + 700), (15, 15, 25, 255))
-                padded.paste(background, (0, 700))
-                extra['help_bg'] = padded
-            else:
-                extra['help_bg'] = background.copy()
+            # 背景按画布尺寸等比覆盖裁切，不做纯色填充（浅色主题下会露出色带）
+            extra['help_bg'] = source.convert('RGBA').copy()
 
     if _ICON_PATH.is_dir():
         extra['icon_path'] = _ICON_PATH
@@ -152,7 +146,7 @@ async def _render_help(
             plugin_icon=icon,
             plugin_help=data,
             plugin_prefix='',
-            help_mode='dark',
+            help_mode='light',
             banner_sub_text='找到你今天的她',
             # This module owns the mtime/config-aware cache key above.
             enable_cache=False,
