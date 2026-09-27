@@ -10,11 +10,7 @@ __pycache__/
 .pyright/
 
 daily_wife_data.json
-# data/ 是运行时目录；仅放行随插件分发的内置台词库（其余用户数据不入库）
-data/*
-!data/TodayWaifu/
-data/TodayWaifu/*
-!data/TodayWaifu/role_quotes.json
+data/
 group_member_avatar_cache/
 xwuid_gallery_accounts*.txt
 
@@ -29,6 +25,3 @@ index.html
 
 # 含账号密码的本地草稿（不入库）
 图库账号邮件.txt
-
-# uv 运行测试时的临时 lockfile
-uv.lock
