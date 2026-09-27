@@ -127,8 +127,13 @@ def _http_get(url: str, *, timeout: int = 15, max_bytes: int = MAX_GALLERY_RESPO
     request = Request(url, headers=_request_headers())
     with urlopen(request, timeout=timeout) as resp:
         content_length = resp.headers.get('Content-Length')
-        if content_length and int(content_length) > max_bytes:
-            raise OSError(f'远程响应过大（超过 {max_bytes} 字节）。')
+        if content_length:
+            try:
+                declared_length = int(content_length)
+            except ValueError as exc:
+                raise OSError('远程响应的 Content-Length 无效。') from exc
+            if declared_length > max_bytes:
+                raise OSError(f'远程响应过大（超过 {max_bytes} 字节）。')
         chunks: list[bytes] = []
         total = 0
         while chunk := resp.read(min(64 * 1024, max_bytes - total + 1)):

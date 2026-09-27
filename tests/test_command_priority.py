@@ -27,7 +27,7 @@ class CommandPriorityTests(unittest.TestCase):
 
     def test_daily_wife_prefix_routes_help_alias(self) -> None:
         source = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8-sig')
-        self.assertIn("str(ev.command or '').strip() == '今日老婆'", source)
+        self.assertIn("str(ev.command or '').strip() in {'今日老婆', '娶婆娘', 'jrlp', 'qlp'}", source)
         self.assertIn("specified_name == '帮助'", source)
         self.assertIn('from .help import daily_wife_help', source)
         self.assertIn('return await daily_wife_help(bot, ev)', source)

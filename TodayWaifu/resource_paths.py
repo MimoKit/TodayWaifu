@@ -13,7 +13,7 @@ PGR_WIFE_DIR_NAME = 'pgr_wife'
 LOLI_IMAGE_DIR_NAME = 'loli_images'
 ROLE_QUOTES_FILE_NAME = 'role_quotes.json'
 # 随插件分发的内置台词库（只含鸣潮角色），data 目录里没有时用它兜底
-BUNDLED_ROLE_QUOTES_PATH = BASE_DIR / 'data' / 'TodayWaifu' / ROLE_QUOTES_FILE_NAME
+BUNDLED_ROLE_QUOTES_PATH = BASE_DIR.parent / 'data' / 'TodayWaifu' / ROLE_QUOTES_FILE_NAME
 
 
 def data_root() -> Path:

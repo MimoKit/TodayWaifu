@@ -1,4 +1,5 @@
 """TodayWaifu 的高峰期状态仓储协调层。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -75,13 +76,13 @@ class ContextRegistry:
         锁留给维护循环在一小时后回收，那时已经没有协程还在用前一天的 key。
         """
         dropped = 0
-        for key in tuple(self.cache):
-            if key.day != current_day:
-                self.cache.pop(key, None)
-                # 递增而不是删除 generation：让滞后的 hydrate 无法把上一天的快照
-                # 重新发布回来（generation 比较会拒绝它）
-                self._generations[key] = self.generation(key) + 1
-                dropped += 1
+        stale_keys = {key for key in self.cache if key.day != current_day}
+        stale_keys.update(key for key in self.inflight if key.day != current_day)
+        for key in stale_keys:
+            self.cache.pop(key, None)
+            # 递增而不是删除 generation，阻止进行中的旧 hydrate 回写快照。
+            self._generations[key] = self.generation(key) + 1
+            dropped += 1
         for key, task in tuple(self.inflight.items()):
             if task.done():
                 self.inflight.pop(key, None)

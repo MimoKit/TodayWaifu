@@ -46,7 +46,7 @@ class ConfigMigrationTests(unittest.TestCase):
             },
         )
 
-    def test_first_start_overwrites_empty_and_custom_values_once(self) -> None:
+    def test_first_start_preserves_custom_value_and_fills_empty_once(self) -> None:
         migration = _migration_module()
         with TemporaryDirectory() as directory:
             marker = Path(directory) / '.remote_urls_v3_migrated'
@@ -82,7 +82,7 @@ class ConfigMigrationTests(unittest.TestCase):
 
             self.assertEqual(
                 config.config['DailyWifeApiUrl'].data,
-                'https://twfapi.xlinxc.cn',
+                'https://custom.example.test/gallery',
             )
             self.assertEqual(config.write_count, 1)
             self.assertTrue(marker.is_file())

@@ -1,4 +1,5 @@
 """TodayWaifu 的每日记录持久化与记录转换。"""
+
 from __future__ import annotations
 
 import copy
@@ -141,6 +142,8 @@ async def _load_daily_context(ev: Event) -> DailyContext:
         return cached
     task = _CONTEXT_REGISTRY.inflight.get(key)
     if task is None:
+        generation = _CONTEXT_REGISTRY.generation(key)
+
         async def hydrate() -> DailyContext:
             context = await DailyWifeRecord.get_context(
                 key.day,
@@ -149,9 +152,10 @@ async def _load_daily_context(ev: Event) -> DailyContext:
             )
             data = {'days': {key.day: {_context_key(ev): context}}}
             result = _get_today_context(data, ev)
-            _CONTEXT_REGISTRY.put(key, result)
-            _DAILY_CONTEXT_CACHE[key.cache_key] = (key.day, result)
+            if _CONTEXT_REGISTRY.put(key, result, generation):
+                _DAILY_CONTEXT_CACHE[key.cache_key] = (key.day, result)
             return result
+
         task = asyncio.create_task(hydrate())
         _CONTEXT_REGISTRY.inflight[key] = task
     try:
@@ -225,9 +229,7 @@ async def _save_daily_context(ev: Event, context: DailyContext) -> None:
     """兼容路径整体提交上下文；成功后才发布新的内存快照。"""
     key = _daily_context_key(ev)
     snapshot = copy.deepcopy(context)
-    await DailyWifeRecord.upsert_context(
-        key.day, key.bot_id, key.group_id, snapshot
-    )
+    await DailyWifeRecord.upsert_context(key.day, key.bot_id, key.group_id, snapshot)
     _CONTEXT_REGISTRY.put(key, snapshot)
     _DAILY_CONTEXT_CACHE[key.cache_key] = (key.day, snapshot)
     _invalidate_status_cache()
@@ -398,11 +400,7 @@ def _mark_all_daily_records_divorced(
         divorced.append((kind, str(raw['name'])))
 
     safe_record = context['safe_wives'].get(user_key)
-    if (
-        isinstance(safe_record, dict)
-        and str(safe_record.get('name') or '').strip()
-        and not safe_record.get('divorced')
-    ):
+    if isinstance(safe_record, dict) and str(safe_record.get('name') or '').strip() and not safe_record.get('divorced'):
         safe_record['divorced'] = True
         safe_record['divorced_at'] = divorced_at
         divorced.append(('safe_wife', str(safe_record['name'])))

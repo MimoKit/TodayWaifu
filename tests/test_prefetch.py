@@ -1,4 +1,5 @@
 """零点前预热的调度与边界：必须严格有界，且只在图库模式下运行。"""
+
 import ast
 import unittest
 from typing import Any
@@ -14,9 +15,7 @@ def _extract_scheduler() -> Any:
     """单独抽出纯函数 seconds_until_prefetch 来跑（prefetch.py 依赖 gsuid_core）。"""
     tree = ast.parse(PREFETCH.read_text(encoding='utf-8'))
     node = next(
-        item
-        for item in tree.body
-        if isinstance(item, ast.FunctionDef) and item.name == 'seconds_until_prefetch'
+        item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == 'seconds_until_prefetch'
     )
     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
     module = ast.Module(body=[future, node], type_ignores=[])
@@ -96,7 +95,7 @@ class PrefetchBoundednessTests(unittest.TestCase):
 
     def test_prefetch_only_runs_in_gallery_mode_and_respects_the_switch(self) -> None:
         source = PREFETCH.read_text(encoding='utf-8')
-        body = source[source.index('async def _prefetch_once('):source.index('def _prefetch_modes(')]
+        body = source[source.index('async def _prefetch_once(') : source.index('def _prefetch_modes(')]
         self.assertIn("_cfg_bool('DailyWifePrefetchEnabled', True)", body)
         # 图片来源按功能拆分后，预热只针对跟随图库的那些功能
         self.assertIn("if _image_source(mode) == 'gallery'", body)
@@ -104,15 +103,13 @@ class PrefetchBoundednessTests(unittest.TestCase):
 
     def test_prefetch_skips_images_already_on_disk(self) -> None:
         source = PREFETCH.read_text(encoding='utf-8')
-        body = source[source.index('async def _prefetch_once('):source.index('def _prefetch_modes(')]
+        body = source[source.index('async def _prefetch_once(') : source.index('def _prefetch_modes(')]
         self.assertIn('read_url_cache', body)
         self.assertIn("stats['cached'] += 1", body)
 
     def test_prefetch_never_raises_out_of_the_loop(self) -> None:
         source = PREFETCH.read_text(encoding='utf-8')
-        runner = source[
-            source.index('async def _run_prefetch_once('):source.index('async def _prefetch_loop(')
-        ]
+        runner = source[source.index('async def _run_prefetch_once(') : source.index('async def _prefetch_loop(')]
         # 不允许 except Exception（skill 红线），但必须有具体异常兜底
         self.assertNotIn('except Exception', runner)
         self.assertIn('except asyncio.CancelledError', runner)
@@ -121,9 +118,15 @@ class PrefetchBoundednessTests(unittest.TestCase):
     def test_prefetch_runs_once_shortly_after_startup(self) -> None:
         """重启可能发生在零点之后，那时缓存未必完整，必须补跑一次。"""
         source = PREFETCH.read_text(encoding='utf-8')
-        loop = source[source.index('async def _prefetch_loop('):]
+        loop = source[source.index('async def _prefetch_loop(') :]
         self.assertIn('await asyncio.sleep(PREFETCH_STARTUP_DELAY_SECONDS)', loop)
         self.assertIn('await _run_prefetch_once()', loop)
+
+    def test_prefetch_window_waits_for_next_day_after_startup_run(self) -> None:
+        source = PREFETCH.read_text(encoding='utf-8')
+        loop = source[source.index('async def _prefetch_loop(') :]
+        self.assertIn('if delay <= 1.0:', loop)
+        self.assertIn('next_day = datetime.now() + timedelta(days=1)', loop)
 
     def test_startup_delay_is_small_but_not_zero(self) -> None:
         values = self._constants()

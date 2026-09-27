@@ -80,6 +80,13 @@ class RuntimeFallbackTests(unittest.TestCase):
         self.assertIn('is_file()', body)
         self.assertIn('return BUNDLED_ROLE_QUOTES_PATH', body)
 
+    def test_bundled_path_points_to_repository_data(self) -> None:
+        source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
+        self.assertIn(
+            "BUNDLED_ROLE_QUOTES_PATH = BASE_DIR.parent / 'data' / 'TodayWaifu' / ROLE_QUOTES_FILE_NAME",
+            source,
+        )
+
     def test_seeding_never_overwrites_user_edits(self) -> None:
         source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
         body = source[source.index('def ensure_role_quotes_seeded()') :]

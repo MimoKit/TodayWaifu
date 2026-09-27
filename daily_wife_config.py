@@ -60,7 +60,9 @@ if not _FORCED_URL_MIGRATION_MARKER.is_file():
             del DailyWifeConfig.config[_k]
     for _key, _url in _FORCED_REMOTE_URLS.items():
         if _key in DailyWifeConfig.config:
-            DailyWifeConfig.config[_key].data = _url
+            _config_item = DailyWifeConfig.config[_key]
+            if not str(_config_item.data or '').strip():
+                _config_item.data = _url
     DailyWifeConfig.write_config()
     try:
         # 清除旧版迁移标记
