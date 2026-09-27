@@ -187,7 +187,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifeSendRoleQuote': GsBoolConfig(
         '发送角色剧情与对话台词',
         '开启后抽取今日老婆时，在文字后附带角色剧情或对话台词',
-        True,
+        False,
     ),
     'DailyWifeShowUserId': GsBoolConfig(
         '显示触发者 ID',

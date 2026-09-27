@@ -136,7 +136,7 @@
       },
       {
         "key": "DailyWifeSendRoleQuote",
-        "expr": "GsBoolConfig('发送角色剧情与对话台词', '开启后抽取今日老婆时，在文字后附带角色剧情或对话台词', True)"
+        "expr": "GsBoolConfig('发送角色剧情与对话台词', '开启后抽取今日老婆时，在文字后附带角色剧情或对话台词', False)"
       },
       {
         "key": "DailyWifeShowUserId",

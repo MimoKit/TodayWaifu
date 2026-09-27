@@ -79,7 +79,7 @@ def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> s
             user_id=user_id,
         )
     ]
-    if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', True)):
+    if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', False)):
         quote = get_role_quote(role.name)
         if quote:
             lines.append(quote)
