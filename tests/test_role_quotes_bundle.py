@@ -11,8 +11,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / 'TodayWaifu'
-BUNDLED = ROOT / 'data' / 'TodayWaifu' / 'role_quotes.json'
+BUNDLED = ROOT / 'role_quotes.json'
 ROLE_MAP = ROOT / 'role_id_map.json'
+
+
+def _resolved_bundled_path() -> Path:
+    """按插件代码的算法解析内置库路径，用于校验两者一致。
+
+    resource_paths.py 位于 <插件根>/TodayWaifu/，故 BASE_DIR = Path(__file__).parent.parent
+    解析出来就是插件根目录。
+    """
+    resource_paths = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
+    marker = 'BUNDLED_ROLE_QUOTES_PATH = '
+    line = next(item for item in resource_paths.splitlines() if item.startswith(marker))
+    expr = line[len(marker) :].strip()
+    return eval(expr, {'BASE_DIR': ROOT, 'ROLE_QUOTES_FILE_NAME': 'role_quotes.json'})
 
 # role_quotes.py 会截断超长台词；卡片排版也不允许更长
 MAX_QUOTE_LENGTH = 20
@@ -80,12 +93,16 @@ class RuntimeFallbackTests(unittest.TestCase):
         self.assertIn('is_file()', body)
         self.assertIn('return BUNDLED_ROLE_QUOTES_PATH', body)
 
-    def test_bundled_path_points_to_repository_data(self) -> None:
+    def test_bundled_path_points_to_plugin_root(self) -> None:
+        """内置库与 ICON.png / role_id_map.json 同级，放插件根即可，不要另建 data 目录。"""
         source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
-        self.assertIn(
-            "BUNDLED_ROLE_QUOTES_PATH = BASE_DIR.parent / 'data' / 'TodayWaifu' / ROLE_QUOTES_FILE_NAME",
-            source,
-        )
+        self.assertIn('BUNDLED_ROLE_QUOTES_PATH = BASE_DIR / ROLE_QUOTES_FILE_NAME', source)
+
+    def test_bundled_path_resolves_to_the_shipped_file(self) -> None:
+        """守卫：解析出来的内置库路径必须真实存在（曾因多写一层 parent 而静默失效）。"""
+        path = _resolved_bundled_path()
+        self.assertTrue(path.is_file(), f'内置台词库路径不可达: {path}')
+        self.assertEqual(path.resolve(), BUNDLED.resolve())
 
     def test_seeding_never_overwrites_user_edits(self) -> None:
         source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')

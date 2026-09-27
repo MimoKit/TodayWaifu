@@ -10,7 +10,7 @@ from dataclasses import dataclass
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / "TodayWaifu" / "daily.py"
 _CORE_DATA = ROOT.parents[2] / "data" / "TodayWaifu" / "role_quotes.json"
-_PLUGIN_DATA = ROOT / "data" / "TodayWaifu" / "role_quotes.json"
+_PLUGIN_DATA = ROOT / "role_quotes.json"
 DATA_FILE = _CORE_DATA if _CORE_DATA.is_file() else _PLUGIN_DATA
 ROLE_QUOTES_PATH = ROOT / "TodayWaifu" / "role_quotes.py"
 

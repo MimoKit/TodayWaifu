@@ -12,8 +12,8 @@ HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 PGR_WIFE_DIR_NAME = 'pgr_wife'
 LOLI_IMAGE_DIR_NAME = 'loli_images'
 ROLE_QUOTES_FILE_NAME = 'role_quotes.json'
-# 随插件分发的内置台词库（含鸣潮、异环、战双角色），data 目录里没有时用它兜底
-BUNDLED_ROLE_QUOTES_PATH = BASE_DIR.parent / 'data' / 'TodayWaifu' / ROLE_QUOTES_FILE_NAME
+# 随插件分发的内置台词库（含鸣潮、异环、战双角色），与 ICON.png / role_id_map.json 同级
+BUNDLED_ROLE_QUOTES_PATH = BASE_DIR / ROLE_QUOTES_FILE_NAME
 
 
 def data_root() -> Path:
