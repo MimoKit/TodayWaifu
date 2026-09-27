@@ -29,3 +29,6 @@ index.html
 
 # 含账号密码的本地草稿（不入库）
 图库账号邮件.txt
+
+# uv 运行测试时的临时 lockfile
+uv.lock
