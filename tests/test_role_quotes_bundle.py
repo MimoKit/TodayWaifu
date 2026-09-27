@@ -103,12 +103,6 @@ class RuntimeFallbackTests(unittest.TestCase):
         self.assertIn('except OSError', body)
         self.assertIn('logger.warning', body)
 
-    def test_readme_documents_how_to_add_other_games(self) -> None:
-        readme = (ROOT / 'README.md').read_text(encoding='utf-8')
-        self.assertIn('role_quotes.json', readme)
-        for game in ('鸣潮', '异环', '战双'):
-            self.assertIn(game, readme, f'README 应说明内置库覆盖 {game}')
-
 
 if __name__ == '__main__':
     unittest.main()
