@@ -27,8 +27,8 @@ def _resolved_bundled_path() -> Path:
     expr = line[len(marker) :].strip()
     return eval(expr, {'BASE_DIR': ROOT, 'ROLE_QUOTES_FILE_NAME': 'role_quotes.json'})
 
-# role_quotes.py 会截断超长台词；卡片排版也不允许更长
-MAX_QUOTE_LENGTH = 20
+# role_quotes.py 会截断超长台词；卡片排版允许到 30 字
+MAX_QUOTE_LENGTH = 30
 # 抽取需要多样性，每个角色至少几条；库里绝大多数角色是 5 条以上
 MIN_QUOTES_PER_ROLE = 3
 

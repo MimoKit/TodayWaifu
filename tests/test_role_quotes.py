@@ -76,20 +76,20 @@ class RoleQuotesTests(unittest.TestCase):
         self.get_role_quote = self.role_quotes_mod["get_role_quote"]
 
     def test_all_role_quotes_in_data_within_limit(self) -> None:
-        """确保 data/TodayWaifu/role_quotes.json 中预设台词主体不超过 20 字。"""
+        """确保台词库中预设台词主体不超过 30 字（卡片排版与 role_quotes.py 截断阈值）。"""
         for role_name, quotes in self.role_quotes.items():
             for quote in quotes:
                 self.assertLessEqual(
                     len(quote),
-                    20,
-                    f"角色 {role_name} 的台词超过 20 字: {quote} (长度 {len(quote)})",
+                    30,
+                    f"角色 {role_name} 的台词超过 30 字: {quote} (长度 {len(quote)})",
                 )
 
         for quote in self.default_quotes:
             self.assertLessEqual(
                 len(quote),
-                20,
-                f"默认台词超过 20 字: {quote} (长度 {len(quote)})",
+                30,
+                f"默认台词超过 30 字: {quote} (长度 {len(quote)})",
             )
 
     def test_get_role_quote_format(self) -> None:

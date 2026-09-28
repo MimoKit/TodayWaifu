@@ -55,7 +55,7 @@ def _load_quotes_from_data() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...
 
 
 def get_role_quote(name: str) -> str:
-    """获取角色的剧情/对话文本，附带角色名，文本内容不超过 20 字。"""
+    """获取角色的剧情/对话文本，附带角色名，文本内容不超过 30 字。"""
     clean_name = name.strip()
     role_quotes, default_quotes = _load_quotes_from_data()
 
@@ -75,8 +75,8 @@ def get_role_quote(name: str) -> str:
         return ""
 
     selected = random.choice(quotes)
-    if len(selected) > 20:
-        selected = selected[:20]
+    if len(selected) > 30:
+        selected = selected[:30]
 
     quote_line = f"「{selected}」"
     author_line = f"——{matched_name}"
