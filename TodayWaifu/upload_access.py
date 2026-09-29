@@ -26,6 +26,22 @@ def can_use_whitelisted_feature(
     )
 
 
+def can_use_pm_or_whitelisted_feature(
+    user_id: str | int,
+    user_pm: int | str,
+    required_pm: int | str,
+    master_ids: object,
+    whitelist_ids: object,
+) -> bool:
+    """允许达到当前服务权限，或命中主人/白名单。"""
+    if can_use_whitelisted_feature(user_id, master_ids, whitelist_ids):
+        return True
+    try:
+        return int(user_pm) <= int(required_pm)
+    except (TypeError, ValueError):
+        return False
+
+
 def can_upload_images(
     user_id: str | int,
     master_ids: object,
