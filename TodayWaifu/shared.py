@@ -218,7 +218,6 @@ from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
 from .upload_access import (
     can_upload_images,
     normalized_user_ids,
-    can_use_whitelisted_feature,
     can_use_pm_or_whitelisted_feature,
 )
 from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
