@@ -1,6 +1,7 @@
 """战双帕弥什本地图库抽取。"""
 from __future__ import annotations
 
+from .daily import _build_text
 from .shared import (
     LOG_PREFIX,
     UPLOAD_IMAGE_MAX_BYTES,
@@ -9,7 +10,6 @@ from .shared import (
     Event,
     WifeRecord,
     RoleCandidate,
-    _cfg,
     time,
     logger,
     random,
@@ -34,7 +34,6 @@ from .shared import (
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
-    _daily_kind_metadata,
     _normalize_role_name,
     _load_pgr_wife_candidates,
     _get_other_daily_wife_name,
@@ -186,12 +185,11 @@ async def _ensure_daily_pgr_wife_record(
     return chosen
 
 
-def _pgr_result_text(record: WifeRecord) -> str | None:
+def _pgr_result_text(record: WifeRecord, user_id: str = '') -> str | None:
     if not _cfg_bool('DailyWifeSendText', True):
         return None
-    metadata = _daily_kind_metadata('pgr')
-    template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
-    return template.format(name=record.name, role_id='/'.join(record.role_ids))
+    # 复用鸣潮/异环同一套文本构造，否则战双永远不带角色台词（曾漏掉台词与 ID 行）
+    return _build_text(record.to_role(), 'pgr', user_id)
 
 
 async def _send_daily_pgr_wife(
@@ -280,7 +278,7 @@ async def _send_daily_pgr_wife(
             bot,
             RoleCandidate(record.name, record.role_ids, (record.image,)),
             record.image,
-            _pgr_result_text(record) or '',
+            _pgr_result_text(record, str(ev.user_id or '')) or '',
             ev.user_id,
             ev.group_id is not None,
             'pgr',
@@ -291,7 +289,7 @@ async def _send_daily_pgr_wife(
         bot,
         record.image,
         '这张战双老婆图片已经不存在，请重新发送命令。',
-        _pgr_result_text(record),
+        _pgr_result_text(record, str(ev.user_id or '')),
         ev.user_id,
         ev.group_id is not None,
         'pgr',
