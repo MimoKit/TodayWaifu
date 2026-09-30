@@ -77,11 +77,11 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 感谢所有为 TodayWaifu 提交代码、修复问题、完善文档或提出建议的人。
 
-<a href="https://github.com/MimoKit/TodayWaifu/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=MimoKit/TodayWaifu" alt="TodayWaifu contributors" height="48"></a>
+<a href="https://github.com/MimoKit/TodayWaifu/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=MimoKit/TodayWaifu&max=100" alt="TodayWaifu contributors" height="48"></a>
 
 当前公开署名贡献者（已排除机器人账号）：
 
-[MimoKit](https://github.com/MimoKit) · [CWalkene](https://github.com/CWalkene) · [spaxie](https://github.com/spaxie) · [Xbaiyz12](https://github.com/Xbaiyz12) · [xiaolinlino](https://github.com/xiaolinlino)
+[MimoKit](https://github.com/MimoKit) · [CWalkene](https://github.com/CWalkene) · [spaxie](https://github.com/spaxie) · [Xbaiyz12](https://github.com/Xbaiyz12) · [xiaolinlino](https://github.com/xiaolinlino) · [zory1117](https://github.com/zory1117)
 
 <br/>
 
