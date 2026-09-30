@@ -25,6 +25,7 @@ from .shared import (
     _wife_state,
     wife_list_sv,
     daily_wife_sv,
+    assign_husband_sv,
     assign_wife_sv,
     get_role_quote,
     _filter_by_mode,
@@ -32,6 +33,7 @@ from .shared import (
     husband_list_sv,
     marry_member_sv,
     specify_wife_sv,
+    _can_assign_husband,
     _can_assign_wife,
     _load_candidates,
     _send_role_image,
@@ -539,7 +541,7 @@ def _assignment_role_name(ev: Event, target_user_id: str) -> str:
     for prefix in ('给', '把', '将', '为'):
         if text.startswith(prefix):
             text = text[len(prefix):].strip()
-    for word in ('分配老婆', '分配今日老婆', '分配', '老婆'):
+    for word in ('分配老婆', '分配今日老婆', '分配老公', '分配今日老公', '分配', '老婆', '老公'):
         text = text.replace(word, ' ')
     return re.sub(r'\s+', ' ', text).strip()
 
@@ -605,6 +607,58 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
     )
 
 
+async def _send_assign_husband(bot: Bot, ev: Event) -> None:
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起主人分配老公命令')
+    if not _husband_available():
+        return
+    if not _can_assign_husband(ev):
+        return await _safe_send(bot, '只有机器人主人或分配白名单用户可以分配老公。')
+
+    target_user_id = _get_event_target_user_id(ev)
+    if not target_user_id:
+        return await _safe_send(bot, '要分配给谁？用法：分配老公 @对方 角色名')
+
+    role_name = _assignment_role_name(ev, str(target_user_id))
+    if not role_name:
+        return await _safe_send(bot, '要分配哪个老公？用法：分配老公 @对方 角色名')
+
+    candidates, error = await _load_candidates('husband')
+    if error or not candidates:
+        return await _safe_send(bot, error or '没有找到可用角色。')
+
+    candidates = _filter_by_mode(candidates, 'husband')
+    role = _find_assignable_wife(candidates, role_name)
+    if role is None:
+        return await _safe_send(bot, f'未找到名为“{role_name}”的老公角色。')
+
+    record = _pick_role_record((role,), random)
+    if record is None:
+        logger.warning(f'{LOG_PREFIX} 主人分配老公未找到可用图片: {role.name}')
+        return await _safe_send(bot, f'未找到“{role.name}”可用的老公图片。')
+    image = record.image
+    target_key = str(target_user_id)
+
+    assigned_record = _record_to_dict(record, ev, target_key)
+    assigned_record['assigned_by'] = _user_key(ev)
+    assigned_record['assigned_by_name'] = _user_display_name(ev)
+    async with _daily_context_lock(ev):
+        await _save_daily_records(ev, [('husbands', target_key, assigned_record)])
+
+    logger.info(
+        f'{LOG_PREFIX} 主人 {ev.user_id} 将老公 {role.name} 分配给 {target_key}, '
+        f'ids={role.role_ids} image={image}'
+    )
+    await _send_role_image(
+        bot,
+        role,
+        image,
+        f'已把今天的老公{role.name}分配给对方。',
+        target_key,
+        ev.group_id is not None,
+        kind='husband',
+    )
+
+
 async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
     if not _marry_member_enabled():
         return
@@ -644,7 +698,7 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife') -> None:
 
 
 @specify_wife_sv.on_prefix(
-    ('今日老婆', '娶婆娘', 'jrlp', 'qlp'),
+    ('今日老婆', '今日老婆 ', '娶婆娘', 'jrlp', 'qlp'),
     block=True,
     to_ai="""抽取当前用户今天的老婆。
     当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。
@@ -810,6 +864,36 @@ async def assign_wife(bot: Bot, ev: Event) -> None:
 )
 async def assign_wife_usage(bot: Bot, ev: Event) -> None:
     await _send_assign_wife(bot, ev)
+
+
+@assign_husband_sv.on_prefix(
+    ('分配老公', '分配今日老公'),
+    block=True,
+    to_ai="""为指定用户分配今日老公。
+    当管理员或用户说“给某人分配老公”“分配今日老公 @某人 角色名”时调用。
+    Args:
+        text: 分配参数，通常包含目标用户和老公名，例如“@用户 忌炎”。
+    """,
+    covers=['机器人主人为指定用户分配今日老公（含角色名）'],
+    aliases=['今日老婆·分配老公'],
+)
+async def assign_husband(bot: Bot, ev: Event) -> None:
+    await _send_assign_husband(bot, ev)
+
+
+@assign_husband_sv.on_fullmatch(
+    ('分配老公', '分配今日老公'),
+    block=True,
+    to_ai="""显示分配今日老公的用法。
+    当用户只说“分配老公”但没有提供目标或角色名时调用。
+    Args:
+        text: 无需参数，留空。
+    """,
+    covers=['「分配老公」的用法说明'],
+    aliases=['今日老婆·分配老公用法'],
+)
+async def assign_husband_usage(bot: Bot, ev: Event) -> None:
+    await _send_assign_husband(bot, ev)
 
 
 @specify_wife_sv.on_prefix(

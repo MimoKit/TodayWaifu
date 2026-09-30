@@ -32,6 +32,13 @@ class CommandPriorityTests(unittest.TestCase):
         self.assertIn('from .help import daily_wife_help', source)
         self.assertIn('return await daily_wife_help(bot, ev)', source)
 
+    def test_daily_wife_prefix_accepts_a_space_before_role_name(self) -> None:
+        source = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8-sig')
+        self.assertRegex(
+            source,
+            r"\('今日老婆',\s*'今日老婆 ',\s*'娶婆娘',\s*'jrlp',\s*'qlp'\)",
+        )
+
 
     def test_help_passes_command_icon_directory_to_renderer(self) -> None:
         source = (ROOT / 'TodayWaifu' / 'help.py').read_text(encoding='utf-8-sig')

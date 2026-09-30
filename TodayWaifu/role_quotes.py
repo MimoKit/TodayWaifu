@@ -55,22 +55,11 @@ def _load_quotes_from_data() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...
 
 
 def get_role_quote(name: str) -> str:
-    """获取角色的剧情/对话文本，附带角色名，文本内容不超过 30 字。"""
+    """按精确角色名获取台词；没有对应台词时返回空字符串。"""
     clean_name = name.strip()
-    role_quotes, default_quotes = _load_quotes_from_data()
+    role_quotes, _ = _load_quotes_from_data()
 
     quotes: tuple[str, ...] | None = role_quotes.get(clean_name)
-    matched_name = clean_name
-    if quotes is None:
-        for k, v in role_quotes.items():
-            if k in clean_name or clean_name in k:
-                quotes = v
-                matched_name = k
-                break
-    if quotes is None:
-        quotes = default_quotes
-        matched_name = clean_name
-
     if not quotes:
         return ""
 
@@ -79,7 +68,7 @@ def get_role_quote(name: str) -> str:
         selected = selected[:30]
 
     quote_line = f"「{selected}」"
-    author_line = f"——{matched_name}"
+    author_line = f"——{clean_name}"
 
     # 手机QQ群单行气泡上限约为15字宽，固定为14可确保署名紧贴右侧且不被强制换行
     target_width = 14

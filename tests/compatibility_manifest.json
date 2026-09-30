@@ -152,7 +152,7 @@
       },
       {
         "key": "DailyWifeAssignWhitelist",
-        "expr": "GsListStrConfig('分配老婆白名单', '允许使用分配老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-分配老婆”服务中配置', [])"
+        "expr": "GsListStrConfig('分配老婆/老公白名单', '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在对应服务中配置', [])"
       },
       {
         "key": "DailyWifeSpecifyWhitelist",
@@ -365,7 +365,7 @@
     {
       "file": "TodayWaifu/daily.py",
       "function": "daily_wife_prefix",
-      "decorator": "specify_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ', covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'], aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'])"
+      "decorator": "specify_wife_sv.on_prefix(('今日老婆', '今日老婆 ', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ', covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'], aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'])"
     },
     {
       "file": "TodayWaifu/daily.py",
@@ -411,6 +411,16 @@
       "file": "TodayWaifu/daily.py",
       "function": "assign_wife_usage",
       "decorator": "assign_wife_sv.on_fullmatch(('分配老婆', '分配今日老婆'), block=True, to_ai='显示分配今日老婆的用法。\\n    当用户只说“分配老婆”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['「分配老婆」的用法说明'], aliases=['今日老婆·分配老婆用法'])"
+    },
+    {
+      "file": "TodayWaifu/daily.py",
+      "function": "assign_husband",
+      "decorator": "assign_husband_sv.on_prefix(('分配老公', '分配今日老公'), block=True, to_ai='为指定用户分配今日老公。\\n    当管理员或用户说“给某人分配老公”“分配今日老公 @某人 角色名”时调用。\\n    Args:\\n        text: 分配参数，通常包含目标用户和老公名，例如“@用户 忌炎”。\\n    ', covers=['机器人主人为指定用户分配今日老公（含角色名）'], aliases=['今日老婆·分配老公'])"
+    },
+    {
+      "file": "TodayWaifu/daily.py",
+      "function": "assign_husband_usage",
+      "decorator": "assign_husband_sv.on_fullmatch(('分配老公', '分配今日老公'), block=True, to_ai='显示分配今日老公的用法。\\n    当用户只说“分配老公”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['「分配老公」的用法说明'], aliases=['今日老婆·分配老公用法'])"
     },
     {
       "file": "TodayWaifu/daily.py",

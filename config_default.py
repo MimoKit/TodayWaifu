@@ -205,8 +205,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
 
     '_DividerAssignWife': GsDivider('分配老婆', ''),
     'DailyWifeAssignWhitelist': GsListStrConfig(
-        '分配老婆白名单',
-        '允许使用分配老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-分配老婆”服务中配置',
+        '分配老婆/老公白名单',
+        '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在对应服务中配置',
         [],
     ),
     'DailyWifeSpecifyWhitelist': GsListStrConfig(

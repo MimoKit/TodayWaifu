@@ -101,13 +101,14 @@ class RoleQuotesTests(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[1].endswith("——今汐"))
 
-        # 未知角色也能正常 fallback 并带上角色名
+    def test_unmatched_name_does_not_reuse_a_substring_quote(self) -> None:
+        """未收录的短名不能误用包含它的其他角色台词。"""
+        self.assertEqual(self.get_role_quote("心"), "")
+        self.assertIn("——鉴心", self.get_role_quote("鉴心"))
+
+        # 未知角色没有对应台词时不附加台词
         fallback_quote = self.get_role_quote("某个未知角色")
-        self.assertTrue(fallback_quote.startswith("「"))
-        self.assertIn("——某个未知角色", fallback_quote)
-        fb_lines = fallback_quote.splitlines()
-        self.assertEqual(len(fb_lines), 2)
-        self.assertTrue(fb_lines[1].endswith("——某个未知角色"))
+        self.assertEqual(fallback_quote, "")
 
     def test_build_text_includes_quote(self) -> None:
         """确保 _build_text 会附带角色的剧情/台词。"""

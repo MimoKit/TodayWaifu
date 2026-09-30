@@ -228,6 +228,7 @@ from ..daily_wife_config import DailyWifeConfig
 help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
 assign_wife_sv = SV('今日老婆-分配老婆', priority=2)
+assign_husband_sv = SV('今日老婆-分配老公', pm=3, priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
@@ -280,7 +281,7 @@ __all__ = [
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
-    '_can_assign_wife', '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
+    '_can_assign_husband', '_can_assign_wife', '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
     'get_role_quote',
     '_is_master', '_is_secondhand_wife',
     '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
@@ -310,7 +311,7 @@ __all__ = [
     'DailyWifeRecord', '_migrate_legacy_wife_data',
     'read_file_bytes_cached', 'is_url_cached', 'prefer_cached_urls',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
-    'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
+    'assign_husband_sv', 'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
     'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv', 'shota_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
@@ -350,9 +351,23 @@ def _can_assign_wife(ev: Event) -> bool:
     )
 
 
+def _can_assign_husband(ev: Event) -> bool:
+    return _is_master(ev) or can_use_pm_or_whitelisted_feature(
+        ev.user_id,
+        ev.user_pm,
+        assign_husband_sv.pm,
+        (),
+        _cfg('DailyWifeAssignWhitelist'),
+    )
+
+
 def _can_specify_wife(ev: Event) -> bool:
-    return _is_master(ev) or str(ev.user_id) in normalized_user_ids(
-        _cfg('DailyWifeSpecifyWhitelist')
+    return _is_master(ev) or can_use_pm_or_whitelisted_feature(
+        ev.user_id,
+        ev.user_pm,
+        specify_wife_sv.pm,
+        (),
+        _cfg('DailyWifeSpecifyWhitelist'),
     )
 
 
