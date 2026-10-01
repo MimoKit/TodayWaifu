@@ -2,7 +2,8 @@
 
 背景：台词库原本只存在于 data 目录、插件仓库里没有，别人装完插件后台词功能会
 静默为空（get_role_quote 返回空串，daily.py 直接跳过，不报错也不提示）。现在随仓库
-分发一份完整的内置库，并在运行时回退读取、首次启动播种到 data 目录。
+分发一份完整的内置库，运行时只读这一份——曾额外播种到 data 并优先读那份，结果是
+升级后的新库永远被旧副本挡住，故已移除该路径。
 """
 
 import json
@@ -103,14 +104,25 @@ class BundledQuotesTests(unittest.TestCase):
         self.assertTrue(defaults, '需要兜底台词，否则未收录角色仍会静默没有台词')
 
 
-class RuntimeFallbackTests(unittest.TestCase):
-    def test_role_quotes_path_falls_back_to_the_bundle(self) -> None:
+def _function_source(path: Path, name: str) -> str:
+    """截取某个顶层函数的源码，避免把后续函数的实现算进来。"""
+    source = path.read_text(encoding='utf-8')
+    start = source.index(f'def {name}(')
+    rest = source[start:]
+    nxt = rest.find('\ndef ', 1)
+    return rest if nxt == -1 else rest[:nxt]
+
+
+class BundledPathTests(unittest.TestCase):
+    def test_quotes_ignore_any_data_copy(self) -> None:
+        """台词库路径只能落到内置文件：曾优先读 data 副本，升级后的新库永远被挡住。"""
+        body = _function_source(PACKAGE / 'resource_paths.py', 'role_quotes_path')
+        self.assertIn('BUNDLED_ROLE_QUOTES_PATH', body)
+        self.assertNotIn('data_root()', body, 'role_quotes_path 不得再读 data 目录')
+
         source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
-        self.assertIn('BUNDLED_ROLE_QUOTES_PATH', source)
-        body = source[source.index('def role_quotes_path()') : source.index('def ensure_role_quotes_seeded()')]
-        self.assertIn('user_role_quotes_path()', body)
-        self.assertIn('is_file()', body)
-        self.assertIn('return BUNDLED_ROLE_QUOTES_PATH', body)
+        self.assertNotIn('user_role_quotes_path', source, '用户副本路径与播种函数应已移除')
+        self.assertNotIn('ensure_role_quotes_seeded', source)
 
     def test_bundled_path_points_to_plugin_root(self) -> None:
         """内置库与 ICON.png / role_id_map.json 同级，放插件根即可，不要另建 data 目录。"""
@@ -122,22 +134,6 @@ class RuntimeFallbackTests(unittest.TestCase):
         path = _resolved_bundled_path()
         self.assertTrue(path.is_file(), f'内置台词库路径不可达: {path}')
         self.assertEqual(path.resolve(), BUNDLED.resolve())
-
-    def test_seeding_never_overwrites_user_edits(self) -> None:
-        source = (PACKAGE / 'resource_paths.py').read_text(encoding='utf-8')
-        body = source[source.index('def ensure_role_quotes_seeded()') :]
-        self.assertIn('if target.is_file()', body, '用户已有台词文件时不得覆盖')
-        self.assertIn('shutil.copyfile', body)
-
-    def test_startup_hook_seeds_the_file_and_survives_io_errors(self) -> None:
-        """播种是便利功能：磁盘/权限出错必须降级为 warning，不能中断启动流程。"""
-        shared = (PACKAGE / 'shared.py').read_text(encoding='utf-8')
-        body = shared[
-            shared.index('async def _seed_role_quotes_on_startup()') : shared.index('def _prune_daily_context_state()')
-        ]
-        self.assertIn('ensure_role_quotes_seeded', body)
-        self.assertIn('except OSError', body)
-        self.assertIn('logger.warning', body)
 
 
 if __name__ == '__main__':

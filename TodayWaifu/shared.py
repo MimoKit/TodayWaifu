@@ -404,21 +404,6 @@ async def _migrate_daily_wife_data_on_startup() -> None:
         logger.exception(f'{LOG_PREFIX} 旧每日记录迁移失败: {exc}')
 
 
-@on_core_start_before(priority=-65)
-async def _seed_role_quotes_on_startup() -> None:
-    """首次运行把插件内置的台词库写入 data 目录，方便用户自行增补。"""
-    from .resource_paths import ensure_role_quotes_seeded
-
-    try:
-        seeded = await run_blocking(ensure_role_quotes_seeded)
-    except OSError as exc:
-        # 播种只是便利功能，磁盘/权限问题不该影响插件启动
-        logger.warning(f'{LOG_PREFIX} 内置台词库播种失败: {exc}')
-        return
-    if seeded:
-        logger.info(f'{LOG_PREFIX} 已把内置角色台词库写入 data/TodayWaifu/role_quotes.json')
-
-
 def _prune_daily_context_state() -> None:
     today = _today_key()
     _CONTEXT_REGISTRY.prune(today)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from gsuid_core.data_store import get_res_path
@@ -36,24 +35,10 @@ def loli_root() -> Path:
     return data_root() / LOLI_IMAGE_DIR_NAME
 
 
-def user_role_quotes_path() -> Path:
-    """用户 data 目录里的台词库；要增补其他游戏角色就改这个文件。"""
-    return data_root() / ROLE_QUOTES_FILE_NAME
-
-
 def role_quotes_path() -> Path:
-    """优先用户 data 目录的台词库，缺失时回退到插件内置的那份。"""
-    user_path = user_role_quotes_path()
-    if user_path.is_file():
-        return user_path
+    """只读随插件分发的台词库。
+
+    曾把内置库播种到 data 并优先读那份，结果是升级后的新库永远被旧副本挡住
+    （#27 播种的自创台词一直压过 #30 的官方原文），故不再读 data 副本。
+    """
     return BUNDLED_ROLE_QUOTES_PATH
-
-
-def ensure_role_quotes_seeded() -> bool:
-    """首次运行把内置台词库播种到 data 目录，方便用户自行增补；已存在则不动。"""
-    target = user_role_quotes_path()
-    if target.is_file() or not BUNDLED_ROLE_QUOTES_PATH.is_file():
-        return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(BUNDLED_ROLE_QUOTES_PATH, target)
-    return True

@@ -1,4 +1,4 @@
-"""TodayWaifu 角色剧情与对话台词模块，从 data/TodayWaifu/role_quotes.json 读取。"""
+"""TodayWaifu 角色剧情与对话台词模块，读取随插件分发的 role_quotes.json。"""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ _DEFAULT_QUOTES_CACHE: tuple[str, ...] = ()
 _CACHE_MTIME: float = 0.0
 
 
-def _load_quotes_from_data() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...]]:
+def _load_bundled_quotes() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...]]:
     global _QUOTES_CACHE, _DEFAULT_QUOTES_CACHE, _CACHE_MTIME
     path = role_quotes_path()
     if not path.is_file():
@@ -57,16 +57,16 @@ def _load_quotes_from_data() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...
 def get_role_quote(name: str) -> str:
     """获取角色的剧情/对话文本，附带角色名，文本内容不超过 30 字。"""
     clean_name = name.strip()
-    role_quotes, default_quotes = _load_quotes_from_data()
+    role_quotes, default_quotes = _load_bundled_quotes()
 
     quotes: tuple[str, ...] | None = role_quotes.get(clean_name)
     matched_name = clean_name
     if quotes is None:
-        for k, v in role_quotes.items():
-            if k in clean_name or clean_name in k:
-                quotes = v
-                matched_name = k
-                break
+        # 只认「角色名里含某个已知键」；反向匹配会让「心」被「鉴心」截胡
+        contained = [k for k in role_quotes if k in clean_name]
+        if contained:
+            matched_name = max(contained, key=len)
+            quotes = role_quotes[matched_name]
     if quotes is None:
         quotes = default_quotes
         matched_name = clean_name

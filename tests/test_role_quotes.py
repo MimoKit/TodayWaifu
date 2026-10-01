@@ -9,9 +9,7 @@ from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 DAILY_PATH = ROOT / "TodayWaifu" / "daily.py"
-_CORE_DATA = ROOT.parents[2] / "data" / "TodayWaifu" / "role_quotes.json"
-_PLUGIN_DATA = ROOT / "role_quotes.json"
-DATA_FILE = _CORE_DATA if _CORE_DATA.is_file() else _PLUGIN_DATA
+DATA_FILE = ROOT / "role_quotes.json"
 ROLE_QUOTES_PATH = ROOT / "TodayWaifu" / "role_quotes.py"
 
 
@@ -66,7 +64,7 @@ class _FakeKindMetadata:
     text_template_default: str = "你今天的老婆是{name}"
 
 
-@unittest.skipUnless(DATA_FILE.is_file(), "缺少 data/TodayWaifu/role_quotes.json，跳过台词库测试")
+@unittest.skipUnless(DATA_FILE.is_file(), "缺少插件内置的 role_quotes.json，跳过台词库测试")
 class RoleQuotesTests(unittest.TestCase):
     def setUp(self) -> None:
         self.data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
@@ -75,7 +73,7 @@ class RoleQuotesTests(unittest.TestCase):
         self.role_quotes_mod = _load_role_quotes_module()
         self.get_role_quote = self.role_quotes_mod["get_role_quote"]
 
-    def test_all_role_quotes_in_data_within_limit(self) -> None:
+    def test_all_role_quotes_within_limit(self) -> None:
         """确保台词库中预设台词主体不超过 30 字（卡片排版与 role_quotes.py 截断阈值）。"""
         for role_name, quotes in self.role_quotes.items():
             for quote in quotes:
@@ -108,6 +106,12 @@ class RoleQuotesTests(unittest.TestCase):
         fb_lines = fallback_quote.splitlines()
         self.assertEqual(len(fb_lines), 2)
         self.assertTrue(fb_lines[1].endswith("——某个未知角色"))
+
+    def test_unlisted_name_never_borrows_another_role(self) -> None:
+        """未收录的名字只能走兜底台词，不能被同名子串的其它角色截胡（曾把「心」算成「鉴心」）。"""
+        quote_text = self.get_role_quote("鉴")
+        self.assertEqual(len(quote_text.splitlines()), 2)
+        self.assertTrue(quote_text.splitlines()[1].endswith("——鉴"), quote_text)
 
     def test_build_text_includes_quote(self) -> None:
         """确保 _build_text 会附带角色的剧情/台词。"""
