@@ -15,6 +15,7 @@ from .shared import (
     _user_key,
     _safe_send,
     divorce_sv,
+    _wife_state,
     _daily_bucket_name,
     _daily_context_lock,
     _load_daily_context,
@@ -97,6 +98,12 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
         bucket_name = _daily_bucket_name(kind)
         bucket = context[bucket_name]
         record = bucket.get(user_key)
+        # 补偿老婆另存于 safe_wives；旧记录仅用于保留被抢历史，不能作为离婚对象。
+        if kind == 'wife' and isinstance(record, dict) and record.get('stolen_by'):
+            safe_record = context['safe_wives'].get(user_key)
+            if isinstance(safe_record, dict) and str(safe_record.get('name') or '').strip():
+                bucket_name = 'safe_wives'
+                record = safe_record
         # 群友记录的展示名固定为「群友」：其 name 是具体群昵称，回显会暴露他人昵称。
         item_title = '群友' if isinstance(record, dict) and record.get('record_type') == 'member' else title
         # 状态校验与写入同处锁内，因此这里读到的 record 就是写回时依据的最新状态。
@@ -105,6 +112,8 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
         elif record.get('divorced'):
             # 已离婚时不再写盘：避免无意义的磁盘写入与 mtime 抖动。
             response = f'你今天已经和{item_title}离婚了。'
+        elif _wife_state(record) != 'owned':
+            response = f'你今天没有可以离婚的{item_title}。'
         else:
             # 复制后再改：原 record 可能仍被上下文缓存中的其它引用持有，
             # 就地修改会让未持锁的读取方看到半成品状态。

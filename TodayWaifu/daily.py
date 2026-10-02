@@ -399,6 +399,11 @@ async def _send_daily_wife(
             # 重复抽取会产生多条记录并使「今天已抽过」的判定失效。
             safe_record = context['safe_wives'].get(user_key)
             if isinstance(safe_record, dict):
+                if safe_record.get('divorced'):
+                    return await _safe_send(
+                        bot,
+                        f'你今天已经和{safe_record.get("name", title)}离婚了，明天再来吧~',
+                    )
                 safe_wife = _record_from_dict(safe_record)
                 if safe_wife is not None:
                     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 展示已有的补偿老婆: {safe_wife.name}')
@@ -433,9 +438,11 @@ async def _send_daily_wife(
                     state_changed = True
                 else:
                     latest_safe = context['safe_wives'].get(user_key)
-                    if isinstance(latest_safe, dict):
+                    if isinstance(latest_safe, dict) and latest_safe.get('divorced'):
+                        state_changed = True
+                    elif isinstance(latest_safe, dict):
                         reused_safe_wife = _record_from_dict(latest_safe)
-                    if reused_safe_wife is None:
+                    if not state_changed and reused_safe_wife is None:
                         new_safe_record = _record_to_dict(safe_wife, ev, user_key)
                         new_safe_record['safe'] = True
                         await _save_daily_records(
