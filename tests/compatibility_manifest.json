@@ -23,6 +23,14 @@
         "expr": "GsStrConfig('萝莉图片数据源', '选择 local 只使用本地萝莉图库；选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery', 'gallery', options=['local', 'gallery'])"
       },
       {
+        "key": "_DividerRoleAlias",
+        "expr": "GsDivider('角色别名', '')"
+      },
+      {
+        "key": "DailyWifeAliasSource",
+        "expr": "GsStrConfig('角色别名数据源', '选择 off 关闭别名解析（默认）；选择 xwuid 使用 XWUID 插件的别名表（未安装该插件时自动改用插件自带的别名表）；选择 local 始终使用插件自带的别名表。别名用于「指定老婆」这类需要匹配角色名的场景，而指定角色仅限机器人主人或指定老婆白名单用户使用', 'off', options=['off', 'xwuid', 'local'])"
+      },
+      {
         "key": "DailyWifeCustomRolePilePath",
         "expr": "GsStrConfig('本地角色图片目录', '图片数据源为 local 时生效。留空时自动查找 gsuid_core/data/XutheringWavesUID/custom_role_pile', '')"
       },
