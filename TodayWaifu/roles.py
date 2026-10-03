@@ -23,6 +23,7 @@ from .paths import (
 )
 from .state import CANDIDATE_CACHE
 from .domain import WifeRecord, RoleCandidate
+from .aliases import resolve_role_name
 from .payloads import RoleAccumulator, NamedRoleAccumulator
 from .constants import (
     LOG_PREFIX,
@@ -377,7 +378,9 @@ def _load_pgr_local_candidates() -> tuple[RoleCandidate, ...]:
 
 def _normalize_role_name(name: str) -> str:
     # 不同来源对间隔号的写法不一致，统一为「·」后再比较，避免同一角色被判为不同名字
-    return name.replace('・', '·').replace('•', '·').strip()
+    unified = name.replace('・', '·').replace('•', '·').strip()
+    # 再按 XWUID 别名表归一，用户可以用「小西王」这类别名称呼角色
+    return resolve_role_name(unified)
 
 
 _MALE_ROLE_NAMES_NORM = {_normalize_role_name(n) for n in EXCLUDED_ROLE_NAMES}

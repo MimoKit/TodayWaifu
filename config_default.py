@@ -46,6 +46,16 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         'gallery',
         options=['local', 'gallery'],
     ),
+    '_DividerRoleAlias': GsDivider('角色别名', ''),
+    'DailyWifeAliasSource': GsStrConfig(
+        '角色别名数据源',
+        '选择 off 关闭别名解析（默认）；选择 xwuid 使用 XWUID 插件的别名表'
+        '（未安装该插件时自动改用插件自带的别名表）；选择 local 始终使用插件自带的别名表。'
+        '别名用于「指定老婆」这类需要匹配角色名的场景，而指定角色仅限机器人主人'
+        '或指定老婆白名单用户使用',
+        'off',
+        options=['off', 'xwuid', 'local'],
+    ),
     'DailyWifeCustomRolePilePath': GsStrConfig(
         '本地角色图片目录',
         '图片数据源为 local 时生效。留空时自动查找 gsuid_core/data/XutheringWavesUID/custom_role_pile',
