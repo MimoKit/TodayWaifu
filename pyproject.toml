@@ -8,7 +8,9 @@ license = { text = "GPL-3.0-or-later" }
 # 仅声明 GsCore 框架范围之外的依赖：Pillow 由 Core 自带，python / fastapi / pydantic /
 # gsuid-core / sqlmodel / apscheduler / pydantic-ai 属框架基础依赖，重复声明会与 Core
 # 自身的版本约束产生冲突。此处列出的依赖由框架在启动时自动安装。
-dependencies = []
+dependencies = [
+    "cos-python-sdk-v5>=1.9.44",
+]
 
 [tool.gsuid]
 name = "TodayWaifu"
