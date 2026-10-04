@@ -43,6 +43,10 @@
         "expr": "GsStrConfig('图库接口统一地址', '今日老婆全套图库接口统一地址，默认使用 https://twfapi.xlinxc.cn。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担', 'https://twfapi.xlinxc.cn')"
       },
       {
+        "key": "DailyWifeApiNoR18",
+        "expr": "GsBoolConfig('排除 R18 图片', '开启后，鸣潮/萝莉/正太三类图库改用服务端的 nor18 端点，只返回不含 R18 的图片；战双与测试图库本身没有 R18 内容，不受此项影响。默认关闭（与升级前行为一致）', False)"
+      },
+      {
         "key": "DailyWifeNormalEnabled",
         "expr": "GsBoolConfig('启用普通老婆', '开启后“今日老婆”指令使用普通老婆远程图库，文案使用“你的老婆来啦！”，并遵循今日老婆限制', False)"
       },

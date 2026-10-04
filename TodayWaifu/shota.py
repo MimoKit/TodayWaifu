@@ -24,6 +24,7 @@ from .shared import (
     _user_key,
     _daily_rng,
     _wife_state,
+    _apply_no_r18,
     _shota_enabled,
     _record_to_dict,
     _send_shota_text,
@@ -165,7 +166,7 @@ def _shota_api_url() -> str:
     # /shota/shota 这类无效路径
     if base.endswith('/shota') or base.endswith('/zt'):
         return base
-    return f'{base}/shota'
+    return _apply_no_r18(f'{base}/shota')
 
 
 async def _roll_shota_record(

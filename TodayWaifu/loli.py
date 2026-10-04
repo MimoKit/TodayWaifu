@@ -34,6 +34,7 @@ from .shared import (
     _daily_rng,
     _safe_send,
     _wife_state,
+    _apply_no_r18,
     _image_source,
     _loli_enabled,
     loli_manage_sv,
@@ -288,7 +289,7 @@ def _loli_api_url() -> str:
     # 避免拼接出 /loli/loli 这类无效路径
     if base.endswith('/loli') or base.endswith('/nor18'):
         return base
-    return f'{base}/loli'
+    return _apply_no_r18(f'{base}/loli')
 
 
 async def _roll_loli_record(

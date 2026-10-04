@@ -320,6 +320,30 @@ def _image_source(kind: str = 'wife') -> str:
     return 'gallery' if value.strip().lower() == 'gallery' else 'local'
 
 
+def _no_r18_enabled() -> bool:
+    """是否要求图库排除 R18 图片。
+
+    仅影响服务端提供 nor18 变体的三个图库（鸣潮 / 萝莉 / 正太）：战双与测试图库
+    本身不含 R18 内容，服务端也没有对应端点，套用会直接 404。
+    默认关闭，使升级前后行为一致。
+    """
+    return _cfg_bool('DailyWifeApiNoR18', False)
+
+
+def _apply_no_r18(url: str) -> str:
+    """按开关把接口地址改写到服务端的 nor18 端点。
+
+    地址以调用方给定的为准，只在其后追加路径段，不做整体替换——自定义图库的
+    部署地址必须原样保留。已带 nor18 后缀时原样返回，避免重复拼出 /nor18/nor18。
+    """
+    if not url or not _no_r18_enabled():
+        return url
+    clean = url.rstrip('/')
+    if clean.endswith('/nor18'):
+        return clean
+    return f'{clean}/nor18'
+
+
 def _daily_item_title(kind: str) -> str:
     """返回该功能在对外文案中使用的条目标题。"""
     return _daily_kind_metadata(kind).title

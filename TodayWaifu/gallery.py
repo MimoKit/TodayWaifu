@@ -50,6 +50,7 @@ from .constants import (
     GALLERY_HTTP_TIMEOUT_SECONDS,
     _cfg,
     _cfg_bool,
+    _apply_no_r18,
     _image_source,
 )
 from .file_cache import read_url_cache, write_url_cache
@@ -111,9 +112,10 @@ async def _load_pgr_wife_candidates() -> tuple[RoleCandidate, ...]:
 
 def _gallery_api_url() -> str:
     base = str(_cfg('DailyWifeApiUrl') or DEFAULT_GALLERY_BASE_URL).strip().rstrip('/')
+    # 已填完整端点（含 /roles）时原样尊重：用户显式写了过滤后的地址，不应再叠 nor18
     if base.endswith('/roles'):
         return base
-    return f'{base}/api/xwuid/roles'
+    return _apply_no_r18(f'{base}/api/xwuid/roles')
 
 
 def _request_headers() -> dict[str, str]:
