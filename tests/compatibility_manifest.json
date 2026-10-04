@@ -325,8 +325,12 @@
         "expr": "GsImageConfig('帮助头像', '自定义「今日老婆帮助」左上角头像，建议使用方形图片', str(SHOW_CONFIG_PATH / 'help_icon.png'), str(SHOW_CONFIG_PATH), 'help_icon', 'png')"
       },
       {
+        "key": "DailyWifeHelpStyle",
+        "expr": "GsIntConfig('帮助图风格', '控制帮助图整体配色：1=二次元风格（立绘横幅+渐变分类条），2=手绘风格（柔和手绘底+爱心分类条）。默认 2', 2, 2, options=[1, 2])"
+      },
+      {
         "key": "DailyWifeHelpColumn",
-        "expr": "GsIntConfig('帮助展示行数', '控制帮助图每组展示数量，默认 4，可按需要调整', 4, 10)"
+        "expr": "GsIntConfig('帮助图宽度(每行列数)', '控制帮助图一行放几条命令：4 更紧凑，3 留白更多。数值越大画布越宽；上限 5，超过会溢出画布', 4, 5)"
       }
     ]
   },

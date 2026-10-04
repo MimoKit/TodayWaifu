@@ -16,7 +16,6 @@ from gsuid_core.help.model import PluginHelp
 from gsuid_core.help.draw_new_plugin_help import get_new_help
 
 from .shared import (
-    BASE_DIR,
     LOG_PREFIX,
     HELP_ICON_PATH,
     Bot,
@@ -31,22 +30,44 @@ from .shared import (
 from .executor import run_blocking
 from ..daily_wife_config import DailyWifeShowConfig
 
+# 横幅、背景、分类条与命令卡贴图统一由外部绘图资源包提供，路径在该包内解析。
+# 横幅/背景/分类条随风格成套切换，故不固定为模块级常量，而是每次调用时按风格解析；
+# 命令卡片贴图与风格无关，是唯一可以全局固定的资源。
+from ..todaywaifu_help.get_help import (
+    HELP_DATA as _HELP_JSON_PATH,
+    ICON_PATH as _ICON_PATH,
+    ITEM_PATH as _HELP_ITEM,
+    DEFAULT_STYLE as _HELP_DEFAULT_STYLE,
+    HELP_STYLE_NAMES as _HELP_STYLE_NAMES,
+    HELP_TEXT_COLORS,
+    HelpButtons,
+    resolve_style_path,
+    attach_command_icons,
+)
+
 # 资源签名：路径、mtime_ns、大小；缺失时为 None
 # 用 mtime_ns 而非秒级 mtime：同秒内的两次写入在秒级精度下无法区分，会漏掉重绘。
 PathSignature = tuple[str, int, int] | None
-# 帮助缓存键：5 个资源签名 + 列数 + 权限等级（见 _help_cache_key）
+# 帮助缓存键：7 个资源签名 + 列数 + 权限等级 + 风格编号（见 _help_cache_key）
 # 权限等级参与键是因为帮助内容随权限裁剪，不同权限的用户不能共用同一张图。
+# 分类条与命令卡贴图同样计入签名：它们参与渲染，替换后若不换键会长期显示旧图。
+# 风格编号显式入键：横幅/背景/分类条按风格成套切换，仅靠路径签名虽也能区分，
+# 但一旦两套风格共用某张资源，键就会静默复用另一种风格的旧图。
 HelpCacheKey = tuple[
-    PathSignature, PathSignature, PathSignature, PathSignature, PathSignature, int, int
+    PathSignature,
+    PathSignature,
+    PathSignature,
+    PathSignature,
+    PathSignature,
+    tuple[PathSignature, ...],
+    PathSignature,
+    int,
+    int,
+    int,
 ]
 
 # 帮助图缓存容量刻意很小（4）：键维度多，不同键的图几乎不会复用，
 # 保留过多只会长期占用内存中较大的位图。
-_HELP_JSON_PATH = BASE_DIR / 'help.json'
-_TEXTURE_DIR = BASE_DIR / 'texture2d'
-_BANNER_BG_PATH = _TEXTURE_DIR / 'help_banner.png'
-_BG_PATH = _TEXTURE_DIR / 'help_bg.jpg'
-_ICON_PATH = _TEXTURE_DIR / 'icons'
 _HELP_CACHE_MAX_ENTRIES = 4
 _HELP_CACHE: OrderedDict[HelpCacheKey, str] = OrderedDict()
 # 在途渲染合并表：同一键的并发请求共享一次渲染，否则同时多人触发帮助会重复起绘图任务。
@@ -68,6 +89,20 @@ def _show_config_path(key: str) -> Path | None:
         return None
     path = Path(value).expanduser()
     return path if path.is_file() else None
+
+
+def _help_style() -> int:
+    """读出配置里的帮助图风格编号，越界或非整数一律回落到默认风格。
+
+    风格决定整套横幅/背景/分类条贴图，取值非法时不能静默套用另一套风格，
+    因此这里先夹到已知编号区间再交由 resolve_style_path 解析目录。
+    """
+    value = DailyWifeShowConfig.get_config('DailyWifeHelpStyle').data
+    try:
+        style = int(value)
+    except (TypeError, ValueError):
+        style = _HELP_DEFAULT_STYLE
+    return style if style in _HELP_STYLE_NAMES else _HELP_DEFAULT_STYLE
 
 
 def _help_column() -> int:
@@ -97,18 +132,25 @@ def _help_cache_key(
     icon_path: Path,
     banner_bg_path: Path,
     help_bg_path: Path,
+    text_path: Path,
+    style: int,
     column: int,
     pm: int,
 ) -> HelpCacheKey:
-    # 五个签名对应五份参与渲染的资源，缺一都会导致「换了图但帮助未更新」。
+    # 每个签名对应一份参与渲染的资源，缺一都会导致「换了图但帮助未更新」。
     return (
         _path_signature(_HELP_JSON_PATH),
         _path_signature(icon_path),
         _path_signature(banner_bg_path),
         _path_signature(help_bg_path),
         _path_signature(_ICON_PATH),
+        # 分类条为多张轮换，故整组取签名；命令卡为单张。
+        tuple(_path_signature(path) for path in sorted(text_path.glob('cag_bg*.png'))),
+        # 命令卡与风格无关，取共用的那一份。
+        _path_signature(_HELP_ITEM),
         column,
         pm,
+        style,
     )
 
 
@@ -116,35 +158,41 @@ def _build_help_inputs(
     plugin_icon_path: Path,
     custom_banner_bg_path: Path | None,
     custom_help_bg_path: Path | None,
-) -> tuple[Image.Image, dict[str, PluginHelp], dict[str, Image.Image | Path]]:
+    text_path: Path,
+) -> tuple[
+    Image.Image,
+    dict[str, PluginHelp],
+    dict[str, Image.Image | Path | list[Image.Image]],
+]:
     """在线程中读取 JSON 和 PIL 资源，避免阻塞事件循环。"""
     with Image.open(plugin_icon_path) as source:
         icon = source.convert('RGBA')
 
-    extra: dict[str, Image.Image | Path] = {}
-    banner_bg_path = custom_banner_bg_path or _BANNER_BG_PATH
+    extra: dict[str, Image.Image | Path | list[Image.Image]] = {}
+    # text_path 是当前风格的内置贴图目录，仅在用户未上传自定义图时才作为回落。
+    banner_bg_path = custom_banner_bg_path or text_path / 'banner_bg.jpg'
     if banner_bg_path.is_file():
         with Image.open(banner_bg_path) as source:
-            banner = source.convert('RGBA')
-            if custom_banner_bg_path is None:
-                # 内置横幅只取顶部 40%：原图是整幅插画，直接使用会让横幅比例失真。
-                width, height = banner.size
-                extra['banner_bg'] = banner.crop((0, 0, width, int(height * 0.40)))
-            else:
-                # 用户自定义横幅已按横幅比例制作，原样使用，不做裁切。
-                extra['banner_bg'] = banner.copy()
+            # 横幅已按横幅比例制作，内置与自定义都不再裁切。
+            extra['banner_bg'] = source.convert('RGBA')
 
-    help_bg_path = custom_help_bg_path or _BG_PATH
+    help_bg_path = custom_help_bg_path or text_path / 'bg.jpg'
     if help_bg_path.is_file():
         with Image.open(help_bg_path) as source:
-            # 背景按画布尺寸等比覆盖裁切，不做纯色填充（浅色主题下会露出色带）
-            extra['help_bg'] = source.convert('RGBA').copy()
+            extra['help_bg'] = source.convert('RGBA')
 
     # 图标以目录形式传入而非逐个打开：绘图工具按需读取，避免一次性载入全部图标位图。
     if _ICON_PATH.is_dir():
         extra['icon_path'] = _ICON_PATH
 
-    return icon, _load_help_data(), extra
+    # 分类条与命令卡按卡片式版式绘制：分类条取自当前风格目录并多张轮换，
+    # 命令卡为两风格共用的单张。
+    buttons = HelpButtons(text_path)
+    extra['cag_bg'] = buttons.cag_bg
+    extra['item_bg'] = buttons.item
+
+    # 逐条命令补上图标：help.json 只写命令名，图标需按别名表回查资源目录。
+    return icon, attach_command_icons(_load_help_data(), _ICON_PATH), extra
 
 
 async def _render_help(
@@ -152,6 +200,7 @@ async def _render_help(
     plugin_icon_path: Path,
     custom_banner_bg_path: Path | None,
     custom_help_bg_path: Path | None,
+    text_path: Path,
     column: int,
     pm: int,
 ) -> str:
@@ -163,6 +212,7 @@ async def _render_help(
             plugin_icon_path,
             custom_banner_bg_path,
             custom_help_bg_path,
+            text_path,
         )
         return await get_new_help(
             plugin_name='TodayWaifu',
@@ -177,6 +227,8 @@ async def _render_help(
             enable_cache=False,
             column=column,
             pm=pm,
+            # 浅色立绘底上默认灰字几乎不可见，这里显式指定深色文字。
+            **HELP_TEXT_COLORS,
             **extra,
         )
 
@@ -220,15 +272,21 @@ async def daily_wife_help(bot: Bot, ev: Event) -> list[str] | None:
 
     custom_banner_bg_path = _show_config_path('DailyWifeHelpBannerBgUpload')
     custom_help_bg_path = _show_config_path('DailyWifeHelpBgUpload')
+    # 风格决定内置横幅/背景/分类条取自哪一套贴图；先解析出目录再据此拼路径，
+    # 这样键中登记的路径与 _build_help_inputs 的实际取值必然一致。
+    style = _help_style()
+    text_path = resolve_style_path(style)
     # 键中登记的是实际参与渲染的路径（自定义或内置），与 _build_help_inputs 的选择
     # 逻辑保持一致，否则自定义图切换后缓存键不变，帮助图不会更新。
-    banner_bg_path = custom_banner_bg_path or _BANNER_BG_PATH
-    help_bg_path = custom_help_bg_path or _BG_PATH
+    banner_bg_path = custom_banner_bg_path or text_path / 'banner_bg.jpg'
+    help_bg_path = custom_help_bg_path or text_path / 'bg.jpg'
     column = _help_column()
     key = _help_cache_key(
         plugin_icon_path,
         banner_bg_path,
         help_bg_path,
+        text_path,
+        style,
         column,
         int(ev.user_pm),
     )
@@ -239,6 +297,7 @@ async def daily_wife_help(bot: Bot, ev: Event) -> list[str] | None:
             plugin_icon_path,
             custom_banner_bg_path,
             custom_help_bg_path,
+            text_path,
             column,
             int(ev.user_pm),
         )
