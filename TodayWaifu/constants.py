@@ -156,8 +156,10 @@ DAILY_RECORD_RETENTION_DAYS = 30
 GALLERY_CACHE_MAX_MB = 512
 
 
-# 列表条目超过该数量时改用合并转发发送，避免长消息被平台截断或刷屏。
-LIST_FORWARD_THRESHOLD = 10
+# 列表条目超过该数量时渲染成图片发送：上百人的群直接发一大串文字会淹没聊天，
+# 而官机（QQ 官方机器人）不支持合并转发，只能靠出图收敛长度。
+# 条目不超过该数量时仍发纯文本，保留可复制、可搜索的好处。
+WIFE_LIST_IMAGE_THRESHOLD = 5
 
 
 # 自定义角色的 ID 起始值，取远大于内置角色 ID 的区间，以保证两类 ID 不重叠；
