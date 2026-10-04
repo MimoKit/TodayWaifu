@@ -19,6 +19,8 @@ help_preview.html
 __rank_preview.html
 __rank_preview.png
 .playwright-cli/
+# 预渲染回归产物（脚本 + 对比图，纯本地，不入库）
+test_output/
 
 # 本地文档 / 项目主页（不入库）
 index.html

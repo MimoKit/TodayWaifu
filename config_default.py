@@ -34,15 +34,13 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifePgrImageSource': GsStrConfig(
         '战双老婆图片数据源',
-        '选择 local 只使用本地战双图库目录；'
-        '选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
+        '选择 local 只使用本地战双图库目录；选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
         'gallery',
         options=['local', 'gallery'],
     ),
     'DailyLoliImageSource': GsStrConfig(
         '萝莉图片数据源',
-        '选择 local 只使用本地萝莉图库；'
-        '选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
+        '选择 local 只使用本地萝莉图库；选择 gallery 优先使用远程图库接口，接口不可用时回退本地。默认 gallery',
         'gallery',
         options=['local', 'gallery'],
     ),
@@ -122,7 +120,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',
         [],
     ),
-
     '_DividerNteWife': GsDivider('异环老婆', ''),
     'DailyWifeNteEnabled': GsBoolConfig(
         '启用今日异环老婆',
@@ -197,10 +194,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeShowUserId': GsBoolConfig(
         '显示触发者 ID',
-        (
-            '开启后文字说明额外附带一行“你的ID：xxx”，'
-            '方便 QQ 官方机器人等平台的群友复制 OpenID 进行抢老婆/送老婆'
-        ),
+        ('开启后文字说明额外附带一行“你的ID：xxx”，方便 QQ 官方机器人等平台的群友复制 OpenID 进行抢老婆/送老婆'),
         False,
     ),
     'DailyWifeDebugMode': GsBoolConfig(
@@ -208,7 +202,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试',
         False,
     ),
-
     '_DividerAssignWife': GsDivider('分配老婆', ''),
     'DailyWifeAssignWhitelist': GsListStrConfig(
         '分配老婆白名单',
@@ -220,14 +213,12 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '允许使用指定老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-指定老婆”服务中配置',
         [],
     ),
-
     '_DividerDailyWife': GsDivider('今日老婆', ''),
     'DailyWifeTextTemplate': GsStrConfig(
         '今日老婆文字模板',
         '今日老婆的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID',
         '你今天的老婆是{name}',
     ),
-
     '_DividerGroupMember': GsDivider('群友玩法', ''),
     'DailyWifeEnableGroupMember': GsBoolConfig(
         '今日老婆概率抽群友',
@@ -254,7 +245,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '「娶群友」命令的文字说明模板，可用变量：{name} 群友昵称，{user_id} 群友 QQ',
         '你娶到的群友是{name}',
     ),
-
     '_DividerDailyHusband': GsDivider('今日老公', ''),
     'DailyWifeHusbandEnabled': GsBoolConfig(
         '启用今日老公',
@@ -266,14 +256,12 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '今日老公的文字说明模板，可用变量：{name} 角色名，{role_id} 数字 ID',
         '你今天的老公是{name}',
     ),
-
     '_DividerDailyLoli': GsDivider('今日萝莉', ''),
     'DailyLoliEnabled': GsBoolConfig(
         '启用今日萝莉',
         '开启后可使用「今日萝莉」命令；关闭后命令不生效。图片内容风险请自行承担',
         True,
     ),
-
     '_DividerDailyShota': GsDivider('今日正太', ''),
     'DailyShotaEnabled': GsBoolConfig(
         '启用今日正太',
@@ -285,7 +273,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '今日正太的文字说明模板',
         '你今天的正太来啦！',
     ),
-
     '_DividerRob': GsDivider('抢夺设置', ''),
     'DailyWifeRobEnabled': GsBoolConfig(
         '启用抢老婆',
@@ -342,7 +329,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '可用变量：{name} 名称，{role_id} 图片标识，{target} 被抢用户 ID',
         '抢正太成功！你把对方今天的正太抢过来了！',
     ),
-
     '_DividerGift': GsDivider('赠送设置', ''),
     'DailyWifeGiftEnabled': GsBoolConfig(
         '启用送老婆',
@@ -411,10 +397,17 @@ APPEARANCE_CONFIG_DEFAULT: Dict[str, GSC] = {
         'help_icon',
         'png',
     ),
+    'DailyWifeHelpStyle': GsIntConfig(
+        '帮助图风格',
+        '控制帮助图整体配色：1=二次元风格（立绘横幅+渐变分类条），2=手绘风格（柔和手绘底+爱心分类条）。默认 2',
+        2,
+        2,
+        options=[1, 2],
+    ),
     'DailyWifeHelpColumn': GsIntConfig(
-        '帮助展示行数',
-        '控制帮助图每组展示数量，默认 4，可按需要调整',
-        4,
-        10,
+        '帮助图宽度(每行列数)',
+        '控制帮助图一行放几条命令：4 更紧凑，3 留白更多。数值越大画布越宽；上限 5，超过会溢出画布',
+        3,
+        5,
     ),
 }
