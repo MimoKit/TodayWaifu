@@ -19,7 +19,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip pytest pillow sqlalchemy sqlmodel aiosqlite
+        # 版本范围须与 GsCore 自身的依赖约束一致（sqlalchemy<2.1.0 / sqlmodel<0.0.31），
+        # 不可裸装当日最新版：sqlmodel 0.0.48 放开了 SQLAlchemy 的上界，裸装会拉到 2.1.x，
+        # 而 2.1 起 greenlet 变为可选 extra，SQLAlchemy 的 asyncio 扩展却依赖它，
+        # 结果真实 SQLite 事务用例以 ImportError 假性失败（2026-10-06 的 main 构建即如此）。
+        # 插件运行时由 Core 的依赖树保证这套组合，测试环境需显式复刻。
+        run: >-
+          python -m pip install --upgrade pip pytest pillow
+          "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet
 
       - name: Run test suite
         run: python -m pytest tests/ -q
