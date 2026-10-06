@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from .shared import (
     LOG_PREFIX,
-    WIFE_LIST_IMAGE_THRESHOLD,
+    LIST_FORWARD_THRESHOLD,
     Bot,
     Event,
     WifeRecord,
     RoleCandidate,
+    MessageSegment,
     MemberCandidate,
     RoleRecordValue,
     re,
@@ -32,7 +33,6 @@ from .shared import (
     _wife_state,
     wife_list_sv,
     daily_wife_sv,
-    _image_message,
     assign_wife_sv,
     get_role_quote,
     _filter_by_mode,
@@ -68,8 +68,6 @@ from .shared import (
     _load_group_display_names,
     _get_other_daily_wife_name,
 )
-from .executor import run_blocking
-from .list_image import render_wife_list_image
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> str:
@@ -660,10 +658,11 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife') -> None:
     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
     title_text, items = await _wife_list_items(ev, mode)
-    # 条目多时渲染成图片：上百人的群直接发一大串文字会淹没聊天，官机又不支持合并转发
-    if len(items) > WIFE_LIST_IMAGE_THRESHOLD:
-        image = await run_blocking(render_wife_list_image, title_text, items)
-        await _safe_send(bot, await _image_message(image))
+    if len(items) > LIST_FORWARD_THRESHOLD:
+        await _safe_send(
+            bot,
+            MessageSegment.node([_wife_list_text_from_items(title_text, items)]),
+        )
         return
     await _safe_send(bot, _wife_list_text_from_items(title_text, items))
 
