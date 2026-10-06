@@ -97,7 +97,7 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 当前公开署名贡献者（已排除机器人账号）：
 
-[MimoKit](https://github.com/MimoKit) · [CWalkene](https://github.com/CWalkene) · [spaxie](https://github.com/spaxie) · [Xbaiyz12](https://github.com/Xbaiyz12) · [xiaolinlino](https://github.com/xiaolinlino) · [zory1117](https://github.com/zory1117)
+[MimoKit](https://github.com/MimoKit) · [CWalkene](https://github.com/CWalkene) · [spaxie](https://github.com/spaxie) · [Xbaiyz12](https://github.com/Xbaiyz12) · [xiaolinlino](https://github.com/xiaolinlino) · [zory1117](https://github.com/zory1117) · [wuyi](https://github.com/KimigaiiWuyi)
 
 <br/>
 
