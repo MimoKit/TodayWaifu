@@ -117,5 +117,6 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 - 感谢 [An](https://github.com/An-Sun110) 提供的老婆图库服务器支持。
 - 感谢 [CWalkene](https://github.com/CWalkene) 提供的插件修改和建议。
+- 感谢 [wuyi](https://github.com/KimigaiiWuyi) 提供的插件帮助图UI设计
 - 本项目仅供学习与交流使用，严禁用于任何商业用途。
 - 本项目采用 **[GNU General Public License v3.0 (GPLv3)](./LICENSE)** 协议开源。
