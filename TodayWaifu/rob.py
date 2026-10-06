@@ -4,6 +4,7 @@
 元数据，无需复制判定与转移逻辑。校验、记次、转移归属、落库在同一把每日上下文锁内串行执行，
 使「失败也消耗当日次数」与「成功才发生归属转移」两个约束在并发下都成立。
 """
+
 from __future__ import annotations
 
 import random
@@ -22,12 +23,12 @@ from .shared import (
     _safe_send,
     _wife_state,
     _record_to_dict,
+    name_from_event,
     _cfg_probability,
     _has_active_wife,
     _daily_item_title,
     _daily_bucket_name,
     _husband_available,
-    _user_display_name,
     _daily_context_lock,
     _is_secondhand_wife,
     _load_daily_context,
@@ -167,7 +168,7 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
                     # 仅为原持有者补写失主标记：记录本体保留，使对方仍能看到当天的历史留痕
                     target_update = dict(target_update)
                     target_update['stolen_by'] = robber_id
-                    target_update['stolen_by_name'] = _user_display_name(ev, robber_id)
+                    target_update['stolen_by_name'] = name_from_event(ev, robber_id)
                     updates.append((bucket, target_key, target_update))
 
             # 成败与记次在同一批次落库：分两次提交时中途失败会留下「次数已扣但归属未变」的

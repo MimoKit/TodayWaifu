@@ -1,9 +1,12 @@
-"""TodayWaifu 的群成员目录、头像与显示名。
+"""TodayWaifu 的群成员目录与头像。
 
 成员相关数据分布在两处：GsCore 的 CoreUser 表提供群成员缓存，头像需要按需下载到本地。
 两者都有时效性且获取成本不低（一次数据库查询 / 一次网络请求），因此分别经有界缓存与
 在途合并表收敛，避免同一群、同一成员被并发重复读取。
+
+显示名的字段探测、有效值判定与回写策略集中在 `display_name` 模块，此处只用它。
 """
+
 from __future__ import annotations
 
 import re
@@ -21,86 +24,11 @@ from gsuid_core.models import Event
 from gsuid_core.utils.database.models import CoreUser
 
 from .paths import _user_key, _daily_rng, _custom_upload_data_root
-from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT, _GROUP_DISPLAY_NAME_CACHE
+from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT
 from .domain import WifeRecord, MemberCandidate
 from .executor import run_blocking
 from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
-
-
-def _valid_display_name(value: object, user_id: str | int | None = None) -> str:
-    # 上游写入的占位值多种多样（Python 的 None、字符串 "None"、数据库 NULL 字面量、
-    # 甚至直接用数字 1 兜底），逐项排除而非只判空：这些值一旦进入展示文案，
-    # 用户会看到「今天的老婆是 None」。
-    text = str(value or '').strip()
-    if text in {'', '1', 'None', 'none', 'NULL', 'null'}:
-        return ''
-    # 显示名等于用户 ID 时视为没有昵称，交由调用方回落到 ID，避免文案重复两次。
-    if user_id is not None and text == str(user_id):
-        return ''
-    return text
-
-
-def _display_name_from_mapping(data: object, user_id: str | int | None = None) -> str:
-    # 按优先级探测字段名而不是固定取一个：不同适配器对昵称的命名不统一
-    #（群名片 / 昵称 / 用户名），此处按语义由具体到宽泛依次回退。
-    if not isinstance(data, dict):
-        return ''
-    for field in ('card', 'nickname', 'name', 'username', 'user_name'):
-        value = _valid_display_name(data.get(field), user_id)
-        if value:
-            return value
-    return ''
-
-
-def _user_display_name(ev: Event, user_id: str | int | None = None) -> str:
-    # 事件自带的发送者信息比数据库更新（用户刚改群名片时数据库尚未同步），
-    # 因此查询目标就是发送者本人时优先用事件数据；查他人时没有事件上下文，
-    # 只能回落到用户键。
-    key = _user_key(ev, user_id)
-    if user_id is None or key == str(ev.user_id):
-        value = _display_name_from_mapping(ev.sender or {}, key)
-        if value:
-            return value
-    return key
-
-
-async def _load_group_display_names(ev: Event) -> dict[str, str]:
-    # 非群聊没有成员名单，返回空表而非报错，使调用方统一走「无显示名」分支。
-    if not ev.group_id:
-        return {}
-
-    # 缓存键只含 bot_id 与 group_id，不含发起请求的用户：成员名单是群级数据，
-    # 按用户区分缓存只会重复查询同一份名单。
-    cache_key = f'{ev.bot_id}:{ev.group_id}'
-
-    async def load_names() -> dict[str, str]:
-        try:
-            users = await CoreUser.get_group_all_user(str(ev.group_id))
-        except SQLAlchemyError as exc:
-            # 数据库异常降级为空表：显示名只是文案修饰，不值得让整条抽卡流程失败。
-            logger.warning(f'{LOG_PREFIX} 读取 GsCore 群成员缓存失败: {exc}')
-            return {}
-
-        # 同一用户可能在多个 bot_id 下各有一行（多适配器接入同一群）。优先取当前
-        # 真实 bot 的行，使显示名与用户实际看到的来源一致；取不到再退到任意一行。
-        preferred_bot_id = str(ev.real_bot_id or ev.bot_id or '').strip()
-        exact: dict[str, str] = {}
-        fallback: dict[str, str] = {}
-        for user in users or []:
-            user_id = str(user.user_id or '').strip()
-            if not user_id:
-                continue
-            name = _valid_display_name(user.user_name, user_id)
-            if name:
-                fallback[user_id] = name
-                if preferred_bot_id and str(user.bot_id or '').strip() == preferred_bot_id:
-                    exact[user_id] = name
-        logger.debug(f'{LOG_PREFIX} 成功加载群 {ev.group_id} 的成员显示名称')
-        # 只有当精确匹配确实命中时才采用它：exact 为空说明没有该 bot 的行，
-        # 此时回退结果比空表更有用。
-        return exact or fallback
-
-    return await _GROUP_DISPLAY_NAME_CACHE.get(cache_key, load_names)
+from .display_name import usable_name, placeholder_name
 
 
 def _member_feature_enabled() -> bool:
@@ -241,9 +169,9 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
             user_id = str(user.user_id or '').strip()
             if not user_id or user_id in excluded_user_ids:
                 continue
-            # CoreUser 的展示名列固定为 user_name（不存在 nickname/name/username 列）
-            # 取不到显示名时用 ID 兜底：成员记录即便没有昵称也应可被抽中。
-            name = _valid_display_name(user.user_name, user_id) or user_id
+            # CoreUser 的展示名列固定为 user_name（不存在 nickname/name/username 列）。
+            # 取不到显示名时用统一的占位而非裸 ID：成员记录即便没有昵称也应可被抽中。
+            name = usable_name(user.user_name, user_id) or placeholder_name(user_id)
             avatar = _valid_member_text(user.user_icon)
             candidate = MemberCandidate(name=name, user_id=user_id, avatar=avatar)
             fallback[user_id] = candidate
@@ -264,9 +192,7 @@ async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCan
     # 共享一次下载即可，否则会重复占用网络与线程池。
     task = _MEMBER_AVATAR_INFLIGHT.get(member.user_id)
     if task is None:
-        task = asyncio.create_task(
-            run_blocking(_resolve_member_avatar, member.user_id, member.avatar)
-        )
+        task = asyncio.create_task(run_blocking(_resolve_member_avatar, member.user_id, member.avatar))
         _MEMBER_AVATAR_INFLIGHT[member.user_id] = task
     try:
         avatar = await task

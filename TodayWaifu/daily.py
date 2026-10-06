@@ -7,6 +7,7 @@
 因此本模块统一采用「锁外准备、锁内复核落库」的模式，热点路径上任何网络/磁盘等待
 都不得进入临界区。
 """
+
 from __future__ import annotations
 
 from .shared import (
@@ -39,11 +40,13 @@ from .shared import (
     _record_to_dict,
     husband_list_sv,
     marry_member_sv,
+    name_from_event,
     specify_wife_sv,
     _can_assign_wife,
     _load_candidates,
     _send_role_image,
     daily_husband_sv,
+    load_group_names,
     _can_specify_wife,
     _daily_item_title,
     _pick_role_record,
@@ -54,18 +57,16 @@ from .shared import (
     _husband_available,
     _pick_group_member,
     _save_daily_record,
-    _user_display_name,
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
-    _valid_display_name,
     _daily_kind_metadata,
     _normalize_role_name,
     daily_normal_wife_sv,
+    resolve_display_name,
     _marry_member_enabled,
     _roll_group_member_wife,
     _get_event_target_user_id,
-    _load_group_display_names,
     _get_other_daily_wife_name,
 )
 
@@ -178,12 +179,21 @@ async def _ensure_daily_wife_record(
     return chosen
 
 
+def _stamp_display_name(raw_record: RoleRecordValue, display_name: str) -> RoleRecordValue:
+    """把新解析到的名字写回记录，并标记来源与时间供下一轮判断是否过期。"""
+    updated_record = dict(raw_record)
+    updated_record['display_name'] = display_name
+    updated_record['display_name_source'] = 'coreuser'
+    updated_record['display_name_updated_at'] = int(time.time())
+    return updated_record
+
+
 async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tuple[int, str, str]]]:
     bucket = 'husbands' if mode == 'husband' else 'wives'
     title = '老公' if mode == 'husband' else '老婆'
     # 群成员查询可能访问数据库或平台适配器而产生阻塞，必须置于每日记录锁之外：
     # 若在临界区内等待，同群其它用户的抽取会被一并阻塞。
-    group_display_names = await _load_group_display_names(ev)
+    group_display_names = await load_group_names(ev)
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
         wives = context.get(bucket, {})
@@ -201,19 +211,16 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
             if record is None:
                 continue
             seen_users.add(user_id)
-            display_name = _valid_display_name(raw_record.get('display_name'), user_id)
-            if not display_name:
-                display_name = group_display_names.get(str(user_id), '')
-                if display_name:
-                    updated_record = dict(raw_record)
-                    updated_record['display_name'] = display_name
-                    updated_record['display_name_source'] = 'coreuser'
-                    updated_record['display_name_updated_at'] = int(time.time())
-                    data_changed = True
-                    changed_records.append((bucket, str(user_id), updated_record))
-                    raw_record = updated_record
-            if not display_name:
-                display_name = str(user_id)
+            display_name, refreshed = resolve_display_name(
+                stored=raw_record.get('display_name'),
+                group_names=group_display_names,
+                user_id=user_id,
+                updated_at=raw_record.get('display_name_updated_at'),
+            )
+            if refreshed:
+                raw_record = _stamp_display_name(raw_record, display_name)
+                data_changed = True
+                changed_records.append((bucket, str(user_id), raw_record))
             updated_at = raw_record.get('updated_at')
             try:
                 order = int(updated_at)
@@ -246,19 +253,16 @@ async def _wife_list_items(ev: Event, mode: str = 'wife') -> tuple[str, list[tup
                     if record is None:
                         continue
                     seen_users.add(user_id)
-                    display_name = _valid_display_name(raw_record.get('display_name'), user_id)
-                    if not display_name:
-                        display_name = group_display_names.get(str(user_id), '')
-                        if display_name:
-                            updated_record = dict(raw_record)
-                            updated_record['display_name'] = display_name
-                            updated_record['display_name_source'] = 'coreuser'
-                            updated_record['display_name_updated_at'] = int(time.time())
-                            data_changed = True
-                            changed_records.append(('safe_wives', str(user_id), updated_record))
-                            raw_record = updated_record
-                    if not display_name:
-                        display_name = str(user_id)
+                    display_name, refreshed = resolve_display_name(
+                        stored=raw_record.get('display_name'),
+                        group_names=group_display_names,
+                        user_id=user_id,
+                        updated_at=raw_record.get('display_name_updated_at'),
+                    )
+                    if refreshed:
+                        raw_record = _stamp_display_name(raw_record, display_name)
+                        data_changed = True
+                        changed_records.append(('safe_wives', str(user_id), raw_record))
                     updated_at = raw_record.get('updated_at')
                     try:
                         order = int(updated_at)
@@ -285,8 +289,7 @@ def _wife_list_text_from_items(title_text: str, items: list[tuple[int, str, str]
         return title_text
     lines = [title_text]
     lines.extend(
-        f'{index}. {display_name} → {wife_name}'
-        for index, (_, display_name, wife_name) in enumerate(items, 1)
+        f'{index}. {display_name} → {wife_name}' for index, (_, display_name, wife_name) in enumerate(items, 1)
     )
     return '\n'.join(lines)
 
@@ -296,7 +299,6 @@ async def _wife_list_text(ev: Event, mode: str = 'wife') -> str:
     return _wife_list_text_from_items(title_text, items)
 
 
-
 async def _send_record_image(
     bot: Bot,
     record: WifeRecord,
@@ -304,11 +306,7 @@ async def _send_record_image(
     user_id: str | int | None = None,
     is_group: bool = True,
 ) -> None:
-    text = (
-        _record_text(record, mode, str(user_id or ''))
-        if bool(_cfg('DailyWifeSendText'))
-        else None
-    )
+    text = _record_text(record, mode, str(user_id or '')) if bool(_cfg('DailyWifeSendText')) else None
     if record.record_type == 'member':
         await _send_local_image(
             bot,
@@ -323,14 +321,10 @@ async def _send_record_image(
     await _send_role_image(bot, record.to_role(), record.image, text, user_id, is_group, mode)
 
 
-
-async def _send_daily_wife(
-    bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = ''
-) -> list[str] | None:
+async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_name: str = '') -> list[str] | None:
     title = _daily_item_title(mode)
     logger.debug(
-        f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} '
-        f'请求 {title} (指定: {specified_name or "无"})'
+        f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id or "direct"} 请求 {title} (指定: {specified_name or "无"})'
     )
 
     is_master = _is_master(ev)
@@ -343,9 +337,7 @@ async def _send_daily_wife(
 
     specified_role: RoleCandidate | None = None
     if specified_name and not can_specify_role:
-        logger.warning(
-            f'{LOG_PREFIX} 用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝'
-        )
+        logger.warning(f'{LOG_PREFIX} 用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝')
         return await _safe_send(
             bot,
             f'只有机器人主人或指定老婆白名单用户才能指定{title}哦。',
@@ -356,12 +348,16 @@ async def _send_daily_wife(
         if error or not candidates:
             return await _safe_send(bot, error or '没有找到可用角色。')
         target_candidates = [
-            c for c in candidates
+            c
+            for c in candidates
             if c.name == specified_name
-            or (mode == 'normal' and (
-                specified_name.casefold() in c.name.casefold()
-                or any(specified_name.casefold() in str(r_id).casefold() for r_id in c.role_ids)
-            ))
+            or (
+                mode == 'normal'
+                and (
+                    specified_name.casefold() in c.name.casefold()
+                    or any(specified_name.casefold() in str(r_id).casefold() for r_id in c.role_ids)
+                )
+            )
         ]
         if not target_candidates:
             return await _safe_send(
@@ -460,7 +456,9 @@ async def _send_daily_wife(
 
             logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 的老婆被抢，补偿抽取: {safe_wife.name}')
             return await _send_role_image(
-                bot, safe_wife.to_role(), safe_wife.image,
+                bot,
+                safe_wife.to_role(),
+                safe_wife.image,
                 text=f'你的{wife_name}已经被{stolen_by_name}抢走了…\n但你迎来了新的{title}{safe_wife.name}！',
                 user_id=ev.user_id,
                 is_group=ev.group_id is not None,
@@ -562,7 +560,7 @@ def _assignment_role_name(ev: Event, target_user_id: str) -> str:
 
     for prefix in ('给', '把', '将', '为'):
         if text.startswith(prefix):
-            text = text[len(prefix):].strip()
+            text = text[len(prefix) :].strip()
     for word in ('分配老婆', '分配今日老婆', '分配', '老婆'):
         text = text.replace(word, ' ')
     return re.sub(r'\s+', ' ', text).strip()
@@ -610,14 +608,13 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
 
     assigned_record = _record_to_dict(record, ev, target_key)
     assigned_record['assigned_by'] = _user_key(ev)
-    assigned_record['assigned_by_name'] = _user_display_name(ev)
+    assigned_record['assigned_by_name'] = name_from_event(ev)
     deletes = [('safe_wives', target_key)]
     async with _daily_context_lock(ev):
         await _save_daily_records(ev, [('wives', target_key, assigned_record)], deletes)
 
     logger.info(
-        f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, '
-        f'ids={role.role_ids} image={image}'
+        f'{LOG_PREFIX} 主人 {ev.user_id} 将老婆 {role.name} 分配给 {target_key}, ids={role.role_ids} image={image}'
     )
     await _send_role_image(
         bot,
@@ -634,11 +631,11 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         return
     logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了娶群友命令')
     if not ev.group_id:
-        return await _safe_send(bot,'这个命令只能在群聊里使用。')
+        return await _safe_send(bot, '这个命令只能在群聊里使用。')
 
     member = await _pick_group_member(ev, _event_rng(ev))
     if member is None:
-        return await _safe_send(bot,'没有获取到本群成员，暂时娶不到群友。')
+        return await _safe_send(bot, '没有获取到本群成员，暂时娶不到群友。')
 
     logger.info(
         f'{LOG_PREFIX} marry_member user={ev.user_id} group={ev.group_id} '

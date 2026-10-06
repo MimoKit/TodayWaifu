@@ -6,6 +6,7 @@
 发起阶段只做即时反馈与登记待确认项，真正的状态判定与写入全部集中在 ``_accept_gift_daily``
 的临界区内。
 """
+
 from __future__ import annotations
 
 import time
@@ -26,12 +27,12 @@ from .shared import (
     _wife_state,
     _context_key,
     _record_to_dict,
+    name_from_event,
     _has_active_wife,
     _daily_item_title,
     _record_from_dict,
     _daily_bucket_name,
     _husband_available,
-    _user_display_name,
     _daily_context_lock,
     _is_secondhand_wife,
     _load_daily_context,
@@ -171,7 +172,6 @@ def clear_pending_gifts_for_user(ev: Event, user_id: str) -> None:
             _GIFT_PENDING.pop(key, None)
 
 
-
 async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     title = _daily_item_title(kind)
     # 功能状态在入口处先行判定：后续步骤会读取上下文并可能登记待确认项，
@@ -186,8 +186,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     if not target_user_id:
         return await _safe_send(
             bot,
-            '要送给谁？请艾特对方，或在命令后面写对方 QQ。\n'
-            'QQ 官方机器人等没有 QQ 号的平台，可直接粘贴对方的用户 ID。',
+            '要送给谁？请艾特对方，或在命令后面写对方 QQ。\nQQ 官方机器人等没有 QQ 号的平台，可直接粘贴对方的用户 ID。',
         )
 
     giver_id = _user_key(ev)
@@ -231,7 +230,7 @@ async def _send_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         )
 
     _set_pending_gift(ev, target_user_id, giver_id, kind)
-    giver_name = _user_display_name(ev, giver_id)
+    giver_name = name_from_event(ev, giver_id)
     role = giver_record.to_role()
     # 实际展示的赠送对象文案按类型区分：萝莉不暴露角色名，正太统一以类型名呈现。
     item_text = title if kind == 'loli' else f'{title}{role.name}'
@@ -318,7 +317,7 @@ async def _accept_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
                     # 复制后再改，避免就地修改上下文缓存中的字典。
                     giver_update = dict(giver_update)
                     giver_update['gifted_to'] = target_user_id
-                    giver_update['gifted_to_name'] = _user_display_name(ev, target_user_id)
+                    giver_update['gifted_to_name'] = name_from_event(ev, target_user_id)
                     updates.append((bucket, giver_id, giver_update))
                 await _save_daily_records(ev, updates)
 
@@ -350,7 +349,6 @@ async def _reject_gift_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
         return await _safe_send(bot, f'没有待确认的送{title}请求。')
     _clear_pending_gift(ev, target_user_id, kind)
     await _safe_send(bot, f'已拒绝对方的送{title}请求。')
-
 
 
 async def _send_gift_wife(bot: Bot, ev: Event) -> None:

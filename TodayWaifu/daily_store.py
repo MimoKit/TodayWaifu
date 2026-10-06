@@ -20,10 +20,10 @@ from .paths import _user_key, _today_key, _context_key, _daily_context_key
 from .state import _CONTEXT_REGISTRY, _DAILY_CONTEXT_CACHE
 from .domain import WifeRecord
 from .models import DailyWifeRecord
-from .members import _user_display_name
 from .senders import _is_valid_image_ref
 from .payloads import WifeData, DailyContext, RoleRecordValue
 from .constants import LOG_PREFIX, DAILY_WIFE_KINDS, ALL_DAILY_RECORD_KINDS, _daily_bucket_name
+from .display_name import name_from_event
 from .invalidation import _invalidate_status_cache
 
 
@@ -247,9 +247,7 @@ async def _save_daily_records(
     _invalidate_status_cache()
 
 
-async def _save_daily_record(
-    ev: Event, bucket: str, user_key: str, value: RoleRecordValue | bool | None
-) -> None:
+async def _save_daily_record(ev: Event, bucket: str, user_key: str, value: RoleRecordValue | bool | None) -> None:
     """提交单条记录（与同一瞬间的其它写入合并为一次事务），成功后才更新内存快照。"""
     await _submit_writes(ev, [(bucket, user_key, value)])
     context = await _load_daily_context(ev)
@@ -373,7 +371,7 @@ def _record_to_dict(
         data.update(
             {
                 'user_id': _user_key(ev, user_id),
-                'display_name': _user_display_name(ev, user_id),
+                'display_name': name_from_event(ev, user_id),
                 'group_id': str(ev.group_id or 'direct'),
                 'bot_id': str(ev.bot_id),
                 'day': _today_key(),

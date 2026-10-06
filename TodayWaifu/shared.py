@@ -110,16 +110,13 @@ from .members import (
     _qq_avatar_url,
     _download_avatar,
     _pick_group_member,
-    _user_display_name,
     _valid_member_text,
     _member_probability,
-    _valid_display_name,
     _marry_member_enabled,
     _usable_cached_avatar,
     _resolve_member_avatar,
     _member_feature_enabled,
     _roll_group_member_wife,
-    _load_group_display_names,
     _member_avatar_cache_path,
     _load_group_member_candidates,
     _resolve_member_candidate_avatar,
@@ -218,6 +215,15 @@ from .daily_store import (
     _mark_all_daily_records_divorced,
 )
 from .role_quotes import get_role_quote
+from .display_name import (
+    is_stale,
+    usable_name,
+    name_from_event,
+    load_group_names,
+    placeholder_name,
+    name_from_mapping,
+    resolve_display_name,
+)
 from .invalidation import _invalidate_candidate_cache
 from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
@@ -290,7 +296,7 @@ __all__ = [
     '_can_assign_wife', '_can_specify_wife', '_can_upload_images', '_is_excluded_role', '_is_male_role',
     'get_role_quote',
     '_is_master', '_is_secondhand_wife',
-    '_is_valid_image_ref', '_load_candidates', '_load_group_display_names',
+    '_is_valid_image_ref', '_load_candidates',
     '_load_group_member_candidates', '_load_local_candidates', '_scan_local_candidates', '_load_role_map',
     '_load_pgr_local_candidates', '_load_pgr_wife_candidates', '_pgr_wife_root',
     '_load_wife_data', '_loli_image_root', '_marry_member_enabled',
@@ -311,8 +317,10 @@ __all__ = [
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image', '_send_shota_result_image',
     '_send_role_image', '_image_message', '_image_message_from_path',
     'image_delivery_backlog', 'start_image_delivery_workers', 'stop_image_delivery_workers',
-    '_today_key', '_usable_cached_avatar', '_user_display_name', '_user_key',
-    '_valid_display_name', '_valid_member_text', '_wife_data_path', '_wife_origin',
+    'is_stale', 'usable_name', 'name_from_event', 'name_from_mapping', 'placeholder_name',
+    'load_group_names', 'resolve_display_name',
+    '_today_key', '_usable_cached_avatar', '_user_key',
+    '_valid_member_text', '_wife_data_path', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
     'DailyWifeRecord', '_migrate_legacy_wife_data',
     'read_file_bytes_cached', 'is_url_cached', 'prefer_cached_urls',
