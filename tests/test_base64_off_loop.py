@@ -12,7 +12,6 @@
 """
 import ast
 import sys
-import time
 import base64
 import asyncio
 import unittest
@@ -24,6 +23,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / 'TodayWaifu'
 SENDERS = PLUGIN / 'senders.py'
+
+# worker 线程等待事件循环应答的上限。正常路径下应答在毫秒级返回，此值只用于把
+# 「循环被占住」与「机器慢」区分开，不承担性能基准的职责。
+_PING_TIMEOUT_SECONDS = 10.0
 
 
 # 以文件路径加载 executor 而非导入包：可绕过包入口对 gsuid_core 的依赖，
@@ -89,31 +92,33 @@ class Base64RefTests(unittest.TestCase):
         self.assertNotEqual(loop_thread, worker_thread)
 
     def test_a_large_encode_does_not_stall_the_event_loop(self) -> None:
-        """锁定编码 2MB 图片期间事件循环仍可调度其他协程。"""
-        # 用 2MB 而非小样本：小图编码耗时低于调度粒度，即便内联执行也可能观察到 tick，
-        # 无法区分「未阻塞」与「阻塞过短」。
+        """锁定编码 2MB 图片期间事件循环仍可执行回调。
+
+        判定既不看墙钟，也不数 ticker 次数：worker 线程编码完毕后要求事件循环执行一个
+        回调，并同步等待它完成。循环若被编码占住（``run_blocking`` 退化成同步调用即属
+        此类），该回调永远不会被处理，等待随即超时——与机器快慢无关。
+
+        原写法用 ticker 计数并要求「首步跑在编码结束之前」，但 2MB 编码实测仅 11–35ms，
+        Windows 上 ``sleep(0.001)`` 最早约 15ms 才唤醒，两者同量级：实机 200 次里有 2 次
+        ticker 首步未及执行（ticks==0）而误报，且断言强度仅剩「循环转过 1 圈」。
+        """
+        # 用 2MB 而非小样本：小图编码耗时低于调度粒度，无法反映真实阻塞时长。
         payload = b'x' * (2 * 1024 * 1024)
 
-        async def run() -> float:
-            ticks = 0
+        async def run() -> None:
+            loop = asyncio.get_running_loop()
+            answered = threading.Event()
 
-            async def ticker() -> None:
-                nonlocal ticks
-                while True:
-                    ticks += 1
-                    await asyncio.sleep(0.001)
+            def encode_then_ping() -> None:
+                encode_base64_ref(payload)
+                loop.call_soon_threadsafe(answered.set)
+                # 断言在 worker 线程内抛出，经 run_in_executor 的 future 回抛给测试
+                self.assertTrue(
+                    answered.wait(_PING_TIMEOUT_SECONDS),
+                    '编码期间事件循环没有响应回调',
+                )
 
-            task = asyncio.ensure_future(ticker())
-            started = time.perf_counter()
-            await executor.run_blocking(encode_base64_ref, payload)
-            elapsed = time.perf_counter() - started
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-            self.assertGreater(ticks, 0, '编码期间事件循环被完全阻塞了')
-            return elapsed
+            await executor.run_blocking(encode_then_ping)
 
         asyncio.run(run())
 
