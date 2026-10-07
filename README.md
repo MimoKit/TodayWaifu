@@ -76,8 +76,7 @@ git clone https://github.com/MimoKit/TodayWaifu
 图库的**列表接口与图片本身均要求鉴权**，必须在控制台填写
 `DailyWifeGalleryToken`，否则拉取列表和下载图片都会返回 403。
 
-令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，
-或前往 <https://twf.xlinxc.cn> 自助申请；留空则不携带令牌。注意：无论选择哪种方式，最终都须加入该交流群，未加群者不予审核。
+令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，留空则不携带令牌。
 
 插件会在列表与图片两类请求上都自动携带该令牌；当图库因限流、封禁或配额拒绝时，
 会提示对应的处理方式，而不会笼统地提示检查令牌。列表返回的图片地址自带短期签名，
