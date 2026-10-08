@@ -31,8 +31,17 @@ def _resolved_bundled_path() -> Path:
     return eval(expr, {'BASE_DIR': ROOT, 'ROLE_QUOTES_FILE_NAME': 'role_quotes.json'})
 
 
-# role_quotes.py 会截断超长台词；卡片排版允许到 30 字
-MAX_QUOTE_LENGTH = 30
+def _resolved_max_quote_length() -> int:
+    """按插件代码的取值解析台词长度上限，避免测试与运行时各写一个数字而悄悄分叉。"""
+    # 与 _resolved_bundled_path 同法：只对常量表达式求值，不导入依赖 GsCore 的模块。
+    source = (PACKAGE / 'role_quotes.py').read_text(encoding='utf-8')
+    marker = 'MAX_QUOTE_LENGTH = '
+    line = next(item for item in source.splitlines() if item.startswith(marker))
+    return int(line[len(marker) :].strip())
+
+
+# role_quotes.py 会截断超长台词；超出该长度即视为库文件越界
+MAX_QUOTE_LENGTH = _resolved_max_quote_length()
 # 抽取需要多样性，每个角色至少几条；库里绝大多数角色是 5 条以上
 MIN_QUOTES_PER_ROLE = 3
 # 对照表角色的覆盖率下限。允许新角色先进对照表、台词后补（运行时回退兜底台词），
