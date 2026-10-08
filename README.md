@@ -10,7 +10,7 @@
 <div align="center">
   <a href="https://github.com/Genshin-bots/gsuid_core">早柚核心</a> &nbsp;·&nbsp;
   <a href="https://blog.xlinxc.cn/posts/botplugin/todaywaifu-plugin-intro">详细文档</a> &nbsp;·&nbsp;
-  <a href="https://qm.qq.com/q/pJVt8HNwrg">交流 Q 群 (798949533)</a> &nbsp;·&nbsp;
+  <a href="https://qm.qq.com/q/pJVt8HNwrg">交流Q群</a> &nbsp;·&nbsp;
   <a href="https://github.com/MimoKit/TodayWaifu/issues">问题反馈</a>
 </div>
 
