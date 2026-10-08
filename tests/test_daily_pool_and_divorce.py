@@ -60,6 +60,7 @@ class NteRosterTests(unittest.TestCase):
                 '小吱',
                 '伊洛伊',
                 '真红',
+                '残虹',
             },
         )
 

@@ -89,22 +89,24 @@ class RoleQuotesTests(unittest.TestCase):
         self.get_role_quote = self.role_quotes_mod["get_role_quote"]
 
     def test_all_role_quotes_within_limit(self) -> None:
-        """确保台词库中预设台词主体不超过 30 字（卡片排版与 role_quotes.py 截断阈值）。"""
+        """确保台词库中预设台词主体不超过 role_quotes.py 的截断阈值。"""
         # 该上限是排版约束而非风格偏好：台词与署名同处一张卡片，超长文本会被截断，
         # 用户看到的句子在语义中途断开。逐条遍历而非抽查，是因为新增角色时最易越界。
+        # 阈值取自实现里的常量，避免测试与运行时各写一个数字而分叉。
+        limit = int(self.role_quotes_mod["MAX_QUOTE_LENGTH"])
         for role_name, quotes in self.role_quotes.items():
             for quote in quotes:
                 self.assertLessEqual(
                     len(quote),
-                    30,
-                    f"角色 {role_name} 的台词超过 30 字: {quote} (长度 {len(quote)})",
+                    limit,
+                    f"角色 {role_name} 的台词超过 {limit} 字: {quote} (长度 {len(quote)})",
                 )
 
         for quote in self.default_quotes:
             self.assertLessEqual(
                 len(quote),
-                30,
-                f"默认台词超过 30 字: {quote} (长度 {len(quote)})",
+                limit,
+                f"默认台词超过 {limit} 字: {quote} (长度 {len(quote)})",
             )
 
     def test_get_role_quote_format(self) -> None:

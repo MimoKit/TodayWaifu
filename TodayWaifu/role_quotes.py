@@ -14,6 +14,10 @@ from typing import Tuple
 
 from .resource_paths import role_quotes_path
 
+# 台词与署名同处一条消息，超长台词在手机 QQ 气泡里会折成多行；该值是排版可接受的
+# 上限，内置库应逐条控制在此长度内，超出仅作截断兜底。
+MAX_QUOTE_LENGTH = 60
+
 # 缓存用 (内容, 文件 mtime) 组合校验，而不是只缓存一次：插件升级会替换同路径的台词
 # 文件，仅按 mtime 判断即可在无需重启 Core 的情况下让新台词生效。
 _QUOTES_CACHE: dict[str, tuple[str, ...]] = {}
@@ -70,7 +74,7 @@ def _load_bundled_quotes() -> Tuple[dict[str, tuple[str, ...]], tuple[str, ...]]
 
 
 def get_role_quote(name: str) -> str:
-    """获取角色的剧情/对话文本，附带角色名，文本内容不超过 30 字。
+    """获取角色的剧情/对话文本，附带角色名，文本内容不超过 MAX_QUOTE_LENGTH 字。
 
     回退顺序为「精确名 → 最长包含键 → 默认台词 → 空字符串」。精确匹配优先是为了让
     用户能看到完全对应的角色台词；包含匹配只用于名称被加上前后缀（如「老婆」）的场景。
@@ -99,8 +103,8 @@ def get_role_quote(name: str) -> str:
     selected = random.choice(quotes)
     # 截断仅用于兜底：内置库已控制在限长内，此处防止手工编辑库文件后出现超长台词
     # 撑破气泡排版。
-    if len(selected) > 30:
-        selected = selected[:30]
+    if len(selected) > MAX_QUOTE_LENGTH:
+        selected = selected[:MAX_QUOTE_LENGTH]
 
     quote_line = f"「{selected}」"
     author_line = f"——{matched_name}"
