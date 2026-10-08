@@ -4,11 +4,17 @@ on:
   issues:
     types: [opened, reopened, edited]
 
+concurrency:
+  group: issue-triage-${{ github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
+  contents: read
   issues: write
 
 jobs:
   label:
+    if: ${{ github.event.issue && !github.event.issue.pull_request && github.event.issue.user.type != 'Bot' }}
     runs-on: ubuntu-latest
     steps:
       - name: Apply issue labels
@@ -18,9 +24,7 @@ jobs:
             const issue = context.payload.issue;
             if (!issue || issue.pull_request) return;
 
-            const labels = new Set(['needs-triage', 'bug']);
-
-            const wanted = [...labels];
+            const desiredLabels = ['needs-triage', 'bug'];
             const existing = await github.paginate(github.rest.issues.listLabelsOnIssue, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -28,8 +32,11 @@ jobs:
               per_page: 100,
             });
             const current = new Set(existing.map(label => label.name));
-            const missing = wanted.filter(label => !current.has(label));
-            if (missing.length === 0) return;
+            const missing = desiredLabels.filter(label => !current.has(label));
+
+            if (missing.length === 0) {
+              return;
+            }
 
             await github.rest.issues.addLabels({
               owner: context.repo.owner,

@@ -1,0 +1,42 @@
+name: Update contributors
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: update-contributors-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Refresh README contributor avatars
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/update_contributors.py
+
+      - name: Commit README update
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "Contributor list did not change."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: refresh contributor avatars"
+          git push

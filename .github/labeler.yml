@@ -23,4 +23,5 @@ github-actions:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/workflows/**"
+          - ".github/dependabot.yml"
           - ".github/labeler.yml"

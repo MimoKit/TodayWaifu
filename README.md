@@ -92,11 +92,27 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 感谢所有为 TodayWaifu 提交代码、修复问题、完善文档或提出建议的人。
 
-<a href="https://github.com/MimoKit/TodayWaifu/graphs/contributors"><img src="https://contributors-img.web.app/image?repo=MimoKit/TodayWaifu&max=100" alt="TodayWaifu contributors" height="48"></a>
+贡献者头像和提交贡献数会由 GitHub Actions 从仓库 Contributors API 自动更新（每周一次，也会在 `main` 更新时刷新）；机器人账号不显示。
 
-当前公开署名贡献者（已排除机器人账号）：
+<!-- contributors:start -->
+<table>
+<tbody>
+  <tr>
+    <td align="center"><a href="https://github.com/MimoKit"><img src="https://avatars.githubusercontent.com/u/278909251?v=4&amp;size=64" width="56" height="56" alt="MimoKit" title="MimoKit" /></a><br /><sub><b>MimoKit</b></sub><br /><sub>182 contributions</sub></td>
+    <td align="center"><a href="https://github.com/CWalkene"><img src="https://avatars.githubusercontent.com/u/52878114?v=4&amp;size=64" width="56" height="56" alt="CWalkene" title="CWalkene" /></a><br /><sub><b>CWalkene</b></sub><br /><sub>8 contributions</sub></td>
+    <td align="center"><a href="https://github.com/Xbaiyz12"><img src="https://avatars.githubusercontent.com/u/197220149?v=4&amp;size=64" width="56" height="56" alt="Xbaiyz12" title="Xbaiyz12" /></a><br /><sub><b>Xbaiyz12</b></sub><br /><sub>7 contributions</sub></td>
+    <td align="center"><a href="https://github.com/xiaolinlino"><img src="https://avatars.githubusercontent.com/u/322805100?v=4&amp;size=64" width="56" height="56" alt="xiaolinlino" title="xiaolinlino" /></a><br /><sub><b>xiaolinlino</b></sub><br /><sub>7 contributions</sub></td>
+    <td align="center"><a href="https://github.com/spaxie"><img src="https://avatars.githubusercontent.com/u/311188777?v=4&amp;size=64" width="56" height="56" alt="spaxie" title="spaxie" /></a><br /><sub><b>spaxie</b></sub><br /><sub>5 contributions</sub></td>
+    <td align="center"><a href="https://github.com/KimigaiiWuyi"><img src="https://avatars.githubusercontent.com/u/55526518?v=4&amp;size=64" width="56" height="56" alt="KimigaiiWuyi" title="KimigaiiWuyi" /></a><br /><sub><b>KimigaiiWuyi</b></sub><br /><sub>1 contribution</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/zory1117"><img src="https://avatars.githubusercontent.com/u/58585101?v=4&amp;size=64" width="56" height="56" alt="zory1117" title="zory1117" /></a><br /><sub><b>zory1117</b></sub><br /><sub>1 contribution</sub></td>
+  </tr>
+</tbody>
+</table>
+<!-- contributors:end -->
 
-[MimoKit](https://github.com/MimoKit) · [CWalkene](https://github.com/CWalkene) · [spaxie](https://github.com/spaxie) · [Xbaiyz12](https://github.com/Xbaiyz12) · [xiaolinlino](https://github.com/xiaolinlino) · [zory1117](https://github.com/zory1117) · [wuyi](https://github.com/KimigaiiWuyi)
+[查看 GitHub Contributors 页面](https://github.com/MimoKit/TodayWaifu/graphs/contributors)
 
 <br/>
 
