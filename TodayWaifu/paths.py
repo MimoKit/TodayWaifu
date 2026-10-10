@@ -306,10 +306,6 @@ def _event_rng(ev: Event) -> random.Random:
     return _daily_rng(ev)
 
 
-def _wife_data_path() -> Path:
-    return _custom_upload_data_root() / 'daily_wife_data.json'
-
-
 def _today_key() -> str:
     # 以本地日期为准：跨日翻转必须与用户的自然日一致，不能用 UTC 造成提前或延后换日。
     return date.today().isoformat()

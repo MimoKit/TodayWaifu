@@ -107,7 +107,6 @@ class CompatibilityContractTests(unittest.TestCase):
         # 被搬走，只会在新位置重建，表现为所有人的记录与已下载图片凭空消失
         for text in (
             "get_res_path('TodayWaifu')",
-            "daily_wife_data.json",
             "custom_role_map.json",
             "custom_role_map.txt",
             "custom_role_pile",

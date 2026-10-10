@@ -8,7 +8,6 @@
 """
 from __future__ import annotations
 
-import os
 import re
 import sys
 import json
@@ -44,7 +43,6 @@ from .paths import (
     _today_key,
     _context_key,
     _pgr_wife_root,
-    _wife_data_path,
     _configured_path,
     _loli_image_root,
     _resolve_role_map_path,
@@ -134,7 +132,6 @@ from .senders import (
     stop_image_delivery_workers,
     start_image_delivery_workers,
 )
-from .storage import read_json_dict
 from .targets import _get_event_target_user_id
 from .delivery import _safe_send, _send_loli_text, _send_shota_text
 from .executor import run_blocking, shutdown_blocking_executor
@@ -320,9 +317,9 @@ __all__ = [
     'is_stale', 'usable_name', 'name_from_event', 'name_from_mapping', 'placeholder_name',
     'load_group_names', 'resolve_display_name',
     '_today_key', '_usable_cached_avatar', '_user_key',
-    '_valid_member_text', '_wife_data_path', '_wife_origin',
+    '_valid_member_text', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
-    'DailyWifeRecord', '_migrate_legacy_wife_data',
+    'DailyWifeRecord',
     'read_file_bytes_cached', 'is_url_cached', 'prefer_cached_urls',
     'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
@@ -369,59 +366,6 @@ def _can_specify_wife(ev: Event) -> bool:
     return _is_master(ev) or str(ev.user_id) in normalized_user_ids(
         _cfg('DailyWifeSpecifyWhitelist')
     )
-
-
-
-async def _migrate_legacy_wife_data() -> int:
-    """把旧版 daily_wife_data.json 导入数据库，导入成功后改名为 .migrated.bak 备份。
-
-    幂等性由「改名」与「先删后插」双重保证：旧文件改名后即消失，重复启动不会重复导入；
-    即使备份阶段失败而残留旧文件，导入本身按 (day, context) 先删后插也不会产生重复行。
-    只迁移最近数日的数据，更早的直接丢弃（见 models.LEGACY_MIGRATION_KEEP_DAYS）：
-    历史冷数据既不会被查询，却会永久占用表空间并拖慢热路径扫描。
-    """
-    path = _wife_data_path()
-    if not path.is_file():
-        # 兼顾更早版本：数据文件原位于插件目录，需先搬到 data 目录再迁移，
-        # 否则升级后既读不到旧数据，也会因插件目录被覆盖而永久丢失。
-        legacy = BASE_DIR / 'daily_wife_data.json'
-        if legacy.is_file():
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(legacy.read_bytes())
-                logger.info(f'{LOG_PREFIX} 已迁移旧数据文件到 data 目录: {path}')
-            except OSError as exc:
-                logger.warning(f'{LOG_PREFIX} 迁移旧数据文件失败: {exc}')
-                return 0
-        else:
-            return 0
-
-    data = read_json_dict(path)
-    if not data:
-        logger.warning(f'{LOG_PREFIX} 旧数据文件为空或已损坏，跳过导入: {path}')
-        imported = 0
-    else:
-        imported = await DailyWifeRecord.import_legacy_data(data)
-    backup = path.with_name(f'{path.name}.migrated.bak')
-    try:
-        os.replace(path, backup)
-        logger.info(f'{LOG_PREFIX} 旧数据文件已备份为 {backup.name}（导入 {imported} 条记录）')
-    except OSError as exc:
-        logger.warning(f'{LOG_PREFIX} 旧数据文件备份失败: {exc}')
-    return imported
-
-
-@on_core_start_before(priority=-70)
-async def _migrate_daily_wife_data_on_startup() -> None:
-    """插件启动钩子：在核心建表（priority=-90）之后执行旧 JSON 迁移。
-
-    priority 必须晚于核心建表：迁移依赖每日记录表与其唯一索引已存在，
-    否则写入会因缺表或缺冲突目标而失败。
-    """
-    try:
-        await _migrate_legacy_wife_data()
-    except (OSError, SQLAlchemyError) as exc:
-        logger.exception(f'{LOG_PREFIX} 旧每日记录迁移失败: {exc}')
 
 
 def _prune_daily_context_state() -> None:
