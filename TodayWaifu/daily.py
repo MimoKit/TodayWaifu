@@ -633,6 +633,30 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
     if not ev.group_id:
         return await _safe_send(bot, '这个命令只能在群聊里使用。')
 
+    user_key = _user_key(ev)
+    async with _daily_context_lock(ev):
+        context = await _load_daily_context(ev)
+        marry_bucket = context.setdefault('marry_members', {})
+        current = marry_bucket.get(user_key)
+        if isinstance(current, dict):
+            if current.get('divorced'):
+                return await _safe_send(bot, '你今天已经和群友离婚了，明天再来吧~')
+            existing_record = _record_from_dict(current)
+            if existing_record is not None:
+                text = (
+                    _build_member_text(existing_record.to_member(), 'marry')
+                    if bool(_cfg('DailyWifeSendText'))
+                    else None
+                )
+                return await _send_local_image(
+                    bot,
+                    existing_record.image,
+                    '本地群友头像文件不存在，请稍后重试。',
+                    text,
+                    ev.user_id,
+                    ev.group_id is not None,
+                )
+
     member = await _pick_group_member(ev, _event_rng(ev))
     if member is None:
         return await _safe_send(bot, '没有获取到本群成员，暂时娶不到群友。')
@@ -641,6 +665,11 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         f'{LOG_PREFIX} marry_member user={ev.user_id} group={ev.group_id} '
         f'member={member.name} qq={member.user_id} avatar={member.avatar}'
     )
+    record = WifeRecord.from_member(member)
+    record_dict = _record_to_dict(record, ev, ev.user_id)
+    async with _daily_context_lock(ev):
+        await _save_daily_records(ev, [('marry_members', user_key, record_dict)])
+
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
     await _send_local_image(
         bot,

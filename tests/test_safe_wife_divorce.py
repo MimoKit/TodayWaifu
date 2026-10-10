@@ -35,6 +35,7 @@ class SafeWifeDivorceTests(unittest.IsolatedAsyncioTestCase):
             'wives': {'u1': {'name': '旧老婆', 'stolen_by': 'u2'}},
             'safe_wives': {'u1': {'name': '新老婆', 'safe': True}},
             'husbands': {'u1': {'name': '老公'}},
+            'marry_members': {},
         }
         self.messages = AsyncMock()
         self.saved = AsyncMock(side_effect=self._save)
@@ -93,6 +94,37 @@ class SafeWifeDivorceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.context['wives']['u1']['divorced'])
         self.assertTrue(self.context['husbands']['u1']['divorced'])
         self.assertNotIn('divorced', self.context['safe_wives']['u1'])
+
+    async def test_divorce_marry_member_by_specific_command(self):
+        self.ev.command = '离婚群友'
+        self.context['marry_members']['u1'] = {'name': '群友A'}
+        await self.divorce(self.bot, self.ev, 'wife')
+        self.assertTrue(self.context['marry_members']['u1']['divorced'])
+        self.assertEqual(self.context['marry_members']['u1']['divorced_at'], 123)
+        self.messages.assert_awaited_once_with(self.bot, '已经和今天的群友离婚：群友A。')
+        self.assertNotIn('divorced', self.context['safe_wives']['u1'])
+
+    async def test_divorce_marry_member_when_no_member_married(self):
+        self.ev.command = '离婚群友'
+        await self.divorce(self.bot, self.ev, 'wife')
+        self.saved.assert_not_awaited()
+        self.messages.assert_awaited_once_with(self.bot, '你今天没有可以离婚的群友。')
+        self.assertNotIn('divorced', self.context['safe_wives']['u1'])
+
+    async def test_divorce_marry_member_already_divorced(self):
+        self.ev.command = '离婚群友'
+        self.context['marry_members']['u1'] = {'name': '群友A', 'divorced': True}
+        await self.divorce(self.bot, self.ev, 'wife')
+        self.saved.assert_not_awaited()
+        self.messages.assert_awaited_once_with(self.bot, '你今天已经和群友离婚了。')
+
+    async def test_divorce_fallback_to_marry_member_when_no_wife(self):
+        del self.context['wives']['u1']
+        del self.context['safe_wives']['u1']
+        self.context['marry_members']['u1'] = {'name': '群友B'}
+        await self.divorce(self.bot, self.ev, 'wife')
+        self.assertTrue(self.context['marry_members']['u1']['divorced'])
+        self.messages.assert_awaited_once_with(self.bot, '已经和今天的群友离婚：群友B。')
 
     def _daily(self):
         self.namespace.update({
