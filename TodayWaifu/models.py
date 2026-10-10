@@ -31,12 +31,9 @@ from gsuid_core.utils.database.base_models import (
 
 if TYPE_CHECKING:
     # 仅供类型检查器解析：本模块被测试以 importlib 独立加载，运行时相对导入会直接失败。
-    from .payloads import WifeData, DailyContext, RoleRecordValue
+    from .payloads import DailyContext, RoleRecordValue
 
 LOG_PREFIX = '[鸣潮今日老婆]'
-
-# 迁移时只保留最近数日：旧 JSON 可能积压多年，全量导入会无谓放大表体积与清理成本。
-LEGACY_MIGRATION_KEEP_DAYS = 2
 
 # 非 dict 值（如 rob_attempts 的 True 标记）没有可拆分的业务列，以此 record_type 标识。
 MARKER_RECORD_TYPE = 'marker'
@@ -584,52 +581,6 @@ class DailyWifeRecord(BaseModel, table=True):
         if rows:
             session.add_all(rows)
         return len(rows)
-
-    @classmethod
-    @with_session
-    async def import_legacy_data(
-        cls,
-        session: AsyncSession,
-        data: WifeData,
-        keep_days: int = LEGACY_MIGRATION_KEEP_DAYS,
-    ) -> int:
-        """导入旧 daily_wife_data.json 的内容，只保留最近 keep_days 天。
-
-        每个 (day, context) 均为先删后插，重复执行结果一致（幂等），迁移可安全重试；
-        更早的日期直接丢弃，避免陈年数据挤占表空间并拖慢当日的读取路径。
-        """
-        days = data.get('days') if isinstance(data, dict) else None
-        if not isinstance(days, dict) or not days:
-            return 0
-
-        imported = 0
-        for day in sorted((str(key) for key in days.keys()), reverse=True)[:keep_days]:
-            contexts = days.get(day)
-            if not isinstance(contexts, dict):
-                continue
-            for context_key, context in contexts.items():
-                if not isinstance(context, dict):
-                    continue
-                bot_id, group_id = split_context_key(context_key)
-                await session.execute(
-                    delete(cls)
-                    .where(cls.day == day)
-                    .where(cls.bot_id == bot_id)
-                    .where(cls.group_id == group_id)
-                )
-                rows: list[DailyWifeRecord] = []
-                for bucket, records in context.items():
-                    if not isinstance(records, dict):
-                        continue
-                    for user_key, value in records.items():
-                        rows.append(
-                            cls._row_from_value(day, bot_id, group_id, bucket, user_key, value)
-                        )
-                if rows:
-                    session.add_all(rows)
-                    imported += len(rows)
-        logger.info(f'{LOG_PREFIX} 旧 JSON 数据迁移完成，共导入 {imported} 条记录')
-        return imported
 
 
 # importlib / GsCore 热加载会在同一 SQLModel.metadata 中重复声明本表：SQLModel 对

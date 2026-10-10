@@ -1,8 +1,8 @@
 """TodayWaifu/models.py 数据库层的落盘契约测试。
 
 该模块取代旧的 daily_wife_data.json 单文件读写：整份 JSON 的读-改-写随群数与天数增长
-产生写放大，且并发写入会相互覆盖，零点高峰因此卡死（46fd929）。此处锁定三件事：写入后
-读回的值必须等价、事务失败必须整体回滚、旧 JSON 迁移必须幂等且只保留最近数日。
+产生写放大，且并发写入会相互覆盖，零点高峰因此卡死（46fd929）。此处锁定两件事：写入后
+读回的值必须等价、事务失败必须整体回滚。
 
 需要 gsuid_core 环境（sqlmodel/aiosqlite），用核心 venv 运行：
     D:/122/bot/xiaoyu/botkj/gsuid_core/.venv/Scripts/python.exe tests/test_models_db.py
@@ -39,36 +39,6 @@ def _load_models():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-# 迁移夹具故意含三天数据，且中间日带 rob_attempts 这类非 dict 标记、最新日带 stolen_from
-# 这类可选字段：迁移需完整保留布尔标记与嵌套键，仅比较「导入条数 > 0」无法发现字段丢失。
-LEGACY_DATA = {
-    "days": {
-        "2026-08-10": {
-            "onebot:1001": {
-                "wives": {"u1": {"name": "今汐", "image": "a.png", "updated_at": 1}}
-            }
-        },
-        "2026-08-11": {
-            "onebot:1001": {
-                "wives": {"u2": {"name": "长离", "image": "b.png", "updated_at": 2}},
-                "rob_attempts": {"u2": True},
-            }
-        },
-        "2026-08-12": {
-            "onebot:1002": {
-                "wives": {
-                    "u3": {
-                        "name": "景燃",
-                        "image": "c.png",
-                        "updated_at": 3,
-                        "stolen_from": "u9",
-                    }
-                }
-            }
-        },
-    }
-}
 
 
 @unittest.skipUnless(_DEPS_OK, "缺少 gsuid_core/sqlmodel 环境，跳过数据库测试")
@@ -192,45 +162,6 @@ class DailyWifeRecordDbTests(unittest.TestCase):
             )
 
         asyncio.run(run())
-
-    def test_import_legacy_keeps_only_recent_two_days(self) -> None:
-        # 迁移只保留最近 keep_days 天：旧 JSON 可能积压多年，全量导入会放大表体积并拖慢
-        # 当日读取路径。同时锁定可选字段（stolen_from）与布尔标记在迁移中不丢失。
-        models = self.models
-
-        async def run() -> int:
-            return await models.DailyWifeRecord.import_legacy_data(LEGACY_DATA)
-
-        imported = asyncio.run(run())
-        self.assertGreater(imported, 0)
-
-        async def check() -> None:
-            oldest = await models.DailyWifeRecord.load_day("2026-08-10")
-            self.assertEqual(oldest, {})  # 最老的一天被丢弃
-            middle = await models.DailyWifeRecord.load_day("2026-08-11")
-            self.assertEqual(middle["onebot:1001"]["wives"]["u2"]["name"], "长离")
-            self.assertIs(middle["onebot:1001"]["rob_attempts"]["u2"], True)
-            newest = await models.DailyWifeRecord.load_day("2026-08-12")
-            self.assertEqual(
-                newest["onebot:1002"]["wives"]["u3"]["stolen_from"], "u9"
-            )
-
-        asyncio.run(check())
-
-        # 幂等：重复导入行数不变。迁移在启动时触发，升级重启可能多次执行，
-        # 非幂等会累积重复行；实现以「先按 (day, context) 删除再插入」保证该性质。
-        asyncio.run(run())
-
-        async def count() -> int:
-            from sqlmodel import func, select
-
-            async with base_models.async_maker() as session:
-                result = await session.execute(
-                    select(func.count()).select_from(models.DailyWifeRecord)
-                )
-                return result.one()
-
-        asyncio.run(count())  # 不抛异常即可；行数一致性由先删后插保证
 
 
 if __name__ == "__main__":
