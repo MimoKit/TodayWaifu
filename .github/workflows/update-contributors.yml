@@ -17,8 +17,12 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
+      - name: Delay 5 minutes on update
+        if: github.event_name == 'push'
+        run: sleep 300
+
       - name: Check out repository
         uses: actions/checkout@v7
 
