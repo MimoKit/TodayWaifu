@@ -489,6 +489,16 @@ def _mark_all_daily_records_divorced(
         safe_record['divorced'] = True
         safe_record['divorced_at'] = divorced_at
         divorced.append(('safe_wife', str(safe_record['name'])))
+
+    marry_record = context.get('marry_members', {}).get(user_key)
+    if (
+        isinstance(marry_record, dict)
+        and str(marry_record.get('name') or '').strip()
+        and not marry_record.get('divorced')
+    ):
+        marry_record['divorced'] = True
+        marry_record['divorced_at'] = divorced_at
+        divorced.append(('marry_member', str(marry_record['name'])))
     return divorced
 
 

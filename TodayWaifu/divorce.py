@@ -104,8 +104,42 @@ async def _send_divorce(bot: Bot, ev: Event, kind: str) -> None:
             if isinstance(safe_record, dict) and str(safe_record.get('name') or '').strip():
                 bucket_name = 'safe_wives'
                 record = safe_record
-        # 群友记录的展示名固定为「群友」：其 name 是具体群昵称，回显会暴露他人昵称。
-        item_title = '群友' if isinstance(record, dict) and record.get('record_type') == 'member' else title
+        cmd_text = str(
+            getattr(ev, 'command', '') or getattr(ev, 'text', '') or getattr(ev, 'raw_text', '')
+        ).strip()
+        is_member_cmd = kind == 'wife' and '群友' in cmd_text
+        if is_member_cmd:
+            marry_record = context.get('marry_members', {}).get(user_key)
+            if isinstance(marry_record, dict) and str(marry_record.get('name') or '').strip():
+                bucket_name = 'marry_members'
+                record = marry_record
+                item_title = '群友'
+            elif isinstance(record, dict) and record.get('record_type') == 'member':
+                item_title = '群友'
+            else:
+                item_title = '群友'
+                record = None
+        else:
+            if kind == 'wife' and (
+                not isinstance(record, dict)
+                or not str(record.get('name') or '').strip()
+                or bool(record.get('divorced'))
+            ):
+                marry_record = context.get('marry_members', {}).get(user_key)
+                if (
+                    isinstance(marry_record, dict)
+                    and str(marry_record.get('name') or '').strip()
+                    and not marry_record.get('divorced')
+                ):
+                    bucket_name = 'marry_members'
+                    record = marry_record
+            # 群友记录的展示名固定为「群友」：其 name 是具体群昵称，回显会暴露他人昵称。
+            item_title = (
+                '群友'
+                if bucket_name == 'marry_members'
+                or (isinstance(record, dict) and record.get('record_type') == 'member')
+                else title
+            )
         # 状态校验与写入同处锁内，因此这里读到的 record 就是写回时依据的最新状态。
         if not isinstance(record, dict) or not str(record.get('name') or '').strip():
             response = f'你今天没有可以离婚的{item_title}。'
