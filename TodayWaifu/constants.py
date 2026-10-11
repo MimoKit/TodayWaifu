@@ -366,7 +366,21 @@ def _daily_bucket_name(kind: str) -> str:
     return _daily_kind_metadata(kind).bucket
 
 
-DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')
+# 这些模式共享同一个“今日老婆”名额。普通老婆虽然使用独立数据桶，
+# 但用户侧语义仍然是每日老婆，必须参与跨模式互斥检查。
+DAILY_WIFE_KINDS = ('wife', 'normal', 'nte', 'pgr')
+
+
+MAX_UPLOAD_IMAGE_REFS = 20
+MAX_CUSTOM_ROLE_NAME_LENGTH = 64
+
+
+def _format_template(template: str, default: str, **values: object) -> str:
+    """格式化用户配置模板，模板损坏时回退到默认文案。"""
+    try:
+        return template.format(**values)
+    except (IndexError, KeyError, ValueError):
+        return default.format(**values)
 
 
 # 参与每日记录清理与状态聚合的完整功能集合。此处为显式枚举而非动态推导，

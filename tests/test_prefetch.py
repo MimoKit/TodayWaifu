@@ -176,7 +176,7 @@ class PrefetchBoundednessTests(unittest.TestCase):
         source = PREFETCH.read_text(encoding='utf-8')
         loop = source[source.index('async def _prefetch_loop(') :]
         self.assertIn('if delay <= 1.0:', loop)
-        self.assertIn('next_day = datetime.now() + timedelta(days=1)', loop)
+        self.assertIn("next_day = datetime.now(ZoneInfo('Asia/Shanghai')) + timedelta(days=1)", loop)
 
     def test_startup_delay_is_small_but_not_zero(self) -> None:
         # 延迟下界避免与 Core 启动争抢数据库与线程池，上界保证零点后重启的实例

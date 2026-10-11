@@ -71,11 +71,15 @@ def _build_gift_success_text(role: RoleCandidate, target_user_id: str, kind: str
     # 模板占位符由配置决定，此处一次性补齐全部可用字段；多传的键不会影响 format，
     # 从而让用户自定义模板时无需关心本函数提供了哪些字段。
     template = _gift_success_template(kind)
-    return template.format(
-        name=role.name,
-        role_id='/'.join(role.role_ids),
-        target=target_user_id,
-    )
+    values = {
+        'name': role.name,
+        'role_id': '/'.join(role.role_ids),
+        'target': target_user_id,
+    }
+    try:
+        return template.format(**values)
+    except (IndexError, KeyError, ValueError):
+        return _daily_kind_metadata(kind).gift_success_default.format(**values)
 
 
 def _gift_pending_key(ev: Event, target_user_id: str, kind: str = 'wife') -> str:

@@ -68,6 +68,7 @@ from .shared import (
     _roll_group_member_wife,
     _get_event_target_user_id,
     _get_other_daily_wife_name,
+    _has_exclusive_daily_wife,
 )
 
 
@@ -81,13 +82,16 @@ def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> s
     work = role.role_ids[0] if (role.role_ids and role.role_ids[0] != role.name) else ''
     if mode == 'normal' and not work:
         template = '你今天的老婆是{name}！'
-    lines = [
-        template.format(
-            name=role.name,
-            role_id=work or ('/'.join(role.role_ids) if role.role_ids else ''),
-            user_id=user_id,
-        )
-    ]
+    values = {
+        'name': role.name,
+        'role_id': work or ('/'.join(role.role_ids) if role.role_ids else ''),
+        'user_id': user_id,
+    }
+    try:
+        rendered = template.format(**values)
+    except (IndexError, KeyError, ValueError):
+        rendered = metadata.text_template_default.format(**values)
+    lines = [rendered]
     if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', False)):
         quote = get_role_quote(role.name)
         if quote:
@@ -106,7 +110,12 @@ def _build_member_text(member: MemberCandidate, mode: str = 'daily') -> str:
         template = str(_cfg('DailyWifeMarryGroupMemberTextTemplate') or '你娶到的群友是{name}')
     else:
         template = str(_cfg('DailyWifeGroupMemberTextTemplate') or '你今天的老婆是{name}')
-    return template.format(name=member.name, user_id=member.user_id)
+    values = {'name': member.name, 'user_id': member.user_id}
+    default = '你娶到的群友是{name}' if mode == 'marry' else '你今天的老婆是{name}'
+    try:
+        return template.format(**values)
+    except (IndexError, KeyError, ValueError):
+        return default.format(**values)
 
 
 def _record_text(record: WifeRecord, mode: str = 'wife', user_id: str = '') -> str:
@@ -136,6 +145,9 @@ async def _ensure_daily_wife_record(
             if record is not None:
                 logger.debug(f'{LOG_PREFIX} 命中已有的 {mode} 记录: {record.name}')
                 return record
+        if _has_exclusive_daily_wife(context, key, mode):
+            logger.debug(f'{LOG_PREFIX} 用户 {key} 已在其它每日老婆池持有记录')
+            return None
 
     chosen: WifeRecord | None = None
     if specified_role is not None:
@@ -172,6 +184,9 @@ async def _ensure_daily_wife_record(
             if existing_record is not None:
                 logger.debug(f'{LOG_PREFIX} 写入前发现已有 {mode} 记录，直接复用: {existing_record.name}')
                 return existing_record
+        if _has_exclusive_daily_wife(context, key, mode):
+            logger.debug(f'{LOG_PREFIX} 写入前发现其它每日老婆记录，拒绝新增 {mode}')
+            return None
 
         value = _record_to_dict(chosen, ev, key)
         await _save_daily_record(ev, bucket, key, value)
@@ -634,28 +649,34 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         return await _safe_send(bot, '这个命令只能在群聊里使用。')
 
     user_key = _user_key(ev)
+    existing_record: WifeRecord | None = None
+    already_divorced = False
     async with _daily_context_lock(ev):
         context = await _load_daily_context(ev)
         marry_bucket = context.setdefault('marry_members', {})
         current = marry_bucket.get(user_key)
         if isinstance(current, dict):
             if current.get('divorced'):
-                return await _safe_send(bot, '你今天已经和群友离婚了，明天再来吧~')
-            existing_record = _record_from_dict(current)
-            if existing_record is not None:
-                text = (
-                    _build_member_text(existing_record.to_member(), 'marry')
-                    if bool(_cfg('DailyWifeSendText'))
-                    else None
-                )
-                return await _send_local_image(
-                    bot,
-                    existing_record.image,
-                    '本地群友头像文件不存在，请稍后重试。',
-                    text,
-                    ev.user_id,
-                    ev.group_id is not None,
-                )
+                already_divorced = True
+            else:
+                existing_record = _record_from_dict(current)
+
+    if already_divorced:
+        return await _safe_send(bot, '你今天已经和群友离婚了，明天再来吧~')
+    if existing_record is not None:
+        text = (
+            _build_member_text(existing_record.to_member(), 'marry')
+            if bool(_cfg('DailyWifeSendText'))
+            else None
+        )
+        return await _send_local_image(
+            bot,
+            existing_record.image,
+            '本地群友头像文件不存在，请稍后重试。',
+            text,
+            ev.user_id,
+            ev.group_id is not None,
+        )
 
     member = await _pick_group_member(ev, _event_rng(ev))
     if member is None:
@@ -667,8 +688,23 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
     )
     record = WifeRecord.from_member(member)
     record_dict = _record_to_dict(record, ev, ev.user_id)
+    winner_record: WifeRecord | None = None
+    winner_divorced = False
     async with _daily_context_lock(ev):
-        await _save_daily_records(ev, [('marry_members', user_key, record_dict)])
+        context = await _load_daily_context(ev)
+        current = context.setdefault('marry_members', {}).get(user_key)
+        if isinstance(current, dict) and current.get('divorced'):
+            winner_divorced = True
+        else:
+            winner_record = _record_from_dict(current) if isinstance(current, dict) else None
+            if winner_record is None:
+                await _save_daily_records(ev, [('marry_members', user_key, record_dict)])
+                winner_record = record
+
+    if winner_divorced:
+        return await _safe_send(bot, '你今天已经和群友离婚了，明天再来吧~')
+    if winner_record is not record:
+        member = winner_record.to_member()
 
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
     await _send_local_image(

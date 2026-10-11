@@ -115,7 +115,7 @@ class PgrFeatureSourceTests(unittest.TestCase):
         )
         daily = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8-sig')
 
-        self.assertIn("DAILY_WIFE_KINDS = ('wife', 'nte', 'pgr')", shared)
+        self.assertIn("DAILY_WIFE_KINDS = ('wife', 'normal', 'nte', 'pgr')", shared)
         self.assertIn('_get_other_daily_wife_name(ev, mode)', daily)
         self.assertIn('不要贪心！', daily)
 

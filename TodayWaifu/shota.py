@@ -99,7 +99,7 @@ def _parse_shota_image_urls(payload: GalleryPayload) -> tuple[str, ...]:
                 continue
             clean_url = url.strip()
             # 仅接受绝对 HTTP(S) 地址：其它形态无法在发送阶段下载，提前丢弃以免抽中即失败
-            if not clean_url.startswith(('http://', 'https://')):
+            if not clean_url.startswith('https://'):
                 continue
             if clean_url in seen_urls:
                 continue

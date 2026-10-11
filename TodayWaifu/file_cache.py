@@ -16,6 +16,7 @@ import os
 import time
 import hashlib
 import tempfile
+import threading
 from typing import Optional
 from pathlib import Path
 from collections import OrderedDict
@@ -28,6 +29,7 @@ LOCAL_BYTES_CACHE_MAX_BYTES = 128 * 1024 * 1024
 
 _LOCAL_BYTES_CACHE: 'OrderedDict[str, tuple[int, int, bytes]]' = OrderedDict()
 _LOCAL_BYTES_CACHE_TOTAL_BYTES = 0
+_CACHE_LOCK = threading.RLock()
 
 
 def read_file_bytes_cached(path: Path) -> bytes:
@@ -42,23 +44,25 @@ def read_file_bytes_cached(path: Path) -> bytes:
     stat = path.stat()
     key = str(path)
     global _LOCAL_BYTES_CACHE_TOTAL_BYTES
-    cached = _LOCAL_BYTES_CACHE.get(key)
-    if cached is not None and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
-        _LOCAL_BYTES_CACHE.move_to_end(key)
-        return cached[2]
+    with _CACHE_LOCK:
+        cached = _LOCAL_BYTES_CACHE.get(key)
+        if cached is not None and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+            _LOCAL_BYTES_CACHE.move_to_end(key)
+            return cached[2]
     data = path.read_bytes()
-    previous = _LOCAL_BYTES_CACHE.pop(key, None)
-    if previous is not None:
-        _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(previous[2])
-    _LOCAL_BYTES_CACHE[key] = (stat.st_mtime_ns, stat.st_size, data)
-    _LOCAL_BYTES_CACHE.move_to_end(key)
-    _LOCAL_BYTES_CACHE_TOTAL_BYTES += len(data)
-    while (
-        len(_LOCAL_BYTES_CACHE) > LOCAL_BYTES_CACHE_MAX_ENTRIES
-        or _LOCAL_BYTES_CACHE_TOTAL_BYTES > LOCAL_BYTES_CACHE_MAX_BYTES
-    ):
-        _, removed = _LOCAL_BYTES_CACHE.popitem(last=False)
-        _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(removed[2])
+    with _CACHE_LOCK:
+        previous = _LOCAL_BYTES_CACHE.pop(key, None)
+        if previous is not None:
+            _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(previous[2])
+        _LOCAL_BYTES_CACHE[key] = (stat.st_mtime_ns, stat.st_size, data)
+        _LOCAL_BYTES_CACHE.move_to_end(key)
+        _LOCAL_BYTES_CACHE_TOTAL_BYTES += len(data)
+        while (
+            len(_LOCAL_BYTES_CACHE) > LOCAL_BYTES_CACHE_MAX_ENTRIES
+            or _LOCAL_BYTES_CACHE_TOTAL_BYTES > LOCAL_BYTES_CACHE_MAX_BYTES
+        ):
+            _, removed = _LOCAL_BYTES_CACHE.popitem(last=False)
+            _LOCAL_BYTES_CACHE_TOTAL_BYTES -= len(removed[2])
     return data
 
 
@@ -78,8 +82,9 @@ def clear_file_caches() -> None:
     条目。
     """
     global _LOCAL_BYTES_CACHE_TOTAL_BYTES
-    _LOCAL_BYTES_CACHE.clear()
-    _LOCAL_BYTES_CACHE_TOTAL_BYTES = 0
+    with _CACHE_LOCK:
+        _LOCAL_BYTES_CACHE.clear()
+        _LOCAL_BYTES_CACHE_TOTAL_BYTES = 0
 
 
 # 图库表达「一次性授权」的查询参数集合：其取值随签名轮换而变，但指向的资源未变。
@@ -146,10 +151,11 @@ CACHED_URL_INDEX_MAX = 50000
 
 
 def _remember_cached_url(url: str) -> None:
-    if len(_CACHED_URL_HASHES) >= CACHED_URL_INDEX_MAX:
-        # 溢出时整体丢弃：仅失去优化提示，会退回全量图片，不影响正确性
-        _CACHED_URL_HASHES.clear()
-    _CACHED_URL_HASHES.add(_cache_key(url))
+    with _CACHE_LOCK:
+        if len(_CACHED_URL_HASHES) >= CACHED_URL_INDEX_MAX:
+            # 溢出时整体丢弃：仅失去优化提示，会退回全量图片，不影响正确性
+            _CACHED_URL_HASHES.clear()
+        _CACHED_URL_HASHES.add(_cache_key(url))
 
 
 def is_url_cached(url: str) -> bool:
@@ -158,7 +164,8 @@ def is_url_cached(url: str) -> bool:
     归一化规则与磁盘缓存一致，因此列表下发新签名的 URL 时，仍能命中此前按旧签名下载
     的同一张图片；索引缺失只会退化为「按原列表随机」，不会产生错误结果。
     """
-    return _cache_key(url) in _CACHED_URL_HASHES
+    with _CACHE_LOCK:
+        return _cache_key(url) in _CACHED_URL_HASHES
 
 
 def prefer_cached_urls(urls: tuple[str, ...]) -> tuple[str, ...]:
@@ -172,7 +179,8 @@ def prefer_cached_urls(urls: tuple[str, ...]) -> tuple[str, ...]:
 
 def clear_cached_url_index() -> None:
     """清空已缓存 URL 索引，供测试与调试使用。"""
-    _CACHED_URL_HASHES.clear()
+    with _CACHE_LOCK:
+        _CACHED_URL_HASHES.clear()
 
 
 def read_url_cache(cache_root: Path, url: str) -> Optional[bytes]:
@@ -207,7 +215,8 @@ def clear_expired_files(cache_root: Path, max_age_seconds: float, limit: int = 1
             try:
                 if path.stat().st_mtime < cutoff:
                     path.unlink()
-                    _CACHED_URL_HASHES.discard(path.name)
+                    with _CACHE_LOCK:
+                        _CACHED_URL_HASHES.discard(path.name)
                     removed += 1
             except OSError:
                 continue
@@ -252,7 +261,8 @@ def cached_url_count() -> int:
 
     该值不等于磁盘上的真实文件数：索引可能因外部删除而偏大，也可能因进程重启而清零。
     """
-    return len(_CACHED_URL_HASHES)
+    with _CACHE_LOCK:
+        return len(_CACHED_URL_HASHES)
 
 
 def enforce_cache_size_budget(cache_root: Path, max_bytes: int, limit: int = 5000) -> int:
@@ -295,7 +305,8 @@ def enforce_cache_size_budget(cache_root: Path, max_bytes: int, limit: int = 500
             path.unlink()
         except OSError:
             continue
-        _CACHED_URL_HASHES.discard(path.name)
+        with _CACHE_LOCK:
+            _CACHED_URL_HASHES.discard(path.name)
         total -= size
         removed += 1
     return removed

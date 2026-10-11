@@ -397,10 +397,11 @@ async def _enqueue_image_job(job: _ImageJob) -> bool:
         return True
     except asyncio.QueueFull:
         logger.warning(f'{LOG_PREFIX} 图片投递队列已满({IMAGE_DELIVERY_QUEUE_MAX})，本次只发送文字')
+        fallback = job.text or '当前图片请求较多，请稍后再试。'
         if job.loli_style:
-            await _send_loli_text(job.bot, job.text or '')
+            await _send_loli_text(job.bot, fallback)
         else:
-            await _safe_send(job.bot, job.text or '当前请求过多，请稍后再试。')
+            await _safe_send(job.bot, fallback)
         return False
 
 

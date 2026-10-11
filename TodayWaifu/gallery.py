@@ -7,7 +7,7 @@ import random
 import asyncio
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from gsuid_core.logger import logger
 
@@ -55,6 +55,7 @@ from .constants import (
 )
 from .file_cache import read_url_cache, write_url_cache
 from .circuit_breaker import CircuitBreaker
+from .image_input import safe_urlopen, redact_url
 
 
 def _pgr_gallery_api_url() -> str:
@@ -81,7 +82,7 @@ def _parse_pgr_gallery_candidates(payload: GalleryPayload) -> tuple[RoleCandidat
         images = tuple(
             str(image.get('url') or '').strip()
             for image in item.get('images') or []
-            if isinstance(image, dict) and str(image.get('url') or '').strip().startswith(('http://', 'https://'))
+            if isinstance(image, dict) and str(image.get('url') or '').strip().startswith('https://')
         )
         if name and images:
             candidates.append(RoleCandidate(name=name, role_ids=role_ids, images=images))
@@ -128,7 +129,11 @@ def _request_headers() -> dict[str, str]:
 
 def _http_get(url: str, *, timeout: int = 15, max_bytes: int = MAX_GALLERY_RESPONSE_BYTES) -> bytes:
     request = Request(url, headers=_request_headers())
-    with urlopen(request, timeout=timeout) as resp:
+    try:
+        response = safe_urlopen(request, timeout=timeout)
+    except ValueError as exc:
+        raise OSError(str(exc)) from exc
+    with response as resp:
         content_length = resp.headers.get('Content-Length')
         if content_length:
             try:
@@ -161,6 +166,9 @@ _HTTP_BREAKER = CircuitBreaker(
 
 def _circuit_key(url: str) -> str:
     return urlparse(url).netloc or url
+
+
+_redact_url = redact_url
 
 
 def gallery_circuit_state() -> tuple[bool, float]:
@@ -209,7 +217,7 @@ def _http_get_with_retry(
             f'图库接口连续失败，已熔断 {_HTTP_BREAKER.retry_after(key):.0f} 秒后重试。'
         )
 
-    last_exc: Exception = RuntimeError(f'请求 {url} 失败。')
+    last_exc: Exception = RuntimeError('请求远程资源失败。')
     for attempt in range(retries + 1):
         try:
             body = _http_get(url, timeout=timeout, max_bytes=max_bytes)
@@ -225,7 +233,7 @@ def _http_get_with_retry(
         if attempt < retries:
             delay = _retry_delay(attempt)
             logger.warning(
-                f'{LOG_PREFIX} 请求远程资源失败(第{attempt + 1}/{retries}次重试): {url}，'
+                f'{LOG_PREFIX} 请求远程资源失败(第{attempt + 1}/{retries}次重试): {_redact_url(url)}，'
                 f'{delay:.1f} 秒后重试: {last_exc}'
             )
             time.sleep(delay)
@@ -318,8 +326,8 @@ def _parse_role_candidates(
                 url = str(image_item.get('url') or '').strip()
             else:
                 url = str(image_item or '').strip()
-            # 仅接受 http(s) 图片地址：本地路径由磁盘扫描负责，相对路径也无法在下载侧解析
-            if url.startswith(('http://', 'https://')):
+            # 仅接受 HTTPS 图片地址：本地路径由磁盘扫描负责，相对路径也无法在下载侧解析。
+            if url.startswith('https://'):
                 images.append(url)
         if images:
             candidates.append(RoleCandidate(name=name, role_ids=allowed_role_ids, images=tuple(images)))
@@ -339,7 +347,7 @@ def _auth_error_reason(exc: HTTPError, *, what: str) -> str:
     code = getattr(exc, 'code', 0)
     detail = ''
     try:
-        raw = exc.read()
+        raw = exc.read(64 * 1024 + 1)
         if raw:
             payload = json.loads(raw.decode('utf-8', 'replace'))
             if isinstance(payload, dict):
@@ -392,7 +400,7 @@ async def _download_image(url: str) -> bytes:
     cache_root = _gallery_image_cache_root()
     cached = await run_blocking(read_url_cache, cache_root, url)
     if cached is not None:
-        logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {url}')
+        logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {_redact_url(url)}')
         return cached
 
     task = _IMAGE_INFLIGHT.get(url)
