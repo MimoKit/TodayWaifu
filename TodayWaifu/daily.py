@@ -73,14 +73,14 @@ from .shared import (
 
 
 def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> str:
-    if mode == 'wife' and _cfg_bool('DailyWifeNormalEnabled', False):
-        template = str(_cfg('DailyWifeNormalTextTemplate') or '').strip()
-        if not template:
-            return '你的老婆来啦！'
-    metadata = _daily_kind_metadata(mode)
+    is_normal = mode == 'normal' or (mode == 'wife' and bool(_cfg_bool('DailyWifeNormalEnabled', False)))
+    if is_normal:
+        metadata = _daily_kind_metadata('normal')
+    else:
+        metadata = _daily_kind_metadata(mode)
     template = str(_cfg(metadata.text_template_key) or metadata.text_template_default)
     work = role.role_ids[0] if (role.role_ids and role.role_ids[0] != role.name) else ''
-    if mode == 'normal' and not work:
+    if is_normal and not work:
         template = '你今天的老婆是{name}！'
     values = {
         'name': role.name,
@@ -92,15 +92,15 @@ def _build_text(role: RoleCandidate, mode: str = 'wife', user_id: str = '') -> s
     except (IndexError, KeyError, ValueError):
         rendered = metadata.text_template_default.format(**values)
     lines = [rendered]
-    if mode != 'normal' and bool(_cfg_bool('DailyWifeSendRoleQuote', False)):
+    if not is_normal and bool(_cfg_bool('DailyWifeSendRoleQuote', False)):
         quote = get_role_quote(role.name)
         if quote:
             lines.append(quote)
-    if bool(_cfg('DailyWifeShowRoleId')) and mode != 'normal':
+    if bool(_cfg('DailyWifeShowRoleId')) and not is_normal:
         lines.append(f'角色ID：{"/".join(role.role_ids)}')
     # 部分平台不提供可 @ 的数字账号，群友只能复制该串 ID 完成「抢老婆」，
     # 故与角色 ID 分开设置开关，便于按平台单独关闭。
-    if user_id and bool(_cfg('DailyWifeShowUserId')) and mode != 'normal':
+    if user_id and bool(_cfg('DailyWifeShowUserId')) and not is_normal:
         lines.append(f'你的ID：{user_id}')
     return '\n'.join(lines)
 

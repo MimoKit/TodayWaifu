@@ -77,7 +77,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeNormalEnabled': GsBoolConfig(
         '启用普通老婆',
-        '开启后“今日老婆”指令使用普通老婆远程图库，文案使用“你的老婆来啦！”，并遵循今日老婆限制',
+        '开启后“今日老婆”指令使用普通老婆远程图库，遵循今日老婆限制',
         False,
     ),
     'DailyWifePrefetchEnabled': GsBoolConfig(
