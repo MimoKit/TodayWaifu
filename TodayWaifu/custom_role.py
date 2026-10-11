@@ -43,6 +43,7 @@ from .shared import (
     _invalidate_candidate_cache,
 )
 from .executor import run_blocking
+from .upload_io import MAX_ROLE_NAME_LENGTH, MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -50,7 +51,6 @@ from .image_input import (
     detect_image_suffix,
     image_suffix_from_source,
 )
-from .upload_io import MAX_ROLE_NAME_LENGTH, MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 
 _CUSTOM_ROLE_LOCK = threading.RLock()
 

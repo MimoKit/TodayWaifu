@@ -53,6 +53,7 @@ from .shared import (
     _image_message_from_path,
 )
 from .executor import run_blocking
+from .upload_io import MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -61,7 +62,6 @@ from .image_input import (
     image_suffix_from_source,
 )
 from .source_cache import AsyncSourceCache
-from .upload_io import MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 
 _LOLI_SOURCE_CACHE = AsyncSourceCache[tuple[str, ...]](CACHE_TTL_SECONDS, max_entries=4)
 
