@@ -81,18 +81,22 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('你的老婆来啦！', text)
 
     def test_build_text_when_normal_wife_enabled(self) -> None:
-        # 开启且未配置自定义模板时回落到固定文案「你的老婆来啦！」；该文案不含角色名，
-        # 属既有用户可见输出，改动会导致已习惯该提示的用户收到未预期内容。
+        # 开启普通老婆时走普通老婆模板，正常带上作品来源与角色名
         globals_dict = {
             'RoleCandidate': _FakeRoleCandidate,
             '_cfg_bool': lambda key, default=False: key == 'DailyWifeNormalEnabled',
-            '_daily_kind_metadata': lambda mode: _FakeKindMetadata(),
+            '_daily_kind_metadata': lambda mode: _FakeKindMetadata(
+                text_template_key='DailyWifeNormalTextTemplate',
+                text_template_default='你今天的老婆是来自{role_id}的{name}！',
+            )
+            if mode == 'normal'
+            else _FakeKindMetadata(),
             '_cfg': lambda key: None,
         }
         build_text = _extract_function(DAILY_PATH, '_build_text', globals_dict)
-        role = _FakeRoleCandidate('普通角色', ('9999',), ('https://example.test/normal.png',))
+        role = _FakeRoleCandidate('雷电将军', ('原神', '原神!雷电将军'), ('https://example.test/normal.png',))
         text = build_text(role, mode='wife')
-        self.assertEqual(text, '你的老婆来啦！')
+        self.assertEqual(text, '你今天的老婆是来自原神的雷电将军！')
 
     def test_build_text_normal_mode_with_work(self) -> None:
         # normal 模式的 role_id 取 role_ids[0]，仅当它不等于角色名时才作为「来源作品」渲染；
