@@ -62,6 +62,12 @@ def collect_image_refs(event: ImageBearingEvent) -> tuple[str, ...]:
     return tuple(dict.fromkeys(refs))[:MAX_IMAGE_REFS]
 
 
+TRUSTED_HOSTNAMES = {
+    'twfapi.xlinxc.cn',
+    'twf.xlinxc.cn',
+}
+
+
 def _is_blocked_ip(address: str) -> bool:
     ip = ipaddress.ip_address(address)
     return (
@@ -91,7 +97,11 @@ def _public_addresses(source: str) -> tuple[str, ...]:
         }
     except (OSError, ValueError) as exc:
         raise ValueError('图片地址无法解析。') from exc
-    if not addresses or any(_is_blocked_ip(address) for address in addresses):
+    if not addresses:
+        raise ValueError('图片地址无法解析。')
+    if hostname in TRUSTED_HOSTNAMES:
+        return tuple(sorted(addresses))
+    if any(_is_blocked_ip(address) for address in addresses):
         raise ValueError('图片地址指向受限网络。')
     return tuple(sorted(addresses))
 
