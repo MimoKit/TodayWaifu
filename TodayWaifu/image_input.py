@@ -1,24 +1,22 @@
 from __future__ import annotations
 
+import ssl
 import base64
+import socket
 import hashlib
 import binascii
 import ipaddress
-import socket
-import ssl
 from io import BytesIO
-from http.client import HTTPSConnection
-from http.client import HTTPResponse
-from http.client import HTTPMessage
 from typing import Protocol, runtime_checkable
 from pathlib import Path
+from http.client import HTTPMessage, HTTPResponse, HTTPSConnection
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from urllib.request import (
-    HTTPRedirectHandler,
+    Request,
     HTTPSHandler,
     ProxyHandler,
-    Request,
+    HTTPRedirectHandler,
     build_opener,
 )
 

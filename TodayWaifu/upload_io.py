@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import os
 import tempfile
-from pathlib import Path
 from uuid import uuid4
+from pathlib import Path
 
 MAX_UPLOAD_TOTAL_BYTES = 100 * 1024 * 1024
 MAX_ROLE_NAME_LENGTH = 64

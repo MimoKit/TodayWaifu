@@ -206,10 +206,10 @@ from .daily_store import (
     _save_daily_records,
     _delete_daily_record,
     flush_pending_writes,
+    _has_exclusive_daily_wife,
     _get_existing_daily_record,
     _get_other_daily_wife_name,
     _get_existing_daily_wife_record,
-    _has_exclusive_daily_wife,
     _mark_all_daily_records_divorced,
 )
 from .role_quotes import get_role_quote

@@ -17,8 +17,8 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.dialects.mysql import insert as mysql_insert
-from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from gsuid_core.server import on_core_start_before
 from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site

@@ -28,8 +28,8 @@ from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT
 from .domain import WifeRecord, MemberCandidate
 from .executor import run_blocking
 from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
+from .image_input import redact_url, safe_urlopen
 from .display_name import usable_name, placeholder_name
-from .image_input import safe_urlopen, redact_url
 
 
 def _member_feature_enabled() -> bool:

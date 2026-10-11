@@ -67,8 +67,8 @@ from .shared import (
     _marry_member_enabled,
     _roll_group_member_wife,
     _get_event_target_user_id,
-    _get_other_daily_wife_name,
     _has_exclusive_daily_wife,
+    _get_other_daily_wife_name,
 )
 
 

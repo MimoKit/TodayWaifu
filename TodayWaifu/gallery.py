@@ -54,8 +54,8 @@ from .constants import (
     _image_source,
 )
 from .file_cache import read_url_cache, write_url_cache
+from .image_input import redact_url, safe_urlopen
 from .circuit_breaker import CircuitBreaker
-from .image_input import safe_urlopen, redact_url
 
 
 def _pgr_gallery_api_url() -> str:
