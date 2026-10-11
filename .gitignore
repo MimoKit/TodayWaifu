@@ -12,18 +12,3 @@ __pycache__/
 daily_wife_data.json
 data/
 group_member_avatar_cache/
-xwuid_gallery_accounts*.txt
-
-# 帮助图源文件与渲染残留（本地生成 help.png 用，不入库）
-help_preview.html
-__rank_preview.html
-__rank_preview.png
-.playwright-cli/
-# 预渲染回归产物（脚本 + 对比图，纯本地，不入库）
-test_output/
-
-# 本地文档 / 项目主页（不入库）
-index.html
-
-# 含账号密码的本地草稿（不入库）
-图库账号邮件.txt
