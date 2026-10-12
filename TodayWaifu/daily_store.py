@@ -461,21 +461,6 @@ def _has_active_wife(raw: object) -> bool:
     return isinstance(raw, dict) and bool(raw.get('name')) and _wife_state(raw) == 'owned'
 
 
-def _has_exclusive_daily_wife(
-    context: DailyContext,
-    user_key: str,
-    requested_kind: str,
-) -> bool:
-    """Return whether another shared daily-wife bucket already owns an item."""
-    for kind in DAILY_WIFE_KINDS:
-        if kind == requested_kind:
-            continue
-        bucket = context.get(_daily_bucket_name(kind), {})
-        if isinstance(bucket, dict) and _has_active_wife(bucket.get(user_key)):
-            return True
-    return False
-
-
 def _mark_all_daily_records_divorced(
     context: DailyContext,
     user_key: str,

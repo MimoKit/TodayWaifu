@@ -40,13 +40,11 @@ from .shared import (
     _load_daily_context,
     _save_daily_records,
     _normalize_role_name,
-    _has_exclusive_daily_wife,
     _load_pgr_wife_candidates,
     _get_other_daily_wife_name,
     _invalidate_candidate_cache,
 )
 from .executor import run_blocking
-from .upload_io import MAX_ROLE_NAME_LENGTH, MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 from .image_input import image_hash_id, read_image_bytes, collect_image_refs
 from .folder_gallery import find_named_role_directory
 
@@ -63,15 +61,15 @@ def _unique_pgr_image_path(role_dir: Path, suffix: str, index: int) -> Path:
         counter += 1
 
 
-def _save_pgr_image(
-    role_dir: Path, source: str, index: int, max_bytes: int = UPLOAD_IMAGE_MAX_BYTES,
-) -> Path | None:
-    image_data = read_image_bytes(source, max_bytes)
+def _save_pgr_image(role_dir: Path, source: str, index: int) -> Path | None:
+    image_data = read_image_bytes(source, UPLOAD_IMAGE_MAX_BYTES)
     # 超限或来源不是图片时返回 None，由调用方计入失败，不影响同批其余图片的落盘
     if image_data is None:
         return None
     data, suffix = image_data
-    return save_upload_bytes(role_dir, 'pgr', suffix, data)
+    path = _unique_pgr_image_path(role_dir, suffix, index)
+    path.write_bytes(data)
+    return path
 
 
 async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
@@ -80,8 +78,6 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
 
     # 剥掉常见引号：用户习惯把角色名连同引号一起复制，未剥离会导致精确匹配失败
     role_name = str(ev.text or '').strip().strip('"“”‘’')
-    if len(role_name) > MAX_ROLE_NAME_LENGTH:
-        return await _safe_send(bot, f'角色名最多 {MAX_ROLE_NAME_LENGTH} 个字符。')
     if not role_name:
         return await _safe_send(
             bot,
@@ -106,18 +102,14 @@ async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
 
     saved: list[Path] = []
     failed = 0
-    remaining = MAX_UPLOAD_TOTAL_BYTES
     # 单张失败不中断整批：附件中可能混有非图片内容或超出体积上限的图片，已成功的部分仍应
     # 落盘并回报，失败数量单独统计后附在结果里
     for index, image_ref in enumerate(image_refs, 1):
-        path = await run_blocking(
-            _save_pgr_image, role_dir, image_ref, index, min(UPLOAD_IMAGE_MAX_BYTES, remaining),
-        )
+        path = await run_blocking(_save_pgr_image, role_dir, image_ref, index)
         if path is None:
             failed += 1
         else:
             saved.append(path)
-            remaining -= await run_blocking(lambda: path.stat().st_size)
 
     if not saved:
         return await _safe_send(
@@ -206,9 +198,6 @@ async def _ensure_daily_pgr_wife_record(
         existing = _stored_pgr_record(existing_raw)
         if existing is not None:
             return existing
-        if _has_exclusive_daily_wife(context, key, 'pgr'):
-            logger.debug(f'{LOG_PREFIX} 写入前发现其它每日老婆记录，拒绝新增战双老婆')
-            return None
         value = _record_to_dict(chosen, ev, key)
         await _save_daily_records(ev, [(bucket, key, value)])
     logger.info(f'{LOG_PREFIX} 为用户 {key} 生成新的战双老婆: {chosen.name}')

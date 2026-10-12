@@ -206,7 +206,6 @@ from .daily_store import (
     _save_daily_records,
     _delete_daily_record,
     flush_pending_writes,
-    _has_exclusive_daily_wife,
     _get_existing_daily_record,
     _get_other_daily_wife_name,
     _get_existing_daily_wife_record,
@@ -286,7 +285,7 @@ __all__ = [
     '_gallery_api_url',
     '_daily_bucket_name', '_daily_item_title', '_daily_kind_metadata', '_get_event_target_user_id',
     '_get_existing_daily_record', '_get_existing_daily_wife_record',
-     '_get_other_daily_wife_name', '_has_exclusive_daily_wife',
+    '_get_other_daily_wife_name',
     '_get_today_context',
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
@@ -493,9 +492,6 @@ async def _cache_maintenance_loop() -> None:
             raise
         except (OSError, SQLAlchemyError) as exc:
             logger.warning(f'{LOG_PREFIX} 缓存维护失败: {exc}')
-        except Exception as exc:
-            # 维护任务属于后台旁路，单个缓存条目的形状错误不能让清理循环永久退出。
-            logger.exception(f'{LOG_PREFIX} 缓存维护出现未预期异常，将继续运行: {exc}')
         await asyncio.sleep(CACHE_MAINTENANCE_INTERVAL_SECONDS)
 
 

@@ -9,13 +9,13 @@
 
 from __future__ import annotations
 
+import re
 import time
 import random
 import asyncio
-import hashlib
 from pathlib import Path
 from urllib.error import URLError, HTTPError
-from urllib.request import Request
+from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,7 +28,6 @@ from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT
 from .domain import WifeRecord, MemberCandidate
 from .executor import run_blocking
 from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
-from .image_input import redact_url, safe_urlopen
 from .display_name import usable_name, placeholder_name
 
 
@@ -61,10 +60,10 @@ def _qq_avatar_url(user_id: str) -> str:
 
 
 def _member_avatar_cache_path(user_id: str) -> Path:
-    # 用户 ID 可能包含任意平台标识字符；使用摘要同时避免目录穿越与不同 ID
-    # 经替换后碰撞，防止一个成员复用另一个成员的头像缓存。
-    digest = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()[:32]
-    return _custom_upload_data_root() / 'group_member_avatar_cache' / f'{digest}.jpg'
+    # 用户 ID 来自平台，直接参与拼接路径存在目录穿越风险；此处只保留安全字符集，
+    # 其余一律替换为下划线，使生成的文件名必定落在缓存目录内。
+    safe_user_id = re.sub(r'[^0-9A-Za-z_-]+', '_', str(user_id)) or 'unknown'
+    return _custom_upload_data_root() / 'group_member_avatar_cache' / f'{safe_user_id}.jpg'
 
 
 def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
@@ -83,15 +82,15 @@ def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
 
 def _download_avatar(url: str, path: Path) -> bool:
     try:
-        logger.debug(f'{LOG_PREFIX} 开始下载头像: {redact_url(url)} -> {path}')
+        logger.debug(f'{LOG_PREFIX} 开始下载头像: {url} -> {path}')
         path.parent.mkdir(parents=True, exist_ok=True)
         request = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         # 8 秒超时：头像属于可选素材，长时间阻塞会拖慢整个群友抽取流程。
-        with safe_urlopen(request, timeout=8) as response:
+        with urlopen(request, timeout=8) as response:
             # 多读 1 字节用于判定是否超限，避免把超大响应整个载入内存。
             data = response.read(2 * 1024 * 1024 + 1)
         if not data or len(data) > 2 * 1024 * 1024:
-            logger.warning(f'{LOG_PREFIX} 下载头像数据无效或体积过大: {redact_url(url)}')
+            logger.warning(f'{LOG_PREFIX} 下载头像数据无效或体积过大: {url}')
             return False
         # 先写临时文件再原子替换：并发读方不会读到只写了一半的图片。
         tmp_path = path.with_suffix('.tmp')
@@ -99,9 +98,9 @@ def _download_avatar(url: str, path: Path) -> bool:
         tmp_path.replace(path)
         logger.debug(f'{LOG_PREFIX} 头像下载完成: {path}')
         return True
-    except (OSError, ValueError, HTTPError, URLError, TimeoutError) as exc:
+    except (OSError, HTTPError, URLError, TimeoutError) as exc:
         # 网络与磁盘异常一律降级为失败：调用方会继续尝试其它候选，不需要异常穿透。
-        logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {redact_url(url)} -> {exc}')
+        logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {url} -> {exc}')
         return False
 
 
@@ -115,7 +114,7 @@ def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
 
     source = _valid_member_text(avatar_source)
     if source.startswith(('http://', 'https://')):
-        if source and _download_avatar(source, cache_path):
+        if _download_avatar(source, cache_path):
             return str(cache_path)
     elif source:
         try:

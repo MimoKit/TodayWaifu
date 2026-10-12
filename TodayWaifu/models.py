@@ -16,9 +16,7 @@ from sqlalchemy import Table, UniqueConstraint, func, tuple_
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from gsuid_core.server import on_core_start_before
 from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
@@ -50,34 +48,6 @@ def _conflict_update_columns(statement: Insert) -> dict[str, ColumnElement[objec
     """构造冲突时的覆盖列集合；主键与业务键不参与覆盖，避免行被改写为另一业务键。"""
     excluded: _ExcludedColumns = statement.excluded
     return {column: excluded[column] for column in _CONFLICT_UPDATE_COLUMNS}
-
-
-def _upsert_statement(
-    cls: type['DailyWifeRecord'],
-    session: AsyncSession,
-    values: object,
-) -> Insert:
-    """Construct a dialect-aware upsert for the configured Core database."""
-    bind = session.bind
-    dialect_name = bind.dialect.name if bind is not None else engine.dialect.name
-    if dialect_name == 'sqlite':
-        statement = sqlite_insert(cls).values(values)
-        return statement.on_conflict_do_update(
-            index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
-            set_=_conflict_update_columns(statement),
-        )
-    if dialect_name == 'postgresql':
-        statement = postgresql_insert(cls).values(values)
-        return statement.on_conflict_do_update(
-            index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
-            set_=_conflict_update_columns(statement),
-        )
-    if dialect_name == 'mysql':
-        statement = mysql_insert(cls).values(values)
-        return statement.on_duplicate_key_update(
-            **{column: getattr(statement.inserted, column) for column in _CONFLICT_UPDATE_COLUMNS}
-        )
-    raise RuntimeError(f'Unsupported database dialect: {dialect_name}')
 
 
 # upsert 冲突时需要覆盖的业务列：须与 _row_from_value 产出的列一致，漏列会使旧值残留。
@@ -245,15 +215,20 @@ class DailyWifeRecord(BaseModel, table=True):
             'updated_at': row.updated_at,
             'payload': row.payload,
         }
-        values = {
-            'day': day,
-            'bot_id': bot_id,
-            'group_id': group_id,
-            'bucket': bucket,
-            'user_id': str(user_key),
+        statement = sqlite_insert(cls).values(
+            day=day,
+            bot_id=bot_id,
+            group_id=group_id,
+            bucket=bucket,
+            user_id=str(user_key),
             **values,
-        }
-        await session.execute(_upsert_statement(cls, session, values))
+        )
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=values,
+            )
+        )
 
     @classmethod
     @with_session
@@ -302,7 +277,14 @@ class DailyWifeRecord(BaseModel, table=True):
 
         if not values:
             return
-        await session.execute(_upsert_statement(cls, session, values))
+        statement = sqlite_insert(cls).values(values)
+        update_columns = _conflict_update_columns(statement)
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
 
     @classmethod
     async def _upsert_rows(
@@ -334,7 +316,14 @@ class DailyWifeRecord(BaseModel, table=True):
 
         if not values:
             return
-        await session.execute(_upsert_statement(cls, session, values))
+        statement = sqlite_insert(cls).values(values)
+        update_columns = _conflict_update_columns(statement)
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
 
     @classmethod
     async def _delete_rows(
@@ -449,7 +438,14 @@ class DailyWifeRecord(BaseModel, table=True):
 
         if not values:
             return
-        await session.execute(_upsert_statement(cls, session, values))
+        statement = sqlite_insert(cls).values(values)
+        update_columns = _conflict_update_columns(statement)
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=['day', 'bot_id', 'group_id', 'bucket', 'user_id'],
+                set_=update_columns,
+            )
+        )
 
     @classmethod
     @with_session
