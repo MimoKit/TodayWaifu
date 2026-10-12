@@ -53,6 +53,7 @@ from .constants import (
     _apply_no_r18,
     _image_source,
 )
+from .version import TodayWaifu_version
 from .file_cache import read_url_cache, write_url_cache
 from .image_input import redact_url, safe_urlopen
 from .circuit_breaker import CircuitBreaker
@@ -120,7 +121,7 @@ def _gallery_api_url() -> str:
 
 
 def _request_headers() -> dict[str, str]:
-    headers = {'User-Agent': 'TodayWaifu/1.0'}
+    headers = {'User-Agent': f'TodayWaifu/{TodayWaifu_version}'}
     token = str(_cfg('DailyWifeGalleryToken') or '').strip()
     if token:
         headers['X-Gallery-Token'] = token

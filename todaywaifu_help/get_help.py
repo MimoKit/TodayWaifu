@@ -10,6 +10,8 @@ from PIL import Image
 from gsuid_core.help.model import PluginHelp
 from gsuid_core.help.draw_new_plugin_help import get_new_help
 
+from ..TodayWaifu.version import TodayWaifu_version
+
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 ICON = PLUGIN_DIR / 'ICON.png'
 HELP_DATA = PLUGIN_DIR / 'help.json'
@@ -156,7 +158,7 @@ async def get_help(
 
     return await get_new_help(
         plugin_name='TodayWaifu',
-        plugin_info={'v1.0': ''},
+        plugin_info={f'v{TodayWaifu_version}': ''},
         plugin_icon=plugin_icon,
         plugin_help=plugin_help,
         plugin_prefix=plugin_prefix,

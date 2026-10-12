@@ -44,6 +44,7 @@ from ..todaywaifu_help.get_help import (
     resolve_style_path,
     attach_command_icons,
 )
+from .version import TodayWaifu_version
 
 # 资源签名：路径、mtime_ns、大小；缺失时为 None
 # 用 mtime_ns 而非秒级 mtime：同秒内的两次写入在秒级精度下无法区分，会漏掉重绘。
@@ -216,7 +217,7 @@ async def _render_help(
         )
         return await get_new_help(
             plugin_name='TodayWaifu',
-            plugin_info={'v1.0': ''},
+            plugin_info={f'v{TodayWaifu_version}': ''},
             plugin_icon=icon,
             plugin_help=data,
             plugin_prefix='',
