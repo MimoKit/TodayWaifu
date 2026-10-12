@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 import asyncio
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from gsuid_core.logger import logger
 
@@ -137,7 +138,7 @@ def seconds_until_prefetch(now: datetime | None = None) -> float:
 
     已过当晚预热时刻但仍在预热窗口内时返回一个很小的值，让刚启动的进程立刻补跑。
     """
-    current = now or datetime.now()
+    current = now or datetime.now(ZoneInfo('Asia/Shanghai'))
     target = current.replace(hour=PREFETCH_HOUR, minute=PREFETCH_MINUTE, second=0, microsecond=0)
     if current < target:
         return (target - current).total_seconds()
@@ -177,7 +178,7 @@ async def _prefetch_loop() -> None:
         if delay <= 1.0:
             # 本日窗口内已补跑，直接等待下一日，避免每秒重复全量预热。
             # 以次日 00:00 为基准计算，跨日翻转后目标时刻才落回当天的预热时刻
-            next_day = datetime.now() + timedelta(days=1)
+            next_day = datetime.now(ZoneInfo('Asia/Shanghai')) + timedelta(days=1)
             next_day = next_day.replace(hour=0, minute=0, second=0, microsecond=0)
             delay = seconds_until_prefetch(next_day)
         logger.debug(f'{LOG_PREFIX} 下次图库预热将在 {delay / 60:.1f} 分钟后开始')
