@@ -32,6 +32,7 @@ from .state import (
     _IMAGE_DOWNLOAD_SEMAPHORE,
 )
 from .domain import RoleCandidate
+from .version import TodayWaifu_version
 from .executor import run_blocking
 from .payloads import GalleryPayload
 from .constants import (
@@ -53,7 +54,6 @@ from .constants import (
     _apply_no_r18,
     _image_source,
 )
-from .version import TodayWaifu_version
 from .file_cache import read_url_cache, write_url_cache
 from .image_input import redact_url, safe_urlopen
 from .circuit_breaker import CircuitBreaker

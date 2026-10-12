@@ -27,6 +27,7 @@ from .shared import (
     _safe_send,
     register_help,
 )
+from .version import TodayWaifu_version
 from .executor import run_blocking
 from ..daily_wife_config import DailyWifeShowConfig
 
@@ -44,7 +45,6 @@ from ..todaywaifu_help.get_help import (
     resolve_style_path,
     attach_command_icons,
 )
-from .version import TodayWaifu_version
 
 # 资源签名：路径、mtime_ns、大小；缺失时为 None
 # 用 mtime_ns 而非秒级 mtime：同秒内的两次写入在秒级精度下无法区分，会漏掉重绘。
