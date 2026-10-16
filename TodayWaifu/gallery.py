@@ -442,7 +442,11 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
     role_mode = _role_mode(mode)
     source = _image_source(role_mode)
     now = time.time()
-    cache_key = f'{source}:{role_mode}'
+    # 键前缀 `wuwa:` 用于与 `_load_local_candidates` 的 `local:{role_mode}` 区分：后者缓存
+    # 的是 (候选, 失败原因) 二元组，本函数缓存的是候选元组本身。两处曾共用 `local:` 键，
+    # local 模式写入候选元组后，图库模式的本地补位读到该值即抛
+    # `ValueError: too many values to unpack (expected 2)`（候选数 ≠ 2 时必现）。
+    cache_key = f'wuwa:{source}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and now - cached[0] < CACHE_TTL_SECONDS:
         logger.debug(f'{LOG_PREFIX} 使用缓存的候选角色列表: {cache_key}')
@@ -509,7 +513,9 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
 
 async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
-    cache_key = f'{_image_source(role_mode)}:{role_mode}'
+    # 与 `_load_wuwa_candidates_uncached` 保持同键（含 wuwa: 前缀），否则在途去重查不到
+    # 对方登记的任务，同一份候选会被重复加载
+    cache_key = f'wuwa:{_image_source(role_mode)}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1], None
@@ -536,8 +542,8 @@ async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate
 
 async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     source = _image_source('nte')
-    # 键使用 nte: 前缀而非 local:nte：后者与 `_load_local_candidates` 使用的缓存键相同，
-    # 两个加载器写入的数据结构并不一致，共用键会相互覆盖
+    # 键使用独立的 nte: 前缀：本函数缓存候选元组，`_load_local_candidates` 缓存的是
+    # (候选, 原因) 二元组，两个加载器写入的结构并不一致，共用键会相互覆盖
     cache_key = f'nte:{source}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
