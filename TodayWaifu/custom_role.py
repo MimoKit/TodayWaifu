@@ -9,8 +9,6 @@
 """
 from __future__ import annotations
 
-import threading
-
 from .shared import (
     LOG_PREFIX,
     IMAGE_EXTENSIONS,
@@ -43,7 +41,6 @@ from .shared import (
     _invalidate_candidate_cache,
 )
 from .executor import run_blocking
-from .upload_io import MAX_ROLE_NAME_LENGTH, MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -51,8 +48,6 @@ from .image_input import (
     detect_image_suffix,
     image_suffix_from_source,
 )
-
-_CUSTOM_ROLE_LOCK = threading.RLock()
 
 
 def _role_ids_by_name(role_map: dict[str, str], role_name: str) -> tuple[str, ...]:
@@ -62,7 +57,7 @@ def _role_ids_by_name(role_map: dict[str, str], role_name: str) -> tuple[str, ..
     # 导致同名多 ID 时选中的不是最小 ID。
     target = _normalize_role_name(role_name)
     ids = [role_id for role_id, name in role_map.items() if _normalize_role_name(name) == target]
-    return tuple(sorted(ids, key=lambda item: (0, int(item)) if item.isdigit() else (1, item)))
+    return tuple(sorted(ids, key=lambda item: int(item) if item.isdigit() else item))
 
 
 def _next_custom_role_id(role_map: dict[str, str], pile_root: Path) -> str:
@@ -105,16 +100,9 @@ def _clean_upload_role_name(raw: str, strip_wife_suffix: bool = False) -> str:
 
 
 def _create_or_get_custom_role(role_name: str) -> tuple[str, bool, str | None]:
-    with _CUSTOM_ROLE_LOCK:
-        return _create_or_get_custom_role_locked(role_name)
-
-
-def _create_or_get_custom_role_locked(role_name: str) -> tuple[str, bool, str | None]:
     role_name = _clean_upload_role_name(role_name)
     if not role_name:
         return '', False, '请输入角色名，例如：创建老婆 达妮娅'
-    if len(role_name) > MAX_ROLE_NAME_LENGTH:
-        return '', False, f'角色名最多 {MAX_ROLE_NAME_LENGTH} 个字符。'
 
     map_path = _writable_role_map_path()
     # 对照表缺失时按空表继续：首次使用插件时文件尚不存在，这是正常路径而非错误。
@@ -134,6 +122,7 @@ def _create_or_get_custom_role_locked(role_name: str) -> tuple[str, bool, str | 
     # 目录先于图片创建，使上传流程只需写入文件，无需再关心目录状态。
     (pile_root / role_id).mkdir(parents=True, exist_ok=True)
     # 对照表已变更，候选缓存中不含新角色，必须失效后才会在下一次抽卡中出现。
+    _invalidate_candidate_cache()
     logger.info(f'{LOG_PREFIX} 创建自定义老婆角色: {role_name} -> {role_id}')
     return role_id, True, None
 
@@ -206,18 +195,14 @@ def _custom_role_name_by_id(role_id: str) -> str:
 
 
 def _remove_custom_role_map_ids(role_ids: tuple[str, ...]) -> None:
-    with _CUSTOM_ROLE_LOCK:
-        _remove_custom_role_map_ids_locked(role_ids)
-
-
-def _remove_custom_role_map_ids_locked(role_ids: tuple[str, ...]) -> None:
     # 无 ID 时不读盘：空操作若仍读写对照表，会在文件缺失时产生无意义的 IO。
     if not role_ids:
         return
     map_path = _writable_role_map_path()
     if not map_path.is_file():
         return
-    # Caller holds the shared role lock throughout read/modify/replace.
+    # 读改写之间无显式锁：本模块的删除均由命令处理器串行触发，且写入使用原子替换，
+    # 最坏情况是两个并发删除各自基于旧快照写回，故仅在确有变更时才写盘以缩小窗口。
     role_id_set = {str(role_id) for role_id in role_ids}
     role_map = _load_role_map(map_path)
     kept = {key: value for key, value in role_map.items() if key not in role_id_set}
@@ -298,11 +283,6 @@ def _resolve_custom_role_for_delete(role_name: str) -> tuple[str, str, list[tupl
 
 
 def _delete_custom_role(role_id: str) -> int:
-    with _CUSTOM_ROLE_LOCK:
-        return _delete_custom_role_locked(role_id)
-
-
-def _delete_custom_role_locked(role_id: str) -> int:
     role_dir = _writable_role_pile_root() / str(role_id)
     # 先统计再删除：目录一旦移除就无法再得知图片数量，而返回值要用于结果提示。
     image_count = len(_custom_role_image_map(role_id))
@@ -311,6 +291,7 @@ def _delete_custom_role_locked(role_id: str) -> int:
     # 目录与对照表条目必须一并清理；只删其中一项会留下「有表无图」的空角色，
     # 使其在列表中可见但抽取时无图可用。
     _remove_custom_role_map_ids((str(role_id),))
+    _invalidate_candidate_cache()
     return image_count
 
 
@@ -351,20 +332,16 @@ def _parse_delete_custom_image_text(text: str) -> tuple[str, str]:
     return role_name, hash_id
 
 
-def _save_upload_image_ref(
-    role_dir: Path, role_id: str, source: str, index: int,
-    max_bytes: int = UPLOAD_IMAGE_MAX_BYTES,
-) -> Path | None:
-    image_data = read_image_bytes(source, max_bytes)
+def _save_upload_image_ref(role_dir: Path, role_id: str, source: str, index: int) -> Path | None:
+    image_data = _read_upload_image_bytes(source)
     if image_data is None:
         return None
     data, suffix = image_data
     # 目录按需创建：角色可能由上传命令自动创建，此时目录状态不由调用方保证。
-    with _CUSTOM_ROLE_LOCK:
-        mapping = _load_role_map(_writable_role_map_path())
-        if role_id not in mapping:
-            return None
-        return save_upload_bytes(role_dir, role_id, suffix, data)
+    role_dir.mkdir(parents=True, exist_ok=True)
+    path = _unique_upload_image_path(role_dir, role_id, suffix, index)
+    path.write_bytes(data)
+    return path
 
 
 
@@ -382,7 +359,6 @@ async def _send_create_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None
     # 用 created 区分「新建」与「已存在」：用户需要知道自己输入的名字是否被复用，
     # 否则会误以为每次命令都创建了新角色。
     if created:
-        _invalidate_candidate_cache()
         await _safe_send(bot,f'自定义老婆创建成功\n角色ID：{role_id}')
     else:
         await _safe_send(bot,f'自定义老婆已存在\n角色ID：{role_id}')
@@ -411,23 +387,16 @@ async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | No
         return await _safe_send(bot,error)
 
     role_dir = _writable_role_pile_root() / role_id
-    if created:
-        _invalidate_candidate_cache()
     saved: list[Path] = []
     failed = 0
-    remaining = MAX_UPLOAD_TOTAL_BYTES
     # 逐张保存并累计失败数，而不是遇到失败即中止：一条消息可能同时含多张图，
     # 其中个别图片读取失败不应导致已成功写入的图片被回滚或丢弃。
     for index, image_ref in enumerate(image_refs, 1):
-        path = await run_blocking(
-            _save_upload_image_ref, role_dir, role_id, image_ref, index,
-            min(UPLOAD_IMAGE_MAX_BYTES, remaining),
-        )
+        path = await run_blocking(_save_upload_image_ref, role_dir, role_id, image_ref, index)
         if path is None:
             failed += 1
         else:
             saved.append(path)
-            remaining -= await run_blocking(lambda: path.stat().st_size)
 
     if not saved:
         return await _safe_send(bot,f'【{role_name}】上传图片失败，请确认消息里附带的是图片。')
@@ -505,7 +474,6 @@ async def _send_confirm_delete_custom_wife_role(bot: Bot, ev: Event) -> list[str
 
     # 实际删除数取自磁盘现状，与提示中的 image_count 可能不同（等待期间可能新增图片）。
     deleted_count = await run_blocking(_delete_custom_role, role_id)
-    _invalidate_candidate_cache()
     _clear_pending_custom_role_delete(ev)
     await _safe_send(bot, f'已删除自定义老婆【{role_name}】\n角色ID：{role_id}\n删除图片：{deleted_count} 张')
 

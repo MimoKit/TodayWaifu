@@ -96,22 +96,6 @@ class ImageInputTests(unittest.TestCase):
         image_input = _load_module()
         self.assertEqual(image_input.image_hash_id(Path("/tmp/example.png")), "ca75a0b8")
 
-    def test_validate_remote_image_url_allows_trusted_hostnames_even_with_private_ip(self) -> None:
-        # 官方图库域名在遭遇本地代理/Fake-IP/DNS污染被解析为内网保留IP时，白名单域名仍应放行
-        image_input = _load_module()
-        fake_addr = [(None, None, None, None, ("198.18.0.1", 443))]
-        with patch.object(image_input.socket, "getaddrinfo", return_value=fake_addr):
-            image_input.validate_remote_image_url("https://twfapi.xlinxc.cn/api/loli/roles")
-            image_input.validate_remote_image_url("https://twf.xlinxc.cn/pic.webp")
-
-    def test_validate_remote_image_url_rejects_untrusted_private_ip(self) -> None:
-        # 非白名单域名解析到内网IP时必须严格拦截
-        image_input = _load_module()
-        fake_addr = [(None, None, None, None, ("192.168.1.1", 443))]
-        with patch.object(image_input.socket, "getaddrinfo", return_value=fake_addr):
-            with self.assertRaises(ValueError):
-                image_input.validate_remote_image_url("https://malicious.example.com/pic.png")
-
 
 if __name__ == "__main__":
     unittest.main()

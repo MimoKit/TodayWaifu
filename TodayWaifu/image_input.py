@@ -1,29 +1,18 @@
 from __future__ import annotations
 
-import ssl
 import base64
-import socket
 import hashlib
 import binascii
-import ipaddress
 from io import BytesIO
 from typing import Protocol, runtime_checkable
 from pathlib import Path
-from http.client import HTTPMessage, HTTPResponse, HTTPSConnection
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
-from urllib.request import (
-    Request,
-    HTTPSHandler,
-    ProxyHandler,
-    HTTPRedirectHandler,
-    build_opener,
-)
+from urllib.request import Request, urlopen
 
 from PIL import Image, UnidentifiedImageError
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-MAX_IMAGE_REFS = 20
 
 
 @runtime_checkable
@@ -59,102 +48,7 @@ def collect_image_refs(event: ImageBearingEvent) -> tuple[str, ...]:
     image = getattr(event, "image", None)
     if isinstance(image, str) and image.strip():
         refs.append(image.strip())
-    return tuple(dict.fromkeys(refs))[:MAX_IMAGE_REFS]
-
-
-TRUSTED_HOSTNAMES = {
-    'twfapi.xlinxc.cn',
-    'twf.xlinxc.cn',
-}
-
-
-def _is_blocked_ip(address: str) -> bool:
-    ip = ipaddress.ip_address(address)
-    return (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
-    )
-
-
-def _public_addresses(source: str) -> tuple[str, ...]:
-    """只允许访问公共 HTTPS 图片地址，并拒绝内网/元数据网段。"""
-    parsed = urlparse(source)
-    if parsed.scheme.lower() != 'https' or not parsed.hostname:
-        raise ValueError('仅支持公共 HTTPS 图片地址。')
-    if parsed.username or parsed.password:
-        raise ValueError('图片地址不允许携带用户认证信息。')
-    hostname = parsed.hostname.strip().lower()
-    if hostname in {'localhost', 'metadata.google.internal'} or hostname.endswith('.local'):
-        raise ValueError('图片地址指向受限主机。')
-    try:
-        addresses = {
-            info[4][0]
-            for info in socket.getaddrinfo(hostname, parsed.port or 443, type=socket.SOCK_STREAM)
-        }
-    except (OSError, ValueError) as exc:
-        raise ValueError('图片地址无法解析。') from exc
-    if not addresses:
-        raise ValueError('图片地址无法解析。')
-    if hostname in TRUSTED_HOSTNAMES:
-        return tuple(sorted(addresses))
-    if any(_is_blocked_ip(address) for address in addresses):
-        raise ValueError('图片地址指向受限网络。')
-    return tuple(sorted(addresses))
-
-
-def validate_remote_image_url(source: str) -> None:
-    _public_addresses(source)
-
-
-class _SafeRedirectHandler(HTTPRedirectHandler):
-    def redirect_request(
-        self, req: Request, fp: HTTPResponse, code: int,
-        msg: str, headers: HTTPMessage, newurl: str,
-    ) -> Request | None:
-        validate_remote_image_url(newurl)
-        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
-        if redirected is not None and urlparse(req.full_url).netloc != urlparse(newurl).netloc:
-            redirected.remove_header('X-gallery-token')
-            redirected.remove_header('Authorization')
-        return redirected
-
-
-class _SafeHTTPSHandler(HTTPSHandler):
-    def https_open(self, request: Request) -> HTTPResponse:
-        addresses = _public_addresses(request.full_url)
-
-        def connection(host: str, timeout: float) -> HTTPSConnection:
-            result = HTTPSConnection(host, timeout=timeout, context=ssl.create_default_context())
-
-            def connect(address: tuple[str, int], timeout: float,
-                        source_address: tuple[str, int] | None = None) -> socket.socket:
-                # Connect to the already validated IP. TLS still verifies the original
-                # hostname, so a second DNS lookup cannot redirect us into a private network.
-                return socket.create_connection((addresses[0], address[1]), timeout, source_address)
-
-            result._create_connection = connect
-            return result
-
-        return self.do_open(connection, request)
-
-
-_SAFE_IMAGE_OPENER = build_opener(ProxyHandler({}), _SafeRedirectHandler(), _SafeHTTPSHandler())
-
-
-def safe_urlopen(request: Request, timeout: float) -> HTTPResponse:
-    validate_remote_image_url(request.full_url)
-    return _SAFE_IMAGE_OPENER.open(request, timeout=timeout)
-
-
-def redact_url(url: str) -> str:
-    """Remove credentials, query and fragment before logging a remote reference."""
-    parsed = urlparse(url)
-    host = (parsed.hostname or '').replace(':', '_')
-    return f'{parsed.scheme}://{host}{parsed.path}'
+    return tuple(dict.fromkeys(refs))
 
 
 def image_suffix_from_source(source: str) -> str:
@@ -253,10 +147,9 @@ def read_image_bytes(source: str, max_bytes: int) -> tuple[bytes, str] | None:
             if text.startswith("link://"):
                 text = text[7:]
             if text.startswith(("http://", "https://")):
-                validate_remote_image_url(text)
                 # 多读一个字节用于判定是否超限；超时 15 秒，避免远端挂起占住调用方。
                 request = Request(text, headers={"User-Agent": "Mozilla/5.0"})
-                with safe_urlopen(request, timeout=15) as response:
+                with urlopen(request, timeout=15) as response:
                     data = response.read(max_bytes + 1)
             else:
                 path = Path(text)

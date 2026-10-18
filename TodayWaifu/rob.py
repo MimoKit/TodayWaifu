@@ -61,15 +61,11 @@ def _rob_success_template(kind: str) -> str:
 def _build_rob_success_text(role: RoleCandidate, target_user_id: str, kind: str) -> str:
     # 模板变量由元数据约定：{name} 角色名、{role_id} 标识、{target} 被抢用户 ID
     template = _rob_success_template(kind)
-    values = {
-        'name': role.name,
-        'role_id': '/'.join(role.role_ids),
-        'target': target_user_id,
-    }
-    try:
-        return template.format(**values)
-    except (IndexError, KeyError, ValueError):
-        return _daily_kind_metadata(kind).rob_success_default.format(**values)
+    return template.format(
+        name=role.name,
+        role_id='/'.join(role.role_ids),
+        target=target_user_id,
+    )
 
 
 def _rob_attempt_key(kind: str, user_id: str) -> str:

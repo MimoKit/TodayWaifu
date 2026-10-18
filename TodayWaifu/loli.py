@@ -53,7 +53,6 @@ from .shared import (
     _image_message_from_path,
 )
 from .executor import run_blocking
-from .upload_io import MAX_UPLOAD_TOTAL_BYTES, save_upload_bytes
 from .image_input import (
     image_hash_id,
     read_image_bytes,
@@ -160,13 +159,15 @@ def _unique_loli_path(root: Path, suffix: str, index: int) -> Path:
         counter += 1
 
 
-def _save_loli_image(source: str, index: int, max_bytes: int = UPLOAD_IMAGE_MAX_BYTES) -> Path | None:
-    result = read_image_bytes(source, max_bytes)
+def _save_loli_image(source: str, index: int) -> Path | None:
+    result = _read_loli_image_bytes(source)
     if result is None:
         return None
     data, suffix = result
     root = _loli_image_root()
-    path = save_upload_bytes(root, 'loli', suffix, data)
+    root.mkdir(parents=True, exist_ok=True)
+    path = _unique_loli_path(root, suffix, index)
+    path.write_bytes(data)
     # 落盘后立即失效路径缓存：否则新图片在 TTL 内不可见，用户会误判上传失败
     _invalidate_loli_paths_cache()
     return path
@@ -216,7 +217,7 @@ def _parse_loli_image_urls(payload: GalleryPayload) -> tuple[str, ...]:
                 raise RuntimeError('萝莉图库接口的图片缺少 url 字符串。')
             image_url = image_data['url'].strip()
             # 仅接受绝对 HTTP(S) 地址：相对路径与其它协议无法被发送器下载，会在发送阶段才暴露
-            if not image_url.startswith('https://'):
+            if not image_url.startswith(('http://', 'https://')):
                 raise RuntimeError('萝莉图库接口返回了无效的图片 URL。')
             # 去重保留首次出现顺序：重复项若原样保留，会让同一张图按出现次数获得更高抽取权重
             if image_url not in seen_urls:
@@ -435,16 +436,14 @@ async def _send_upload_loli(bot: Bot, ev: Event) -> None:
 
     saved: list[Path] = []
     failed = 0
-    remaining = MAX_UPLOAD_TOTAL_BYTES
     # 单张失败不中断整批：附件中可能混有非图片内容或超出体积上限的图片，已成功的部分仍应
     # 落盘并回报，失败数量单独统计后附在结果里
     for i, ref in enumerate(refs, 1):
-        path = await run_blocking(_save_loli_image, ref, i, min(UPLOAD_IMAGE_MAX_BYTES, remaining))
+        path = await run_blocking(_save_loli_image, ref, i)
         if path is None:
             failed += 1
         else:
             saved.append(path)
-            remaining -= await run_blocking(lambda: path.stat().st_size)
 
     if not saved:
         return await _send_loli_text(bot, '上传失败，请确认消息里附带的是图片。')

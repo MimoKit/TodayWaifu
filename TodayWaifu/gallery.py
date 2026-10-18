@@ -7,7 +7,7 @@ import random
 import asyncio
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
-from urllib.request import Request
+from urllib.request import Request, urlopen
 
 from gsuid_core.logger import logger
 
@@ -55,7 +55,6 @@ from .constants import (
     _image_source,
 )
 from .file_cache import read_url_cache, write_url_cache
-from .image_input import redact_url, safe_urlopen
 from .circuit_breaker import CircuitBreaker
 
 
@@ -83,7 +82,7 @@ def _parse_pgr_gallery_candidates(payload: GalleryPayload) -> tuple[RoleCandidat
         images = tuple(
             str(image.get('url') or '').strip()
             for image in item.get('images') or []
-            if isinstance(image, dict) and str(image.get('url') or '').strip().startswith('https://')
+            if isinstance(image, dict) and str(image.get('url') or '').strip().startswith(('http://', 'https://'))
         )
         if name and images:
             candidates.append(RoleCandidate(name=name, role_ids=role_ids, images=images))
@@ -130,11 +129,7 @@ def _request_headers() -> dict[str, str]:
 
 def _http_get(url: str, *, timeout: int = 15, max_bytes: int = MAX_GALLERY_RESPONSE_BYTES) -> bytes:
     request = Request(url, headers=_request_headers())
-    try:
-        response = safe_urlopen(request, timeout=timeout)
-    except ValueError as exc:
-        raise OSError(str(exc)) from exc
-    with response as resp:
+    with urlopen(request, timeout=timeout) as resp:
         content_length = resp.headers.get('Content-Length')
         if content_length:
             try:
@@ -167,9 +162,6 @@ _HTTP_BREAKER = CircuitBreaker(
 
 def _circuit_key(url: str) -> str:
     return urlparse(url).netloc or url
-
-
-_redact_url = redact_url
 
 
 def gallery_circuit_state() -> tuple[bool, float]:
@@ -218,7 +210,7 @@ def _http_get_with_retry(
             f'图库接口连续失败，已熔断 {_HTTP_BREAKER.retry_after(key):.0f} 秒后重试。'
         )
 
-    last_exc: Exception = RuntimeError('请求远程资源失败。')
+    last_exc: Exception = RuntimeError(f'请求 {url} 失败。')
     for attempt in range(retries + 1):
         try:
             body = _http_get(url, timeout=timeout, max_bytes=max_bytes)
@@ -234,7 +226,7 @@ def _http_get_with_retry(
         if attempt < retries:
             delay = _retry_delay(attempt)
             logger.warning(
-                f'{LOG_PREFIX} 请求远程资源失败(第{attempt + 1}/{retries}次重试): {_redact_url(url)}，'
+                f'{LOG_PREFIX} 请求远程资源失败(第{attempt + 1}/{retries}次重试): {url}，'
                 f'{delay:.1f} 秒后重试: {last_exc}'
             )
             time.sleep(delay)
@@ -327,8 +319,8 @@ def _parse_role_candidates(
                 url = str(image_item.get('url') or '').strip()
             else:
                 url = str(image_item or '').strip()
-            # 仅接受 HTTPS 图片地址：本地路径由磁盘扫描负责，相对路径也无法在下载侧解析。
-            if url.startswith('https://'):
+            # 仅接受 http(s) 图片地址：本地路径由磁盘扫描负责，相对路径也无法在下载侧解析
+            if url.startswith(('http://', 'https://')):
                 images.append(url)
         if images:
             candidates.append(RoleCandidate(name=name, role_ids=allowed_role_ids, images=tuple(images)))
@@ -348,7 +340,7 @@ def _auth_error_reason(exc: HTTPError, *, what: str) -> str:
     code = getattr(exc, 'code', 0)
     detail = ''
     try:
-        raw = exc.read(64 * 1024 + 1)
+        raw = exc.read()
         if raw:
             payload = json.loads(raw.decode('utf-8', 'replace'))
             if isinstance(payload, dict):
@@ -401,7 +393,7 @@ async def _download_image(url: str) -> bytes:
     cache_root = _gallery_image_cache_root()
     cached = await run_blocking(read_url_cache, cache_root, url)
     if cached is not None:
-        logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {_redact_url(url)}')
+        logger.debug(f'{LOG_PREFIX} 命中图库图片磁盘缓存: {url}')
         return cached
 
     task = _IMAGE_INFLIGHT.get(url)
@@ -450,7 +442,11 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
     role_mode = _role_mode(mode)
     source = _image_source(role_mode)
     now = time.time()
-    cache_key = f'{source}:{role_mode}'
+    # 键前缀 `wuwa:` 用于与 `_load_local_candidates` 的 `local:{role_mode}` 区分：后者缓存
+    # 的是 (候选, 失败原因) 二元组，本函数缓存的是候选元组本身。两处曾共用 `local:` 键，
+    # local 模式写入候选元组后，图库模式的本地补位读到该值即抛
+    # `ValueError: too many values to unpack (expected 2)`（候选数 ≠ 2 时必现）。
+    cache_key = f'wuwa:{source}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and now - cached[0] < CACHE_TTL_SECONDS:
         logger.debug(f'{LOG_PREFIX} 使用缓存的候选角色列表: {cache_key}')
@@ -517,7 +513,9 @@ async def _load_wuwa_candidates_uncached(mode: str = 'wife') -> tuple[tuple[Role
 
 async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     role_mode = _role_mode(mode)
-    cache_key = f'{_image_source(role_mode)}:{role_mode}'
+    # 与 `_load_wuwa_candidates_uncached` 保持同键（含 wuwa: 前缀），否则在途去重查不到
+    # 对方登记的任务，同一份候选会被重复加载
+    cache_key = f'wuwa:{_image_source(role_mode)}:{role_mode}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1], None
@@ -544,8 +542,8 @@ async def _load_wuwa_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate
 
 async def _load_nte_candidates() -> tuple[tuple[RoleCandidate, ...] | None, str | None]:
     source = _image_source('nte')
-    # 键使用 nte: 前缀而非 local:nte：后者与 `_load_local_candidates` 使用的缓存键相同，
-    # 两个加载器写入的数据结构并不一致，共用键会相互覆盖
+    # 键使用独立的 nte: 前缀：本函数缓存候选元组，`_load_local_candidates` 缓存的是
+    # (候选, 原因) 二元组，两个加载器写入的结构并不一致，共用键会相互覆盖
     cache_key = f'nte:{source}'
     cached = CANDIDATE_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < CACHE_TTL_SECONDS:

@@ -16,7 +16,7 @@ import time
 import random
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
-from urllib.request import Request
+from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,7 +28,6 @@ from .paths import _user_key, _daily_rng
 from .state import _MEMBER_CACHE
 from .domain import WifeRecord, MemberCandidate
 from .constants import LOG_PREFIX, _cfg_bool, _cfg_probability
-from .image_input import redact_url, safe_urlopen
 from .display_name import usable_name, placeholder_name
 
 
@@ -105,16 +104,16 @@ def _download_member_avatar(url: str) -> bytes | None:
     """
     request_url = _cache_busted_avatar_url(url)
     try:
-        logger.debug(f'{LOG_PREFIX} 开始下载头像: {redact_url(request_url)}')
+        logger.debug(f'{LOG_PREFIX} 开始下载头像: {request_url}')
         request = Request(request_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with safe_urlopen(request, timeout=8) as response:
+        with urlopen(request, timeout=8) as response:
             # 多读 1 字节用于判定是否超限，避免把超大响应整个载入内存。
             data = response.read(2 * 1024 * 1024 + 1)
     except (OSError, ValueError, HTTPError, URLError, TimeoutError) as exc:
-        logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {redact_url(url)} -> {exc}')
+        logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {url} -> {exc}')
         return None
     if not data or len(data) > 2 * 1024 * 1024:
-        logger.warning(f'{LOG_PREFIX} 头像数据无效或体积过大: {redact_url(url)}')
+        logger.warning(f'{LOG_PREFIX} 头像数据无效或体积过大: {url}')
         return None
     return data
 

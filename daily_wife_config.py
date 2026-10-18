@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-import json
-import tempfile
 from pathlib import Path
 
 from gsuid_core.data_store import get_res_path
@@ -42,6 +39,7 @@ _LEGACY_KEYS_TO_REMOVE = [
 # 都会失效。异常时不中断加载，代价是本次清理未生效（下次启动会重试）。
 if CONFIG_PATH.is_file():
     try:
+        import json
         _raw_data = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
         _raw_changed = False
         for _k in _LEGACY_KEYS_TO_REMOVE:
@@ -49,22 +47,9 @@ if CONFIG_PATH.is_file():
                 del _raw_data[_k]
                 _raw_changed = True
         if _raw_changed:
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            descriptor, temporary_name = tempfile.mkstemp(
-                dir=CONFIG_PATH.parent, prefix=f'.{CONFIG_PATH.name}.', suffix='.tmp'
-            )
-            temporary = Path(temporary_name)
-            try:
-                with os.fdopen(descriptor, 'w', encoding='utf-8') as file:
-                    json.dump(_raw_data, file, ensure_ascii=False, indent=4)
-                    file.write('\n')
-                os.replace(temporary, CONFIG_PATH)
-            finally:
-                temporary.unlink(missing_ok=True)
-    except (OSError, json.JSONDecodeError) as exc:
-        from gsuid_core.logger import logger
-
-        logger.warning(f'[鸣潮今日老婆] 配置迁移失败，保留原文件: {exc}')
+            CONFIG_PATH.write_text(json.dumps(_raw_data, ensure_ascii=False, indent=4), encoding='utf-8')
+    except Exception:
+        pass
 
 DailyWifeConfig = StringConfig(
     'TodayWaifu',
