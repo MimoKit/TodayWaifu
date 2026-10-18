@@ -140,10 +140,10 @@ COS 上传目录和图片链接有效期可保留默认值。插件使用带签�
 <table>
 <tbody>
   <tr>
-    <td align="center"><a href="https://github.com/MimoKit"><img src="https://avatars.githubusercontent.com/u/278909251?v=4&amp;size=64" width="56" height="56" alt="MimoKit" title="MimoKit" /></a><br /><sub><b>MimoKit</b></sub><br /><sub>193 contributions</sub></td>
+    <td align="center"><a href="https://github.com/MimoKit"><img src="https://avatars.githubusercontent.com/u/278909251?v=4&amp;size=64" width="56" height="56" alt="MimoKit" title="MimoKit" /></a><br /><sub><b>MimoKit</b></sub><br /><sub>198 contributions</sub></td>
+    <td align="center"><a href="https://github.com/linsheng0s"><img src="https://avatars.githubusercontent.com/u/322805100?v=4&amp;size=64" width="56" height="56" alt="linsheng0s" title="linsheng0s" /></a><br /><sub><b>linsheng0s</b></sub><br /><sub>17 contributions</sub></td>
     <td align="center"><a href="https://github.com/CWalkene"><img src="https://avatars.githubusercontent.com/u/52878114?v=4&amp;size=64" width="56" height="56" alt="CWalkene" title="CWalkene" /></a><br /><sub><b>CWalkene</b></sub><br /><sub>8 contributions</sub></td>
     <td align="center"><a href="https://github.com/Xbaiyz12"><img src="https://avatars.githubusercontent.com/u/197220149?v=4&amp;size=64" width="56" height="56" alt="Xbaiyz12" title="Xbaiyz12" /></a><br /><sub><b>Xbaiyz12</b></sub><br /><sub>8 contributions</sub></td>
-    <td align="center"><a href="https://github.com/linsheng0s"><img src="https://avatars.githubusercontent.com/u/322805100?v=4&amp;size=64" width="56" height="56" alt="linsheng0s" title="linsheng0s" /></a><br /><sub><b>linsheng0s</b></sub><br /><sub>7 contributions</sub></td>
     <td align="center"><a href="https://github.com/spaxie"><img src="https://avatars.githubusercontent.com/u/311188777?v=4&amp;size=64" width="56" height="56" alt="spaxie" title="spaxie" /></a><br /><sub><b>spaxie</b></sub><br /><sub>5 contributions</sub></td>
     <td align="center"><a href="https://github.com/KimigaiiWuyi"><img src="https://avatars.githubusercontent.com/u/55526518?v=4&amp;size=64" width="56" height="56" alt="KimigaiiWuyi" title="KimigaiiWuyi" /></a><br /><sub><b>KimigaiiWuyi</b></sub><br /><sub>1 contribution</sub></td>
   </tr>
