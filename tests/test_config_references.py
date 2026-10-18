@@ -65,13 +65,27 @@ def _literal_constant(path: Path, name: str) -> object:
 def _defined_keys() -> set[str]:
     # 取不到 CONFIG_DEFAULT 时直接失败而不返回空集：空集会让「无死引用」的断言恒真，
     # 守卫在重构后静默失去判别力
+    #
+    # 配置项已按控制台页面拆成多个模板（CONFIG_DEFAULT / APPEARANCE_CONFIG_DEFAULT /
+    # QQ_BOT_CONFIG_DEFAULT），全部并入已定义集合：只取其中一个会让其余页面的配置键
+    # 被误判为死引用，而漏报同样有害（新增页面的键无人守护）。
     tree = ast.parse((ROOT / 'config_default.py').read_text(encoding='utf-8-sig'))
+    keys: set[str] = set()
+    found_default = False
     for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == 'CONFIG_DEFAULT' and isinstance(node.value, ast.Dict):
-                return {
-                    key.value for key in node.value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)
-                }
+        if not isinstance(node, ast.AnnAssign) or not isinstance(node.target, ast.Name):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        if 'CONFIG_DEFAULT' not in node.target.id:
+            continue
+        if node.target.id == 'CONFIG_DEFAULT':
+            found_default = True
+        keys.update(
+            key.value for key in node.value.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        )
+    if found_default:
+        return keys
     raise AssertionError('config_default.py 里没有 CONFIG_DEFAULT')
 
 

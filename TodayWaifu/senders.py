@@ -15,8 +15,9 @@ from gsuid_core.ai_core.trigger_bridge import ai_return
 
 from .paths import _gallery_image_cache_root
 from .roles import _load_local_candidates
-from .domain import RoleCandidate
+from .domain import RoleCandidate, MemberCandidate
 from .gallery import _download_image
+from .members import _resolve_member_avatar, _download_member_avatar
 from .delivery import _safe_send, _send_loli_text
 from .executor import run_blocking
 from .constants import (
@@ -26,6 +27,16 @@ from .constants import (
     _daily_item_title,
 )
 from .file_cache import read_file_bytes_cached
+from .qq_official import (
+    _markdown_escape,
+    _is_official_qq_bot,
+    _qq_bot_mode_enabled,
+    _generate_petpet_meme,
+    _build_petpet_notice_text,
+    _meme_generator_configured,
+    _try_send_official_qq_image,
+    _build_petpet_notice_markdown,
+)
 from .image_shrink import shrink_image_cached
 
 
@@ -229,6 +240,9 @@ async def _deliver_role_image(
         image = await run_blocking(read_file_bytes_cached, Path(image_url))
 
     image = await run_blocking(_shrink_image_sync, image)
+    # 官方机器人模式下改走「上传图床 + Markdown」，失败时静默降级为下方普通发送
+    if await _try_send_official_qq_image(bot, image, text, user_id, is_group):
+        return
     messages: list[Message | str] = []
     if is_group and user_id is not None and bool(_cfg('DailyWifeAtUser')):
         messages.append(MessageSegment.at(user_id))
@@ -286,6 +300,11 @@ async def _deliver_loli_result_image(
         image_ref = image
     if isinstance(image_ref, (bytes, bytearray)):
         image_ref = await run_blocking(_shrink_image_sync, image_ref)
+    # 官方机器人模式下改走「上传图床 + Markdown」；萝莉/正太与角色图共用同一投递分支
+    if isinstance(image_ref, (bytes, bytearray)) and await _try_send_official_qq_image(
+        bot, image_ref, text, user_id, is_group
+    ):
+        return
     messages.append(await _image_message(image_ref))
     await _safe_send(bot, messages)
 
@@ -504,9 +523,133 @@ async def _send_local_image(
         else:
             image_bytes = await run_blocking(read_file_bytes_cached, Path(image_url))
             image_bytes = await run_blocking(_shrink_image_sync, image_bytes)
+            # 官方机器人模式下改走「上传图床 + Markdown」；成功则本次不再追加普通图片段
+            if await _try_send_official_qq_image(bot, image_bytes, text, user_id, is_group):
+                return
             messages.append(await _image_message(image_bytes))
 
     if not messages:
         await _safe_send(bot, missing_hint)
         return
     await _safe_send(bot, messages if len(messages) > 1 else messages[0])
+
+
+# ── 群友头像投递 ──────────────────────────────────────────────────────────────
+
+
+async def _send_marry_member_result_image(
+    bot: Bot,
+    member: MemberCandidate,
+    text: str | None,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+    """投递娶群友文案和单张群友头像，头像在发送前现取。"""
+    avatar = await _fetch_member_avatar_bytes(member)
+    if avatar is None:
+        await _safe_send(bot, '本地群友头像文件不存在，请稍后重试。')
+        return
+    await _send_plain_member_avatar(bot, avatar, text, user_id, is_group)
+
+
+async def _send_member_daily_image(
+    bot: Bot,
+    member: MemberCandidate,
+    text: str | None,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+    """发送「抽到群友」的单图结果（今日老婆/老公命中群友时）。
+
+    官方机器人模式下先尝试上传图床转 Markdown。头像在发送前现取，保证是最新版本。
+    """
+    avatar = await _fetch_member_avatar_bytes(member)
+    if avatar is None:
+        # 带上文案而非仅发失败提示：文案已生成，丢掉会让用户端失去上下文
+        await _safe_send(bot, text or '本地群友头像文件不存在，请稍后重试。')
+        return
+    if await _try_send_official_qq_image(bot, avatar, text, user_id, is_group):
+        return
+    await _send_plain_member_avatar(bot, avatar, text, user_id, is_group)
+
+
+async def _fetch_member_avatar_bytes(member: MemberCandidate) -> bytes | None:
+    """现取最新头像，并兼容升级前记录中的本地头像路径。"""
+    if not member.avatar:
+        return None
+    avatar_url = _resolve_member_avatar(member.user_id, member.avatar)
+    if avatar_url:
+        return await run_blocking(_download_member_avatar, avatar_url)
+    return await run_blocking(_read_legacy_member_avatar, Path(member.avatar))
+
+
+def _read_legacy_member_avatar(path: Path) -> bytes | None:
+    """限量读取旧 OpenID 记录的头像文件，不新增缓存或文件。"""
+    limit = 2 * 1024 * 1024
+    try:
+        with path.open('rb') as file:
+            data = file.read(limit + 1)
+    except (OSError, ValueError):
+        return None
+    return data if data and len(data) <= limit else None
+
+
+async def _send_plain_member_avatar(
+    bot: Bot,
+    avatar: bytes,
+    text: str | None,
+    user_id: str | int | None,
+    is_group: bool,
+) -> None:
+    """发送单张群友头像；官方模式开启时使用 Markdown 提及。"""
+    messages: list[Message | str] = []
+    mention_user = is_group and user_id is not None and bool(_cfg('DailyWifeAtUser'))
+    if mention_user and _qq_bot_mode_enabled() and _is_official_qq_bot(bot):
+        markdown = f'<@{user_id}>'
+        if text:
+            markdown += f'\n\n{_markdown_escape(text)}'
+        messages.extend(MessageSegment.markdown(markdown))
+    else:
+        if mention_user:
+            messages.append(MessageSegment.at(user_id))
+            messages.append('\n')
+        if text:
+            messages.append(text)
+    messages.append(await _image_message(await run_blocking(_shrink_image_sync, avatar)))
+    await _safe_send(bot, messages if len(messages) > 1 else messages[0])
+
+
+async def _send_member_petpet(bot: Bot, member: MemberCandidate) -> None:
+    """生成并投递摸头表情包；提示文案按平台选择 Markdown 或纯文本。"""
+    if not _meme_generator_configured():
+        await _safe_send(bot, '摸头功能还没配置表情包后端地址，请在控制台填写「表情包后端地址」。')
+        return
+    avatar = await _fetch_member_avatar_bytes(member)
+    if avatar is None:
+        await _safe_send(bot, '没有找到可用的群友头像，重新发送“娶群友”试试。')
+        return
+    try:
+        image = await _generate_petpet_meme(avatar)
+    except RuntimeError as exc:
+        logger.warning(f'{LOG_PREFIX} 摸头表情包生成失败: {exc}')
+        await _safe_send(bot, f'摸头生成失败：{exc}')
+        return
+
+    await _send_petpet_notice(bot, member)
+    await _safe_send(bot, await _image_message(image))
+
+
+async def _send_petpet_notice(bot: Bot, member: MemberCandidate) -> None:
+    """发送摸头提示：官方机器人走 Markdown，其余平台走纯文本。
+
+    Markdown 发送失败必须降级为纯文本，而不是连带放弃后续的表情包图片——
+    合规提醒缺失比提示样式不同严重得多。
+    """
+    if _is_official_qq_bot(bot):
+        markdown = _build_petpet_notice_markdown(member.name)
+        try:
+            await _safe_send(bot, MessageSegment.markdown(markdown))
+            return
+        except Exception as exc:
+            logger.warning(f'{LOG_PREFIX} QQ 机器人摸头提示 Markdown 发送失败，降级为纯文本: {exc}')
+    await _safe_send(bot, _build_petpet_notice_text(member.name))

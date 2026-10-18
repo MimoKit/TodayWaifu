@@ -1,8 +1,11 @@
 """TodayWaifu 的群成员目录与头像。
 
-成员相关数据分布在两处：GsCore 的 CoreUser 表提供群成员缓存，头像需要按需下载到本地。
-两者都有时效性且获取成本不低（一次数据库查询 / 一次网络请求），因此分别经有界缓存与
-在途合并表收敛，避免同一群、同一成员被并发重复读取。
+成员名单来自 GsCore 的 CoreUser 表，获取成本不低（一次数据库查询），因此经有界缓存收敛，
+避免同一群被并发重复读取。
+
+头像则**完全不缓存**：它本身是高频变化的实时资源，缓存一份本地副本既长期占用磁盘，又会在
+用户换头像后继续发出旧图。因此这里只把成员的头像字段解析成可公开访问的 URL，真正的字节
+获取推迟到发送那一刻（见 senders 模块）。
 
 显示名的字段探测、有效值判定与回写策略集中在 `display_name` 模块，此处只用它。
 """
@@ -11,10 +14,8 @@ from __future__ import annotations
 
 import time
 import random
-import asyncio
-import hashlib
-from pathlib import Path
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -23,11 +24,10 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.database.models import CoreUser
 
-from .paths import _user_key, _daily_rng, _custom_upload_data_root
-from .state import _MEMBER_CACHE, _MEMBER_AVATAR_INFLIGHT
+from .paths import _user_key, _daily_rng
+from .state import _MEMBER_CACHE
 from .domain import WifeRecord, MemberCandidate
-from .executor import run_blocking
-from .constants import LOG_PREFIX, MEMBER_AVATAR_CACHE_SECONDS, _cfg_bool, _cfg_probability
+from .constants import LOG_PREFIX, _cfg_bool, _cfg_probability
 from .image_input import redact_url, safe_urlopen
 from .display_name import usable_name, placeholder_name
 
@@ -60,80 +60,63 @@ def _qq_avatar_url(user_id: str) -> str:
     return f'https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640'
 
 
-def _member_avatar_cache_path(user_id: str) -> Path:
-    # 用户 ID 可能包含任意平台标识字符；使用摘要同时避免目录穿越与不同 ID
-    # 经替换后碰撞，防止一个成员复用另一个成员的头像缓存。
-    digest = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()[:32]
-    return _custom_upload_data_root() / 'group_member_avatar_cache' / f'{digest}.jpg'
+def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
+    """把成员头像解析为一个可公开访问的 URL。
+
+    解析顺序为「平台给出的 http 头像 → 数字 ID 的 QQ 头像接口」。平台来源优先，是因为
+    它来自当前会话、与用户此刻的形象一致；QQ 头像接口作为兜底，覆盖平台未上报头像的
+    情况；只有 openid 且没有头像地址时无法通过 QQ 号接口兜底。
+
+    返回空串表示无法解析：调用方据此丢弃该候选。
+
+    注意本函数**不做任何下载与落盘**。头像本身就是高频变化的实时资源，缓存一份本地副本
+    既会长期占用磁盘，又会在用户换头像后继续发出旧图，因此改为每次发送时重新获取。
+    """
+    source = _valid_member_text(avatar_source)
+    if source.startswith(('http://', 'https://')):
+        return source
+    if str(user_id).isdigit():
+        return _qq_avatar_url(str(user_id))
+    return ''
 
 
-def _usable_cached_avatar(path: Path, check_ttl: bool = True) -> bool:
+def _cache_busted_avatar_url(url: str) -> str:
+    """给 qlogo 头像地址追加时间戳，绕开其 30 天的边缘缓存。
+
+    仅对 qlogo 生效：其它图床（如平台自建 CDN）可能对未知查询参数做严格校验，无差别追加
+    会让本来可用的地址失败。地址已带查询串时用 ``&`` 追加，保持 URL 合法。
+    """
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or '').lower()
+    if hostname != 'qlogo.cn' and not hostname.endswith('.qlogo.cn'):
+        return url
+    query = f'{parsed.query}&' if parsed.query else ''
+    return parsed._replace(query=f'{query}_t={int(time.time())}').geturl()
+
+
+def _download_member_avatar(url: str) -> bytes | None:
+    """下载头像字节；失败或体积异常时返回 None。仅供线程池调用。
+
+    8 秒超时：头像属于可选素材，长时间阻塞会拖慢整个群友抽取流程。
+
+    对 qlogo 系地址追加一个时间戳参数：该 CDN 对头像下发 ``max-age=2592000``（30 天），
+    而头像 URL 本身是「用户 ID 固定拼接」因此永不改变，导致边缘节点可能长期回源旧图。
+    时间戳只作用于本次请求，不写回记录，故不会污染存储的地址。实测 qlogo 忽略该参数。
+    """
+    request_url = _cache_busted_avatar_url(url)
     try:
-        # 零字节文件通常来自上次写盘中断，视为不可用，否则会把空文件当成头像发出去。
-        if not path.is_file() or path.stat().st_size <= 0:
-            return False
-        if check_ttl and time.time() - path.stat().st_mtime > MEMBER_AVATAR_CACHE_SECONDS:
-            logger.debug(f'{LOG_PREFIX} 缓存的头像已过期: {path}')
-            return False
-        return True
-    except OSError:
-        # 并发删除或权限问题下 stat 可能失败，按不可用处理而不中断流程。
-        return False
-
-
-def _download_avatar(url: str, path: Path) -> bool:
-    try:
-        logger.debug(f'{LOG_PREFIX} 开始下载头像: {redact_url(url)} -> {path}')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        request = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        # 8 秒超时：头像属于可选素材，长时间阻塞会拖慢整个群友抽取流程。
+        logger.debug(f'{LOG_PREFIX} 开始下载头像: {redact_url(request_url)}')
+        request = Request(request_url, headers={'User-Agent': 'Mozilla/5.0'})
         with safe_urlopen(request, timeout=8) as response:
             # 多读 1 字节用于判定是否超限，避免把超大响应整个载入内存。
             data = response.read(2 * 1024 * 1024 + 1)
-        if not data or len(data) > 2 * 1024 * 1024:
-            logger.warning(f'{LOG_PREFIX} 下载头像数据无效或体积过大: {redact_url(url)}')
-            return False
-        # 先写临时文件再原子替换：并发读方不会读到只写了一半的图片。
-        tmp_path = path.with_suffix('.tmp')
-        tmp_path.write_bytes(data)
-        tmp_path.replace(path)
-        logger.debug(f'{LOG_PREFIX} 头像下载完成: {path}')
-        return True
     except (OSError, ValueError, HTTPError, URLError, TimeoutError) as exc:
-        # 网络与磁盘异常一律降级为失败：调用方会继续尝试其它候选，不需要异常穿透。
         logger.warning(f'{LOG_PREFIX} 下载群友头像失败: {redact_url(url)} -> {exc}')
-        return False
-
-
-def _resolve_member_avatar(user_id: str, avatar_source: str) -> str:
-    # 解析顺序为「新鲜缓存 → 平台给出 http 头像 → 本地路径 → QQ 头像接口 →
-    # 过期缓存」。把平台来源排在 QQ 接口之前，是因为前者来自当前平台、与用户实际
-    # 形象一致；最后仍允许使用过期缓存，使离线或接口限流时至少还有图可发。
-    cache_path = _member_avatar_cache_path(user_id)
-    if _usable_cached_avatar(cache_path):
-        return str(cache_path)
-
-    source = _valid_member_text(avatar_source)
-    if source.startswith(('http://', 'https://')):
-        if source and _download_avatar(source, cache_path):
-            return str(cache_path)
-    elif source:
-        try:
-            local_path = Path(source)
-            if local_path.is_file():
-                # 本地路径直接返回，不复制到缓存：调用方只读取，无需二次占用磁盘。
-                return str(local_path)
-        except (OSError, ValueError):
-            logger.debug(f'{LOG_PREFIX} 头像本地路径无效: {source}')
-
-    if str(user_id).isdigit() and _download_avatar(_qq_avatar_url(str(user_id)), cache_path):
-        return str(cache_path)
-
-    # 过期缓存作为最后兜底，仅在前面全部失败时使用；check_ttl=False 只跳过时效判断，
-    # 空文件仍会被拒绝。
-    if _usable_cached_avatar(cache_path, check_ttl=False):
-        return str(cache_path)
-    return ''
+        return None
+    if not data or len(data) > 2 * 1024 * 1024:
+        logger.warning(f'{LOG_PREFIX} 头像数据无效或体积过大: {redact_url(url)}')
+        return None
+    return data
 
 
 async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...]:
@@ -189,18 +172,12 @@ async def _load_group_member_candidates(ev: Event) -> tuple[MemberCandidate, ...
 
 
 async def _resolve_member_candidate_avatar(member: MemberCandidate) -> MemberCandidate | None:
-    # 按用户 ID 合并在途任务：同一成员可能被多个并发命令同时抽到，
-    # 共享一次下载即可，否则会重复占用网络与线程池。
-    task = _MEMBER_AVATAR_INFLIGHT.get(member.user_id)
-    if task is None:
-        task = asyncio.create_task(run_blocking(_resolve_member_avatar, member.user_id, member.avatar))
-        _MEMBER_AVATAR_INFLIGHT[member.user_id] = task
-    try:
-        avatar = await task
-    finally:
-        # 仅在任务已结束且仍是当前项时移除，避免覆盖掉后来者登记的新任务。
-        if task.done() and _MEMBER_AVATAR_INFLIGHT.get(member.user_id) is task:
-            _MEMBER_AVATAR_INFLIGHT.pop(member.user_id, None)
+    """把候选的头像字段解析为可公开访问的 URL；无法解析时丢弃该候选。
+
+    此处只解析 URL、不下载字节：头像要在发送那一刻才取最新版本，提前下载等于又引入一层
+    隐式缓存。解析是纯字符串运算，无需线程池与在途合并。
+    """
+    avatar = _resolve_member_avatar(member.user_id, member.avatar)
     if not avatar:
         # 无头像的候选直接丢弃：结果图片缺少人像会呈现为空位，弱于换一个候选。
         return None

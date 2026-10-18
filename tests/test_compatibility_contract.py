@@ -111,9 +111,28 @@ class CompatibilityContractTests(unittest.TestCase):
             "custom_role_map.txt",
             "custom_role_pile",
             "loli_images",
-            "group_member_avatar_cache",
         ):
             self.assertIn(text, twf_source + config)
+        # 群友头像不再落盘（见下方独立用例）：其缓存目录已从数据路径契约中移除，
+        # 不能再断言该字面量存在，否则会与「头像必须实时获取」互相矛盾
+        self.assertNotIn("group_member_avatar_cache", twf_source + config)
+
+    def test_member_avatars_are_never_persisted(self) -> None:
+        # 回归守卫：头像本身是高频变化的实时资源，缓存副本既长期占用磁盘，又会在用户
+        # 换头像后继续发出旧图。此处锁定「不落盘」这一决定，防止后续有人重新引入缓存。
+        sources = {
+            path.name: path.read_text(encoding="utf-8-sig")
+            for path in sorted((ROOT / "TodayWaifu").glob("*.py"))
+        }
+        combined = "\n".join(sources.values())
+
+        # 不得再有头像缓存目录、缓存有效期与在途合并表
+        self.assertNotIn("group_member_avatar_cache", combined)
+        self.assertNotIn("MEMBER_AVATAR_CACHE_SECONDS", combined)
+        self.assertNotIn("_MEMBER_AVATAR_INFLIGHT", combined)
+        # 下载头像必须返回字节供当次发送使用，而不是写入某个路径
+        self.assertIn("def _download_member_avatar(", sources["members.py"])
+        self.assertNotIn("def _download_avatar(", sources["members.py"])
 
 
 if __name__ == "__main__":

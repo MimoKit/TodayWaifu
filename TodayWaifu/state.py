@@ -75,7 +75,3 @@ _MEMBER_CACHE = AsyncSourceCache[tuple[MemberCandidate, ...]](60.0, max_entries=
 
 
 _GROUP_DISPLAY_NAME_CACHE = AsyncSourceCache[dict[str, str]](60.0, max_entries=128)
-
-
-# 头像解析在途合并表：头像需走网络下载，按用户 ID 合并可避免同一成员被并发拉取多次。
-_MEMBER_AVATAR_INFLIGHT: dict[str, asyncio.Task[str]] = {}

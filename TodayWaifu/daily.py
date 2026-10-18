@@ -43,6 +43,7 @@ from .shared import (
     name_from_event,
     specify_wife_sv,
     _can_assign_wife,
+    _has_active_wife,
     _load_candidates,
     _send_role_image,
     daily_husband_sv,
@@ -51,7 +52,6 @@ from .shared import (
     _daily_item_title,
     _pick_role_record,
     _record_from_dict,
-    _send_local_image,
     daily_nte_wife_sv,
     _daily_bucket_name,
     _husband_available,
@@ -60,15 +60,21 @@ from .shared import (
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
+    _send_member_petpet,
+    _blockquote_markdown,
     _daily_kind_metadata,
     _normalize_role_name,
+    _qq_bot_mode_enabled,
     daily_normal_wife_sv,
     resolve_display_name,
+    _is_official_qq_event,
     _marry_member_enabled,
     _roll_group_member_wife,
+    _send_member_daily_image,
     _get_event_target_user_id,
     _has_exclusive_daily_wife,
     _get_other_daily_wife_name,
+    _send_marry_member_result_image,
 )
 
 
@@ -323,14 +329,13 @@ async def _send_record_image(
 ) -> None:
     text = _record_text(record, mode, str(user_id or '')) if bool(_cfg('DailyWifeSendText')) else None
     if record.record_type == 'member':
-        await _send_local_image(
+        # 群友记录存的是头像地址而非本地路径（头像不落盘），故走专门的取图发送路径
+        await _send_member_daily_image(
             bot,
-            record.image,
-            '本地群友头像文件不存在，请稍后重试。',
+            record.to_member(),
             text,
             user_id,
             is_group,
-            mode,
         )
         return
     await _send_role_image(bot, record.to_role(), record.image, text, user_id, is_group, mode)
@@ -669,10 +674,9 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
             if bool(_cfg('DailyWifeSendText'))
             else None
         )
-        return await _send_local_image(
+        return await _send_marry_member_result_image(
             bot,
-            existing_record.image,
-            '本地群友头像文件不存在，请稍后重试。',
+            existing_record.to_member(),
             text,
             ev.user_id,
             ev.group_id is not None,
@@ -686,6 +690,7 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         f'{LOG_PREFIX} marry_member user={ev.user_id} group={ev.group_id} '
         f'member={member.name} qq={member.user_id} avatar={member.avatar}'
     )
+    # 先落库再发送，摸头命令复用本次记录；并发请求仍复用锁内确认的同一群友。
     record = WifeRecord.from_member(member)
     record_dict = _record_to_dict(record, ev, ev.user_id)
     winner_record: WifeRecord | None = None
@@ -707,26 +712,47 @@ async def _send_group_member_wife(bot: Bot, ev: Event) -> list[str] | None:
         member = winner_record.to_member()
 
     text = _build_member_text(member, 'marry') if bool(_cfg('DailyWifeSendText')) else None
-    await _send_local_image(
-        bot,
-        member.avatar,
-        '本地群友头像文件不存在，请稍后重试。',
-        text,
-        ev.user_id,
-        ev.group_id is not None,
-    )
+    await _send_marry_member_result_image(bot, member, text, ev.user_id, ev.group_id is not None)
+
+
+async def _send_group_member_petpet(bot: Bot, ev: Event) -> list[str] | None:
+    """用最近一次娶到的群友头像生成摸头表情包。
+
+    记录取自「娶群友」写入的 ``marry_members`` 桶；未娶过时给出可操作提示，
+    而不是静默失败或误用其它记录。
+    """
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 触发了摸头命令')
+    if not ev.group_id:
+        return await _safe_send(bot, '这个命令只能在群聊里使用。')
+
+    user_key = _user_key(ev)
+    context = await _load_daily_context(ev)
+    raw_record = context['marry_members'].get(user_key)
+    if not _has_active_wife(raw_record):
+        return await _safe_send(bot, '你还没有娶到群友，先发送“娶群友”试试。')
+    record = _record_from_dict(raw_record)
+    if record is None or record.record_type != 'member':
+        return await _safe_send(bot, '没有找到可用的群友头像，重新发送“娶群友”试试。')
+
+    await _send_member_petpet(bot, record.to_member())
+    return None
 
 
 async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife') -> None:
     logger.debug(f'{LOG_PREFIX} 用户 {ev.user_id} 在群 {ev.group_id} 请求了 {mode} 列表')
     title_text, items = await _wife_list_items(ev, mode)
+    plain_text = _wife_list_text_from_items(title_text, items)
+    # 官方机器人模式走 Markdown 引用块：该链路不支持合并转发，且裸文本多行会被折叠
+    if _qq_bot_mode_enabled() and _is_official_qq_event(ev):
+        await _safe_send(bot, MessageSegment.markdown(_blockquote_markdown(plain_text)))
+        return
     if len(items) > LIST_FORWARD_THRESHOLD:
         await _safe_send(
             bot,
-            MessageSegment.node([_wife_list_text_from_items(title_text, items)]),
+            MessageSegment.node([plain_text]),
         )
         return
-    await _safe_send(bot, _wife_list_text_from_items(title_text, items))
+    await _safe_send(bot, plain_text)
 
 
 @specify_wife_sv.on_prefix(
@@ -966,3 +992,18 @@ async def daily_husband_list(bot: Bot, ev: Event) -> None:
 )
 async def group_member_wife(bot: Bot, ev: Event) -> None:
     await _send_group_member_wife(bot, ev)
+
+
+@marry_member_sv.on_fullmatch(
+    ('摸头', '群友摸头'),
+    block=True,
+    to_ai="""用最近一次娶到的群友头像生成摸头表情包。
+    当用户说“摸头”“群友摸头”时调用；只能在群聊使用。
+    Args:
+        text: 无需参数，留空。
+    """,
+    covers=['用娶到的群友头像生成摸头表情包'],
+    aliases=['今日老婆·摸头'],
+)
+async def group_member_petpet(bot: Bot, ev: Event) -> None:
+    await _send_group_member_petpet(bot, ev)

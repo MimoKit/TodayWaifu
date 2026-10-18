@@ -441,6 +441,11 @@
       "decorator": "marry_member_sv.on_fullmatch(('娶群友', '取群友'), block=True, to_ai='随机抽取当前群里的一个群友作为今日互动对象。\\n    当用户说“娶群友”“随机娶一个群友”“帮我抽个群友”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['从当前群成员中随机抽取一位作为今日互动对象'], aliases=['今日老婆·娶群友', '今日老婆·抽群友'])"
     },
     {
+      "file": "TodayWaifu/daily.py",
+      "function": "group_member_petpet",
+      "decorator": "marry_member_sv.on_fullmatch(('摸头', '群友摸头'), block=True, to_ai='用最近一次娶到的群友头像生成摸头表情包。\\n    当用户说“摸头”“群友摸头”时调用；只能在群聊使用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['用娶到的群友头像生成摸头表情包'], aliases=['今日老婆·摸头'])"
+    },
+    {
       "file": "TodayWaifu/divorce.py",
       "function": "divorce_wife",
       "decorator": "divorce_sv.on_fullmatch(DIVORCE_COMMANDS, block=True, to_ai='结束当前用户今天的老婆婚姻关系。\\n    “离婚”默认表示离婚老婆，也可以使用老婆离婚等同义命令。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['结束今日老婆婚姻关系'], aliases=['今日老婆·离婚', '今日老婆·和老婆离婚'])"

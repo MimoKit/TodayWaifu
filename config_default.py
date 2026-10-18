@@ -411,3 +411,64 @@ APPEARANCE_CONFIG_DEFAULT: Dict[str, GSC] = {
         5,
     ),
 }
+
+# 第 3 页：QQ 机器人配置
+#
+# 该页承载「QQ 官方机器人模式」的全局总开关与其所需的腾讯云 COS 图床参数。QQ 官方
+# 机器人无法直接下发图片二进制，只能下发带图片链接的 Markdown，因此开启后必须先把
+# 结果图上传到一个公网可访问的图床（此处为腾讯云 COS）。
+#
+# 总开关默认关闭：关闭时本页其余项均不参与运行，插件继续以 ``base64://`` 图片段走
+# 普通个人账号（OB11）协议发送。
+QQ_BOT_CONFIG_DEFAULT: Dict[str, GSC] = {
+    'DailyWifeQqBotMode': GsBoolConfig(
+        '是否开启QQ机器人模式',
+        '全局总开关。开启后走 QQ 官方机器人模式：结果图上传到腾讯云 COS，'
+        '再以 Markdown 艾特触发者发送；关闭后走普通个人账号（OB11）协议发送，'
+        '本页其余配置项均不生效',
+        False,
+    ),
+    '_DividerQqBotCos': GsDivider('腾讯云 COS 图床', ''),
+    'DailyWifeQqBotCosRegion': GsStrConfig(
+        'COS 存储桶地域',
+        '存储桶所在地域，例如 ap-guangzhou、ap-shanghai、ap-beijing。'
+        '填错会得到 NoSuchBucket / 签名错误，请以控制台显示的所在地域为准',
+        'ap-guangzhou',
+    ),
+    'DailyWifeQqBotCosBucket': GsStrConfig(
+        'COS 存储桶名称',
+        '存储桶名称必须带 APPID 后缀，格式为「桶名-APPID」，例如 qqbot-1436882375',
+        '',
+    ),
+    'DailyWifeQqBotCosSecretId': GsStrConfig(
+        'COS SecretId',
+        '腾讯云 API 密钥 SecretId，仅保存在本机运行配置中；建议使用仅授权该存储桶的子账号密钥',
+        '',
+        secret=True,
+    ),
+    'DailyWifeQqBotCosSecretKey': GsStrConfig(
+        'COS SecretKey',
+        '腾讯云 API 密钥 SecretKey，仅保存在本机运行配置中',
+        '',
+        secret=True,
+    ),
+    'DailyWifeQqBotCosPathPrefix': GsStrConfig(
+        'COS 上传目录前缀',
+        '结果图在存储桶中的存放目录前缀，留空则直接放在存储桶根目录',
+        'todaywaifu',
+    ),
+    'DailyWifeQqBotCosSignExpired': GsIntConfig(
+        '图片链接有效期（秒）',
+        '图片访问链接的有效时长。QQ 服务器拉取图片与该链接生成之间存在延迟，'
+        '过短会导致图片无法显示；默认 604800（7 天），上限 2592000（30 天）',
+        604800,
+        2592000,
+    ),
+    '_DividerQqBotMeme': GsDivider('摸头表情包', ''),
+    'DailyWifeMemeGeneratorUrl': GsStrConfig(
+        '表情包后端地址',
+        '「摸头 / 群友摸头」命令所用的 meme-generator 后端地址，留空则摸头不可用。'
+        '只填写自己信任的后端：头像会上传到该地址生成表情包',
+        '',
+    ),
+}

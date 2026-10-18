@@ -43,9 +43,15 @@
 ```bash
 cd gsuid_core/gsuid_core/plugins
 git clone https://github.com/MimoKit/TodayWaifu
-
-或向bot发送：core安装插件TodayWaifu
 ```
+
+也可以向机器人发送：
+
+```text
+core安装插件TodayWaifu
+```
+
+重启 GsCore 后，框架会按 `pyproject.toml` 安装插件依赖，包括腾讯云 COS SDK。
 
 ## 丨快速上手
 
@@ -54,6 +60,9 @@ git clone https://github.com/MimoKit/TodayWaifu
 ```text
 今日老婆帮助
 ```
+
+普通个人账号（OB11）保持默认配置即可使用原有发送方式，无需配置 QQ 官方机器人模式或 COS。
+首次抽取角色前，请按下文准备本地图库，或选择远程图库并填写访问令牌。
 
 <br/>
 
@@ -73,12 +82,18 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 各功能默认值与升级前行为一致。普通老婆、今日老公和今日异环老婆默认关闭，可在控制台开启。
 
+本仓库不包含角色图片。首次安装使用 `local` 时，需要已有 XutheringWavesUID 本地图库，
+或在 `DailyWifeCustomRolePilePath` 配置自己的角色图片目录；没有本地图片时，可将对应来源改为
+`gallery`，并填写下方的图库访问令牌。
+
 ### 图库访问令牌
 
 图库的**列表接口与图片本身均要求鉴权**，必须在控制台填写
 `DailyWifeGalleryToken`，否则拉取列表和下载图片都会返回 403。
 
-令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，留空则不携带令牌。
+令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，
+或前往 <https://twf.xlinxc.cn> 自助申请；留空则不携带令牌。无论通过哪种方式申请，
+均需加入该交流群，未加群者不予审核。
 
 插件会在列表与图片两类请求上都自动携带该令牌；当图库因限流、封禁或配额拒绝时，
 会提示对应的处理方式，而不会笼统地提示检查令牌。列表返回的图片地址自带短期签名，
@@ -87,6 +102,31 @@ git clone https://github.com/MimoKit/TodayWaifu
 
 > [!WARNING]
 > 远程图库模式会从线上接口拉取并发送图片。部分图片可能存在风控风险，请自行评估是否启用；因使用远程图库产生的任何风险由部署者自行承担。
+
+## 丨QQ 官方机器人与娶群友
+
+QQ 官方机器人需要在 GsCore 网页控制台的 **QQ机器人配置** 页开启
+`DailyWifeQqBotMode`（是否开启QQ机器人模式）。该开关默认关闭。
+开启后，角色结果图会上传到腾讯云 COS，并通过 Markdown 发送。请填写以下配置：
+
+| 配置项 | 填写内容 |
+| --- | --- |
+| `DailyWifeQqBotCosRegion` | 存储桶所在地域，例如 `ap-guangzhou` |
+| `DailyWifeQqBotCosBucket` | 带 APPID 后缀的存储桶名，例如 `qqbot-1234567890` |
+| `DailyWifeQqBotCosSecretId` | 有该存储桶上传和读取权限的腾讯云 SecretId |
+| `DailyWifeQqBotCosSecretKey` | 对应的 SecretKey |
+
+COS 上传目录和图片链接有效期可保留默认值。插件使用带签名的 HTTPS 图片链接，
+无需将整个存储桶设为公有读。
+
+在插件业务配置中开启 **启用娶群友**（`DailyWifeMarryGroupMemberEnabled`）后，
+群内发送 `娶群友` 即可使用。成员来自 GsCore 已记录的本群成员缓存。
+娶群友统一发送原有文案和单张群友头像；QQ 官方模式开启时使用 Markdown @，
+关闭时使用普通 @，并遵守 **发送时艾特触发者**（`DailyWifeAtUser`）开关。
+
+摸头是可选功能。在 **QQ机器人配置** 页的 `DailyWifeMemeGeneratorUrl`
+填写已部署的 `meme-generator` 后端地址后，可发送 `摸头` 或 `群友摸头`，
+用最近一次娶到的群友头像生成表情包。后端地址留空只影响摸头，不影响娶群友。
 
 <br/>
 

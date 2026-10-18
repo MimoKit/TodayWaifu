@@ -101,14 +101,19 @@ class NoDefaultExecutorLeakTests(unittest.TestCase):
         self.assertEqual(offenders, [], f'asyncio.to_thread still used in: {offenders}')
 
     def test_every_blocking_call_goes_through_the_plugin_executor(self) -> None:
-        # 逐模块核对调用点：迁移过程中任一调用点被遗漏，都会让该路径退回默认 executor
+        # 逐模块核对调用点：迁移过程中任一调用点被遗漏，都会让该路径退回默认 executor。
+        # members.py 已不再下载头像（改为只解析 URL、由 senders.py 在发送时现取字节），
+        # 故它不再是阻塞调用点；此处按当前真实调用方清单核对。
         callers = {
             path.name
             for path in sorted(PLUGIN.glob('*.py'))
             if 'run_blocking(' in path.read_text(encoding='utf-8-sig') and path.name != 'executor.py'
         }
-        for expected in ('gallery.py', 'senders.py', 'members.py', 'loli.py', 'custom_role.py'):
+        for expected in ('gallery.py', 'senders.py', 'loli.py', 'custom_role.py'):
             self.assertIn(expected, callers)
+        # 头像下载已迁到 senders.py，仍必须走插件线程池而非事件循环
+        senders = (PLUGIN / 'senders.py').read_text(encoding='utf-8-sig')
+        self.assertIn('run_blocking(_download_member_avatar', senders)
 
 
 if __name__ == '__main__':

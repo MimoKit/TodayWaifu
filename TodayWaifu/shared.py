@@ -84,7 +84,6 @@ from .state import (
     _CANDIDATE_INFLIGHT,
     _DAILY_CONTEXT_CACHE,
     _PGR_CANDIDATE_CACHE,
-    _MEMBER_AVATAR_INFLIGHT,
     _GROUP_DISPLAY_NAME_CACHE,
     CUSTOM_ROLE_DELETE_PENDING,
 )
@@ -106,16 +105,14 @@ from .gallery import (
 )
 from .members import (
     _qq_avatar_url,
-    _download_avatar,
     _pick_group_member,
     _valid_member_text,
     _member_probability,
     _marry_member_enabled,
-    _usable_cached_avatar,
     _resolve_member_avatar,
+    _download_member_avatar,
     _member_feature_enabled,
     _roll_group_member_wife,
-    _member_avatar_cache_path,
     _load_group_member_candidates,
     _resolve_member_candidate_avatar,
 )
@@ -124,13 +121,16 @@ from .senders import (
     _send_role_image,
     _send_local_image,
     _is_valid_image_ref,
+    _send_member_petpet,
     image_delivery_backlog,
     _send_loli_result_image,
     _image_message_from_path,
     _send_daily_result_image,
+    _send_member_daily_image,
     _send_shota_result_image,
     stop_image_delivery_workers,
     start_image_delivery_workers,
+    _send_marry_member_result_image,
 )
 from .targets import _get_event_target_user_id
 from .delivery import _safe_send, _send_loli_text, _send_shota_text
@@ -165,7 +165,6 @@ from .constants import (
     IMAGE_HTTP_TIMEOUT_SECONDS,
     MAX_GALLERY_RESPONSE_BYTES,
     DAILY_RECORD_RETENTION_DAYS,
-    MEMBER_AVATAR_CACHE_SECONDS,
     CACHE_MAINTENANCE_FILE_LIMIT,
     GALLERY_HTTP_TIMEOUT_SECONDS,
     STATUS_MIN_RECOMPUTE_SECONDS,
@@ -211,6 +210,11 @@ from .daily_store import (
     _get_other_daily_wife_name,
     _get_existing_daily_wife_record,
     _mark_all_daily_records_divorced,
+)
+from .qq_official import (
+    _blockquote_markdown,
+    _qq_bot_mode_enabled,
+    _is_official_qq_event,
 )
 from .role_quotes import get_role_quote
 from .display_name import (
@@ -280,7 +284,7 @@ __all__ = [
     '_MALE_ROLE_NAMES_NORM', '_cfg', '_cfg_bool', '_cfg_probability',
     '_collect_role_candidates', '_configured_path', '_context_key',
     '_custom_upload_data_root', '_custom_upload_role_map_path',
-    '_custom_upload_role_pile_root', '_daily_rng', '_download_avatar', '_download_image',
+    '_custom_upload_role_pile_root', '_daily_rng', '_download_image',
     '_download_image_sync', '_auth_error_reason', '_event_rng', '_fetch_gallery_payload_from_url_sync',
     '_fetch_gallery_payload_sync', '_filter_by_mode',
     '_gallery_api_url',
@@ -302,7 +306,7 @@ __all__ = [
     '_load_daily_context', '_save_daily_context',
     '_save_daily_records',
     '_save_daily_record', '_delete_daily_record', 'flush_pending_writes',
-    '_mark_all_daily_records_divorced', '_member_avatar_cache_path',
+    '_mark_all_daily_records_divorced', '_download_member_avatar',
     '_member_feature_enabled', '_member_probability',
     '_normalize_role_name', '_parse_role_candidates', '_pick_group_member',
     '_pick_role_record',
@@ -312,12 +316,14 @@ __all__ = [
     '_resolve_nte_custom_panel_root', '_resolve_nte_default_panel_root',
     '_resolve_role_map_path', '_resolve_role_pile_root', '_role_images',
     '_roll_group_member_wife', '_save_wife_data', '_send_local_image', '_send_loli_text', '_send_shota_text',
+    '_send_member_petpet', '_send_member_daily_image', '_send_marry_member_result_image',
+    '_qq_bot_mode_enabled', '_is_official_qq_event', '_blockquote_markdown',
     '_safe_send', '_send_daily_result_image', '_send_loli_result_image', '_send_shota_result_image',
     '_send_role_image', '_image_message', '_image_message_from_path',
     'image_delivery_backlog', 'start_image_delivery_workers', 'stop_image_delivery_workers',
     'is_stale', 'usable_name', 'name_from_event', 'name_from_mapping', 'placeholder_name',
     'load_group_names', 'resolve_display_name',
-    '_today_key', '_usable_cached_avatar', '_user_key',
+    '_today_key', '_user_key',
     '_valid_member_text', '_wife_origin',
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
     'DailyWifeRecord',
@@ -450,7 +456,7 @@ async def _cache_maintenance_once() -> None:
         normal_wife.prune_normal_gallery_cache()
     for registry in (_CONTEXT_REGISTRY,):
         registry.prune(_today_key())
-    for mapping in (_CANDIDATE_INFLIGHT, _IMAGE_INFLIGHT, _MEMBER_AVATAR_INFLIGHT):
+    for mapping in (_CANDIDATE_INFLIGHT, _IMAGE_INFLIGHT):
         for key, task in tuple(mapping.items()):
             if task.done() or task.cancelled():
                 mapping.pop(key, None)
@@ -470,12 +476,6 @@ async def _cache_maintenance_once() -> None:
     )
     if evicted:
         logger.info(f'{LOG_PREFIX} 图库缓存超出容量上限，已淘汰 {evicted} 个最旧文件')
-    await run_blocking(
-        clear_expired_files,
-        _custom_upload_data_root() / 'group_member_avatar_cache',
-        MEMBER_AVATAR_CACHE_SECONDS,
-        CACHE_MAINTENANCE_FILE_LIMIT,
-    )
     from .senders import _prune_image_delivery_workers
 
     _prune_image_delivery_workers()

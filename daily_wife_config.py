@@ -8,7 +8,7 @@ from pathlib import Path
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.gs_config import StringConfig
 
-from .config_default import CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
+from .config_default import CONFIG_DEFAULT, QQ_BOT_CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
 
 # 配置须落在 GsCore data 目录而非插件目录：插件目录在升级、重装时会被整体覆盖，
 # 配置若随代码存放将随升级丢失，故以 data 目录为唯一持久化位置。
@@ -108,7 +108,18 @@ DailyWifeShowConfig = StringConfig(
     get_res_path('TodayWaifu') / 'show_config.json',
     APPEARANCE_CONFIG_DEFAULT,
 )
+
+# QQ 官方机器人配置同样独立成页（控制台第 3 页「QQ机器人配置」）：它只服务官方机器人
+# 这一条发送链路，与普通功能配置的关注点不同，混在同一页会让总开关与图床密钥淹没在
+# 大量业务开关中。独立文件也避免密钥随业务配置一起被导出或备份。
+DailyWifeQqBotConfig = StringConfig(
+    'QQ机器人配置',
+    get_res_path('TodayWaifu') / 'qq_bot_config.json',
+    QQ_BOT_CONFIG_DEFAULT,
+)
+
 # 以目录链接（Windows Junction 等）方式加载插件时，Path.resolve() 会跟踪到真实路径，
 # 使 plugin_name 的自动推导失败；此处显式回填，确保 WebConsole 能把配置页归属到本插件。
 DailyWifeConfig.plugin_name = 'TodayWaifu'
 DailyWifeShowConfig.plugin_name = 'TodayWaifu'
+DailyWifeQqBotConfig.plugin_name = 'TodayWaifu'

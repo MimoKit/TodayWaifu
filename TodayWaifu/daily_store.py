@@ -403,7 +403,7 @@ def _record_from_dict(data: RoleRecordValue) -> WifeRecord | None:
         return None
     if record.record_type == 'member':
         if record.image and not _is_valid_image_ref(record.image):
-            logger.debug(f'{LOG_PREFIX} 群友头像路径已失效: {record.image}')
+            logger.debug(f'{LOG_PREFIX} 群友头像地址已失效: {record.image}')
             return None
         return record
     if not _is_valid_image_ref(record.image):
