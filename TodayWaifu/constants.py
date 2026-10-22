@@ -12,6 +12,7 @@ from pathlib import Path
 from .payloads import ConfigValue
 from .kind_metadata import DailyKindMetadata, daily_kind_metadata
 from ..daily_wife_config import DailyWifeConfig
+from ..official_gallery import DEFAULT_GALLERY_BASE_URL
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -29,7 +30,7 @@ HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 
 
 # 图库基址与接口地址分离：接口路径可能随上游版本调整，基址则用于跨域资源引用。
-DEFAULT_GALLERY_BASE_URL = 'https://twf.xlinxc.cn/v1'
+# 基址来源见 official_gallery.py：可用环境变量覆盖，避免把域名写死在多处。
 DEFAULT_GALLERY_API_URL = f'{DEFAULT_GALLERY_BASE_URL}/api/xwuid/roles'
 
 

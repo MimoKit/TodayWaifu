@@ -6,6 +6,11 @@ from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.gs_config import StringConfig
 
 from .config_default import CONFIG_DEFAULT, QQ_BOT_CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
+from .official_gallery import (
+    DEFAULT_GALLERY_BASE_URL,
+    LEGACY_GALLERY_HOSTS,
+    OFFICIAL_GALLERY_HOST,
+)
 
 # 配置须落在 GsCore data 目录而非插件目录：插件目录在升级、重装时会被整体覆盖，
 # 配置若随代码存放将随升级丢失，故以 data 目录为唯一持久化位置。
@@ -59,12 +64,12 @@ DailyWifeConfig = StringConfig(
 
 _FORCED_URL_MIGRATION_MARKER = CONFIG_PATH.parent / '.remote_urls_v4_migrated'
 _FORCED_REMOTE_URLS = {
-    'DailyWifeApiUrl': 'https://twf.xlinxc.cn/v1',
+    'DailyWifeApiUrl': DEFAULT_GALLERY_BASE_URL,
 }
-# v4 起图库 API 并入主域名的 /v1 前缀，旧域名 twfapi.xlinxc.cn 已停用。
-# 这两个主机上的旧值（无论带什么路径）必须强制改写，否则升级用户会一直请求失效接口；
-# 第三方自建图库的地址保持原样，避免误伤。
-_LEGACY_OFFICIAL_HOSTS = ('twfapi.xlinxc.cn', 'twf.xlinxc.cn')
+# v4 起图库 API 并入主域名的 /v1 前缀。旧官方域名指向的接口已停用，必须强制改写，
+# 否则升级用户会一直请求失效接口。旧域名通过 official_gallery.LEGACY_GALLERY_HOSTS
+# 配置，域名变更时用环境变量追加，不在代码里散落硬编码；第三方自建图库保持原样。
+_LEGACY_OFFICIAL_HOSTS = set(LEGACY_GALLERY_HOSTS) | {OFFICIAL_GALLERY_HOST}
 if not _FORCED_URL_MIGRATION_MARKER.is_file():
     # 旧键需在实例化之后再清一次：StringConfig 会把文件中的键载入 config 映射，并可能
     # 按默认值补全条目，只清理文件覆盖不到该路径。

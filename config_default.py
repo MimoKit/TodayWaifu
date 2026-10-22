@@ -13,6 +13,8 @@ from gsuid_core.utils.plugins_config.models import (
     GsListStrConfig,
 )
 
+from .official_gallery import DEFAULT_GALLERY_BASE_URL
+
 SHOW_CONFIG_PATH = get_res_path(['TodayWaifu', 'show'])
 
 CONFIG_DEFAULT: Dict[str, GSC] = {
@@ -66,8 +68,10 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeApiUrl': GsStrConfig(
         '图库接口统一地址',
-        '今日老婆全套图库接口统一地址，默认使用 https://twf.xlinxc.cn/v1。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担',
-        'https://twf.xlinxc.cn/v1',
+        '今日老婆全套图库接口统一地址（默认使用官方地址，可在控制台改）。'
+        '包含鸣潮/普通老婆/萝莉/正太/战双全套图库。'
+        '启用图库即表示已知晓图片内容风险并自行承担',
+        DEFAULT_GALLERY_BASE_URL,
     ),
     'DailyWifeApiNoR18': GsBoolConfig(
         '排除 R18 图片',
