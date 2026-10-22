@@ -55,7 +55,7 @@ auth_error_reason = _load_auth_error_reason()
 # 只在存在响应流时才可调用
 def _http_error(code: int, body: dict | None = None) -> HTTPError:
     payload = b'' if body is None else json.dumps(body).encode('utf-8')
-    return HTTPError('https://twfapi.xlinxc.cn/api/xwuid/roles', code, 'err', {}, io.BytesIO(payload))
+    return HTTPError('https://twf.xlinxc.cn/v1/api/xwuid/roles', code, 'err', {}, io.BytesIO(payload))
 
 
 # 逐个覆盖图库可能给出的拒绝原因，确保提示与原因一一对应

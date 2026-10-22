@@ -170,17 +170,17 @@ class NormalWifeFeatureTests(unittest.IsolatedAsyncioTestCase):
         # 配置项已合并为统一的 DailyWifeApiUrl，默认地址取自 DEFAULT_GALLERY_BASE_URL
         globals_dict = {
             '_cfg': lambda key: '',
-            'DEFAULT_GALLERY_BASE_URL': 'https://twfapi.xlinxc.cn',
+            'DEFAULT_GALLERY_BASE_URL': 'https://twf.xlinxc.cn/v1',
         }
         get_url = _extract_function(NORMAL_WIFE_PATH, '_normal_gallery_api_url', globals_dict)
-        self.assertEqual(get_url(), 'https://twfapi.xlinxc.cn/api/ceshi/roles')
+        self.assertEqual(get_url(), 'https://twf.xlinxc.cn/v1/api/ceshi/roles')
 
     def test_normal_gallery_api_url_custom(self) -> None:
         # 自定义地址必须优先于默认地址：4a5513e 合并配置项后若漏掉该优先级，
         # 所有自建图库的部署都会被静默切回官方地址。
         globals_dict = {
             '_cfg': lambda key: 'https://custom.api.test/roles' if key == 'DailyWifeApiUrl' else '',
-            'DEFAULT_GALLERY_BASE_URL': 'https://twfapi.xlinxc.cn',
+            'DEFAULT_GALLERY_BASE_URL': 'https://twf.xlinxc.cn/v1',
         }
         get_url = _extract_function(NORMAL_WIFE_PATH, '_normal_gallery_api_url', globals_dict)
         self.assertEqual(get_url(), 'https://custom.api.test/roles')

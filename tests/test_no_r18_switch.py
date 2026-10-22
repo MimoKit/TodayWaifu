@@ -53,8 +53,8 @@ def _url_builder(path: Path, name: str, no_r18: bool) -> Any:
     )
     ast.fix_missing_locations(module)
     namespace: dict[str, Any] = {
-        '_cfg': lambda key: 'https://twfapi.xlinxc.cn' if key == 'DailyWifeApiUrl' else '',
-        'DEFAULT_GALLERY_BASE_URL': 'https://twfapi.xlinxc.cn',
+        '_cfg': lambda key: 'https://twf.xlinxc.cn/v1' if key == 'DailyWifeApiUrl' else '',
+        'DEFAULT_GALLERY_BASE_URL': 'https://twf.xlinxc.cn/v1',
         '_apply_no_r18': lambda url: f'{url.rstrip("/")}/nor18' if no_r18 and url else url,
     }
     exec(compile(module, str(path), 'exec'), namespace)  # noqa: S102
@@ -101,20 +101,20 @@ class UrlBuilderWiringTests(unittest.TestCase):
     def test_wuwa_appends_nor18_when_enabled(self) -> None:
         build = _url_builder(PACKAGE / 'gallery.py', '_gallery_api_url', no_r18=True)
         off = _url_builder(PACKAGE / 'gallery.py', '_gallery_api_url', no_r18=False)
-        self.assertEqual(build(), 'https://twfapi.xlinxc.cn/api/xwuid/roles/nor18')
-        self.assertEqual(off(), 'https://twfapi.xlinxc.cn/api/xwuid/roles')
+        self.assertEqual(build(), 'https://twf.xlinxc.cn/v1/api/xwuid/roles/nor18')
+        self.assertEqual(off(), 'https://twf.xlinxc.cn/v1/api/xwuid/roles')
 
     def test_loli_appends_nor18_when_enabled(self) -> None:
         build = _url_builder(PACKAGE / 'loli.py', '_loli_api_url', no_r18=True)
         off = _url_builder(PACKAGE / 'loli.py', '_loli_api_url', no_r18=False)
-        self.assertEqual(build(), 'https://twfapi.xlinxc.cn/loli/nor18')
-        self.assertEqual(off(), 'https://twfapi.xlinxc.cn/loli')
+        self.assertEqual(build(), 'https://twf.xlinxc.cn/v1/loli/nor18')
+        self.assertEqual(off(), 'https://twf.xlinxc.cn/v1/loli')
 
     def test_shota_appends_nor18_when_enabled(self) -> None:
         build = _url_builder(PACKAGE / 'shota.py', '_shota_api_url', no_r18=True)
         off = _url_builder(PACKAGE / 'shota.py', '_shota_api_url', no_r18=False)
-        self.assertEqual(build(), 'https://twfapi.xlinxc.cn/shota/nor18')
-        self.assertEqual(off(), 'https://twfapi.xlinxc.cn/shota')
+        self.assertEqual(build(), 'https://twf.xlinxc.cn/v1/shota/nor18')
+        self.assertEqual(off(), 'https://twf.xlinxc.cn/v1/shota')
 
     def test_untouched_categories_have_no_nor18_endpoint(self) -> None:
         # 战双与测试图库在服务端没有 nor18 端点，接线上去会 404 并让整条抽卡链路失败。

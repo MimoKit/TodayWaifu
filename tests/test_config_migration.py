@@ -61,7 +61,7 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(
             forced_urls,
             {
-                'DailyWifeApiUrl': 'https://twfapi.xlinxc.cn',
+                'DailyWifeApiUrl': 'https://twf.xlinxc.cn/v1',
             },
         )
 
@@ -70,7 +70,7 @@ class ConfigMigrationTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             # 标记固定在临时目录：迁移以「标记是否存在」判定是否执行，落到真实数据目录
             # 会既污染开发机、又让重复运行之间的判定互相干扰
-            marker = Path(directory) / '.remote_urls_v3_migrated'
+            marker = Path(directory) / '.remote_urls_v4_migrated'
             # 桩配置对象：迁移只会读写 config 映射与调用 write_config，用计数替身即可
             # 观测「是否发生回写」，无须构造 StringConfig
             config = SimpleNamespace(
@@ -91,8 +91,9 @@ class ConfigMigrationTests(unittest.TestCase):
                 'DailyWifeConfig': config,
                 '_FORCED_URL_MIGRATION_MARKER': marker,
                 '_FORCED_REMOTE_URLS': {
-                    'DailyWifeApiUrl': 'https://twfapi.xlinxc.cn',
+                    'DailyWifeApiUrl': 'https://twf.xlinxc.cn/v1',
                 },
+                '_LEGACY_OFFICIAL_HOSTS': ('twfapi.xlinxc.cn', 'twf.xlinxc.cn'),
                 '_LEGACY_KEYS_TO_REMOVE': [
                     'DailyWifeGalleryApiUrl',
                     'DailyWifeNormalGalleryApiUrl',
@@ -124,6 +125,35 @@ class ConfigMigrationTests(unittest.TestCase):
                 'https://later.example.test/gallery',
             )
             self.assertEqual(config.write_count, 1)
+
+    def test_legacy_official_host_is_force_rewritten(self) -> None:
+        # 旧官方域名已停用，必须强制改写；否则升级用户会一直请求失效接口，
+        # 而控制台显示的默认值又是新地址，故障很难从表象定位。
+        migration = _migration_module()
+        with TemporaryDirectory() as directory:
+            marker = Path(directory) / '.remote_urls_v4_migrated'
+            config = SimpleNamespace(
+                config={
+                    'DailyWifeApiUrl': SimpleNamespace(
+                        data='https://twfapi.xlinxc.cn/api/xwuid/roles'
+                    )
+                },
+                write_count=0,
+            )
+            config.write_config = lambda: setattr(config, 'write_count', config.write_count + 1)
+            namespace = {
+                'CONFIG_PATH': marker.parent / 'config.json',
+                'DailyWifeConfig': config,
+                '_FORCED_URL_MIGRATION_MARKER': marker,
+                '_FORCED_REMOTE_URLS': {'DailyWifeApiUrl': 'https://twf.xlinxc.cn/v1'},
+                '_LEGACY_OFFICIAL_HOSTS': ('twfapi.xlinxc.cn', 'twf.xlinxc.cn'),
+                '_LEGACY_KEYS_TO_REMOVE': [],
+            }
+            exec(compile(migration, '<config-migration>', 'exec'), namespace)
+            self.assertEqual(
+                config.config['DailyWifeApiUrl'].data,
+                'https://twf.xlinxc.cn/v1',
+            )
 
 
 if __name__ == '__main__':

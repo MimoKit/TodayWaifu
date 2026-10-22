@@ -57,30 +57,44 @@ DailyWifeConfig = StringConfig(
     CONFIG_DEFAULT,
 )
 
-_FORCED_URL_MIGRATION_MARKER = CONFIG_PATH.parent / '.remote_urls_v3_migrated'
+_FORCED_URL_MIGRATION_MARKER = CONFIG_PATH.parent / '.remote_urls_v4_migrated'
 _FORCED_REMOTE_URLS = {
-    'DailyWifeApiUrl': 'https://twfapi.xlinxc.cn',
+    'DailyWifeApiUrl': 'https://twf.xlinxc.cn/v1',
 }
+# v4 起图库 API 并入主域名的 /v1 前缀，旧域名 twfapi.xlinxc.cn 已停用。
+# 这两个主机上的旧值（无论带什么路径）必须强制改写，否则升级用户会一直请求失效接口；
+# 第三方自建图库的地址保持原样，避免误伤。
+_LEGACY_OFFICIAL_HOSTS = ('twfapi.xlinxc.cn', 'twf.xlinxc.cn')
 if not _FORCED_URL_MIGRATION_MARKER.is_file():
     # 旧键需在实例化之后再清一次：StringConfig 会把文件中的键载入 config 映射，并可能
     # 按默认值补全条目，只清理文件覆盖不到该路径。
     for _k in _LEGACY_KEYS_TO_REMOVE:
         if _k in DailyWifeConfig.config:
             del DailyWifeConfig.config[_k]
-    # 仅在用户未填写地址时写入官方地址：用户自定义值必须保留，否则升级会静默改写其
-    # 指向的图库服务。判空兼判空白，避免仅含空格的无效值阻挡迁移。
     for _key, _url in _FORCED_REMOTE_URLS.items():
         if _key in DailyWifeConfig.config:
             _config_item = DailyWifeConfig.config[_key]
-            if not str(_config_item.data or '').strip():
+            _current = str(_config_item.data or '').strip()
+            _rewrite = not _current
+            if _current:
+                try:
+                    from urllib.parse import urlparse as _urlparse
+                    _host = (
+                        _urlparse(_current if '://' in _current else 'https://' + _current).hostname or ''
+                    ).lower()
+                except Exception:
+                    _host = ''
+                _rewrite = _host in _LEGACY_OFFICIAL_HOSTS
+            if _rewrite:
                 _config_item.data = _url
     DailyWifeConfig.write_config()
     try:
         # 标记文件记录本次强制迁移已执行，使迁移严格幂等：后续启动不再重复清除旧键，
         # 也不会再次改写用户此后填入的地址。
-        _old_marker = CONFIG_PATH.parent / '.remote_urls_v2_migrated'
-        if _old_marker.is_file():
-            _old_marker.unlink()
+        for _old_marker_name in ('.remote_urls_v2_migrated', '.remote_urls_v3_migrated'):
+            _old_marker = CONFIG_PATH.parent / _old_marker_name
+            if _old_marker.is_file():
+                _old_marker.unlink()
         _FORCED_URL_MIGRATION_MARKER.touch()
     except OSError:
         pass

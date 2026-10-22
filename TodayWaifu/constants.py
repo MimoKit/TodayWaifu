@@ -29,7 +29,7 @@ HELP_ICON_PATH = BASE_DIR / 'ICON.png'
 
 
 # 图库基址与接口地址分离：接口路径可能随上游版本调整，基址则用于跨域资源引用。
-DEFAULT_GALLERY_BASE_URL = 'https://twfapi.xlinxc.cn'
+DEFAULT_GALLERY_BASE_URL = 'https://twf.xlinxc.cn/v1'
 DEFAULT_GALLERY_API_URL = f'{DEFAULT_GALLERY_BASE_URL}/api/xwuid/roles'
 
 

@@ -33,9 +33,9 @@ def _load_file_cache():
 
 file_cache = _load_file_cache()
 
-SIGNED_A = 'https://twfapi.xlinxc.cn/xwuid/1209/a.webp?e=1790791200&s=aaaabbbb'
-SIGNED_B = 'https://twfapi.xlinxc.cn/xwuid/1209/a.webp?e=1790812800&s=ccccdddd'
-PLAIN = 'https://twfapi.xlinxc.cn/xwuid/1209/a.webp'
+SIGNED_A = 'https://twf.xlinxc.cn/v1/xwuid/1209/a.webp?e=1790791200&s=aaaabbbb'
+SIGNED_B = 'https://twf.xlinxc.cn/v1/xwuid/1209/a.webp?e=1790812800&s=ccccdddd'
+PLAIN = 'https://twf.xlinxc.cn/v1/xwuid/1209/a.webp'
 
 
 class CanonicalUrlTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class CanonicalUrlTests(unittest.TestCase):
         self.assertEqual(file_cache.canonical_url(mixed), f'{PLAIN}?size=large')
 
     def test_different_paths_stay_distinct(self) -> None:
-        other = 'https://twfapi.xlinxc.cn/xwuid/1209/b.webp?e=1&s=x'
+        other = 'https://twf.xlinxc.cn/v1/xwuid/1209/b.webp?e=1&s=x'
         self.assertNotEqual(file_cache.canonical_url(other), file_cache.canonical_url(SIGNED_A))
 
     def test_empty_and_malformed_input(self) -> None:

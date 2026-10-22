@@ -66,8 +66,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeApiUrl': GsStrConfig(
         '图库接口统一地址',
-        '今日老婆全套图库接口统一地址，默认使用 https://twfapi.xlinxc.cn。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担',
-        'https://twfapi.xlinxc.cn',
+        '今日老婆全套图库接口统一地址，默认使用 https://twf.xlinxc.cn/v1。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担',
+        'https://twf.xlinxc.cn/v1',
     ),
     'DailyWifeApiNoR18': GsBoolConfig(
         '排除 R18 图片',
