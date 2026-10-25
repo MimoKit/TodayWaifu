@@ -208,8 +208,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     '_DividerAssignWife': GsDivider('分配老婆', ''),
     'DailyWifeAssignWhitelist': GsListStrConfig(
-        '分配老婆白名单',
-        '允许使用分配老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-分配老婆”服务中配置',
+        '分配老婆/老公白名单',
+        '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在对应服务中配置',
         [],
     ),
     'DailyWifeSpecifyWhitelist': GsListStrConfig(
@@ -278,6 +278,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '你今天的正太来啦！',
     ),
     '_DividerRob': GsDivider('抢夺设置', ''),
+    'DailyWifeRobProtectedUsers': GsListStrConfig(
+        '抢老婆/抢老公保护 QQ',
+        '填写需要保护的 QQ 号列表；名单全局生效，名单中的用户不能被抢老婆或抢老公。',
+        [],
+    ),
     'DailyWifeRobEnabled': GsBoolConfig(
         '启用抢老婆',
         '开启后可以使用"抢老婆 @对方"抢对方当天老婆',

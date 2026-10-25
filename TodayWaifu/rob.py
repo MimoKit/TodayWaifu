@@ -58,6 +58,17 @@ def _rob_success_template(kind: str) -> str:
     return str(_cfg(metadata.rob_success_key) or metadata.rob_success_default)
 
 
+def _is_rob_protected(user_id: str) -> bool:
+    # 名单来自全局配置，可能是列表，也可能是控制台保存的逗号/空格分隔文本；
+    # 两种形态都归一成去空白后的精确值集合，避免 "123 " 与 "123" 被当成两人。
+    configured = _cfg('DailyWifeRobProtectedUsers')
+    if isinstance(configured, (list, tuple, set)):
+        values = configured
+    else:
+        values = str(configured or '').replace(',', ' ').split()
+    return str(user_id).strip() in {str(value).strip() for value in values if str(value).strip()}
+
+
 def _build_rob_success_text(role: RoleCandidate, target_user_id: str, kind: str) -> str:
     # 模板变量由元数据约定：{name} 角色名、{role_id} 标识、{target} 被抢用户 ID
     template = _rob_success_template(kind)
@@ -104,6 +115,10 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
             f'要抢谁的{title}？请艾特对方，或在命令后面写对方 QQ。\n'
             'QQ 官方机器人等没有 QQ 号的平台，可直接粘贴对方的用户 ID。',
         )
+
+    # 保护名单在读取目标记录之前短路：被保护用户既不会被抢，也不暴露其当天记录
+    if _is_rob_protected(target_user_id):
+        return await _safe_send(bot, f'该用户受到保护，不能抢夺{title}~')
 
     robber_id = _user_key(ev)
     if target_user_id == robber_id:

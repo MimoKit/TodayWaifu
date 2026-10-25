@@ -156,7 +156,7 @@
       },
       {
         "key": "DailyWifeAssignWhitelist",
-        "expr": "GsListStrConfig('分配老婆白名单', '允许使用分配老婆功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在“今日老婆-分配老婆”服务中配置', [])"
+        "expr": "GsListStrConfig('分配老婆/老公白名单', '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关和权限可在对应服务中配置', [])"
       },
       {
         "key": "DailyWifeSpecifyWhitelist",
@@ -229,6 +229,10 @@
       {
         "key": "_DividerRob",
         "expr": "GsDivider('抢夺设置', '')"
+      },
+      {
+        "key": "DailyWifeRobProtectedUsers",
+        "expr": "GsListStrConfig('抢老婆/抢老公保护 QQ', '填写需要保护的 QQ 号列表；名单全局生效，名单中的用户不能被抢老婆或抢老公。', [])"
       },
       {
         "key": "DailyWifeRobEnabled",
@@ -419,6 +423,16 @@
       "file": "TodayWaifu/daily.py",
       "function": "assign_wife_usage",
       "decorator": "assign_wife_sv.on_fullmatch(('分配老婆', '分配今日老婆'), block=True, to_ai='显示分配今日老婆的用法。\\n    当用户只说“分配老婆”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['「分配老婆」的用法说明'], aliases=['今日老婆·分配老婆用法'])"
+    },
+    {
+      "file": "TodayWaifu/daily.py",
+      "function": "assign_husband",
+      "decorator": "assign_husband_sv.on_prefix(('分配老公', '分配今日老公'), block=True, to_ai='为指定用户分配今日老公。\\n    当管理员或用户说“给某人分配老公”“分配今日老公 @某人 角色名”时调用。\\n    Args:\\n        text: 分配参数，通常包含目标用户和老公名，例如“@用户 忌炎”。\\n    ', covers=['机器人主人为指定用户分配今日老公（含角色名）'], aliases=['今日老婆·分配老公'])"
+    },
+    {
+      "file": "TodayWaifu/daily.py",
+      "function": "assign_husband_usage",
+      "decorator": "assign_husband_sv.on_fullmatch(('分配老公', '分配今日老公'), block=True, to_ai='显示分配今日老公的用法。\\n    当用户只说“分配老公”但没有提供目标或角色名时调用。\\n    Args:\\n        text: 无需参数，留空。\\n    ', covers=['「分配老公」的用法说明'], aliases=['今日老婆·分配老公用法'])"
     },
     {
       "file": "TodayWaifu/daily.py",
