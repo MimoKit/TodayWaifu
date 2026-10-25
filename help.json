@@ -341,6 +341,14 @@
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
+      },
+      {
+        "name": "分配老公",
+        "desc": "主人为指定群友分配今日老公",
+        "eg": "分配老公 @对方 角色名",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
       }
     ]
   }
