@@ -40,7 +40,7 @@
       },
       {
         "key": "DailyWifeApiUrl",
-        "expr": "GsStrConfig('图库接口统一地址', '今日老婆全套图库接口统一地址，默认使用 https://twf.xlinxc.cn/v1。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担', 'https://twf.xlinxc.cn/v1')"
+        "expr": "GsStrConfig('图库接口统一地址', '今日老婆全套图库接口统一地址（默认使用官方地址，可在控制台改）。包含鸣潮/普通老婆/萝莉/正太/战双全套图库。启用图库即表示已知晓图片内容风险并自行承担', DEFAULT_GALLERY_BASE_URL)"
       },
       {
         "key": "DailyWifeApiNoR18",
@@ -52,7 +52,7 @@
       },
       {
         "key": "DailyWifePrefetchEnabled",
-        "expr": "GsBoolConfig('零点前预热图库图片', '每天 23:20 开始按低速率把候选角色图片预先下载到本地缓存，避免 0 点日期翻转后全员同时下载造成卡顿；仅图库模式生效，限时限量且可被取消', True)"
+        "expr": "GsBoolConfig('零点前预热图库图片', '每天 23:20 开始按低速率把候选角色图片预先下载到本地缓存，避免 0 点日期翻转后全员同时下载造成卡顿；仅图库模式生效，限时限量且可被取消，同一天最多预热一次（重启不会重跑整库下载）', True)"
       },
       {
         "key": "DailyWifeGalleryCacheMaxMB",

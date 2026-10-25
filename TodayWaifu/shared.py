@@ -528,13 +528,22 @@ async def _stop_blocking_executor_on_shutdown() -> None:
 
 @on_core_start_before(priority=-60)
 async def _start_gallery_prefetch_on_startup() -> None:
-    """启动零点前图库预热循环与图片投递 worker。"""
+    """启动预热循环与图片投递 worker，并从磁盘恢复已缓存图片索引。
+
+    索引只驻留内存，重启后必须重建：否则 `prefer_cached_urls` 退化为全量随机，
+    前一天预热过的图片等于白热。
+    """
     global _PREFETCH_TASK
-    from .prefetch import _prefetch_loop
+    from .prefetch import PREFETCH_TASK_NAME, _prefetch_loop, prefetch_task_running, restore_cached_url_index
 
     start_image_delivery_workers()
-    if _PREFETCH_TASK is None or _PREFETCH_TASK.done():
-        _PREFETCH_TASK = asyncio.create_task(_prefetch_loop())
+    await restore_cached_url_index()
+    if _PREFETCH_TASK is not None and not _PREFETCH_TASK.done():
+        return
+    # 插件热重载会丢掉模块级句柄，靠任务名认出上一份循环，避免两个循环同时下载
+    if prefetch_task_running():
+        return
+    _PREFETCH_TASK = asyncio.create_task(_prefetch_loop(), name=PREFETCH_TASK_NAME)
 
 
 @on_core_shutdown

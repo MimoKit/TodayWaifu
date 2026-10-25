@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import random
 from pathlib import Path
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from importlib.util import find_spec
 
 import gsuid_core
@@ -25,6 +23,7 @@ from .constants import (
     LOLI_IMAGE_DIR_NAME,
     LEGACY_ROLE_MAP_PATH,
     _cfg,
+    _now_shanghai,
     _daily_kind_metadata,
 )
 from .role_map_store import migrate_legacy_text_map
@@ -309,7 +308,7 @@ def _event_rng(ev: Event) -> random.Random:
 
 def _today_key() -> str:
     # 与 GsCore 调度器统一使用 Asia/Shanghai，避免 UTC 容器在北京时间早上才跨日。
-    return datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+    return _now_shanghai().date().isoformat()
 
 
 def _context_key(ev: Event) -> str:

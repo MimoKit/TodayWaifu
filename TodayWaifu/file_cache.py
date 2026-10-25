@@ -152,6 +152,54 @@ def _remember_cached_url(url: str) -> None:
     _CACHED_URL_HASHES.add(_cache_key(url))
 
 
+def has_url_cache(cache_root: Path, url: str) -> bool:
+    """只判断图片是否已落盘，不读取内容。
+
+    预热只关心「还要不要下载」：命中时若顺手把整张图读进内存再哈希、再压一遍，
+    一次重启补跑就会按张数累积出可观的读盘与 CPU。
+    """
+    path = url_hash_cache_path(cache_root, url)
+    try:
+        if path.is_file() and path.stat().st_size > 0:
+            _remember_cached_url(url)
+            return True
+    except OSError:
+        return False
+    return False
+
+
+_HEX_DIGITS = frozenset('0123456789abcdef')
+
+
+def _is_url_cache_name(name: str) -> bool:
+    # 缓存目录里还躺着压缩结果（shrink_ 前缀），只有 URL 摘要形状的文件名属于图片缓存
+    return len(name) == 64 and _HEX_DIGITS.issuperset(name)
+
+
+def rebuild_cached_url_index(cache_root: Path, limit: int = CACHED_URL_INDEX_MAX) -> int:
+    """用缓存目录里的文件名重建「已缓存 URL」索引，返回恢复的条目数。
+
+    索引只驻留内存，进程重启后为空，`prefer_cached_urls` 随即退化为全量随机——
+    预热过的图片等于白热。文件名本身就是缓存键，一次目录遍历即可还原，无需读盘。
+    """
+    if limit <= 0 or not cache_root.is_dir():
+        return 0
+    restored = 0
+    try:
+        with os.scandir(cache_root) as entries:
+            for entry in entries:
+                if restored >= limit:
+                    break
+                name = entry.name
+                if not _is_url_cache_name(name) or not entry.is_file():
+                    continue
+                _CACHED_URL_HASHES.add(name)
+                restored += 1
+    except OSError:
+        return restored
+    return restored
+
+
 def is_url_cached(url: str) -> bool:
     """判断该 URL 对应的图片是否已落盘，为纯内存查询，不产生 I/O。
 

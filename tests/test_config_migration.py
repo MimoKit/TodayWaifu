@@ -20,9 +20,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from official_gallery import (  # noqa: E402
-    DEFAULT_GALLERY_BASE_URL,
     LEGACY_GALLERY_HOSTS,
     OFFICIAL_GALLERY_HOST,
+    DEFAULT_GALLERY_BASE_URL,
 )
 
 

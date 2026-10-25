@@ -7,9 +7,9 @@ from gsuid_core.utils.plugins_config.gs_config import StringConfig
 
 from .config_default import CONFIG_DEFAULT, QQ_BOT_CONFIG_DEFAULT, APPEARANCE_CONFIG_DEFAULT
 from .official_gallery import (
-    DEFAULT_GALLERY_BASE_URL,
     LEGACY_GALLERY_HOSTS,
     OFFICIAL_GALLERY_HOST,
+    DEFAULT_GALLERY_BASE_URL,
 )
 
 # 配置须落在 GsCore data 目录而非插件目录：插件目录在升级、重装时会被整体覆盖，

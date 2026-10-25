@@ -8,13 +8,31 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from datetime import tzinfo, datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from .payloads import ConfigValue
 from .kind_metadata import DailyKindMetadata, daily_kind_metadata
-from ..daily_wife_config import DailyWifeConfig
 from ..official_gallery import DEFAULT_GALLERY_BASE_URL
+from ..daily_wife_config import DailyWifeConfig
 
 BASE_DIR = Path(__file__).parent.parent
+
+
+# 时区助手：优先用 tzdata 的 Asia/Shanghai。精简镜像（如未装 tzdata 的 Windows / 容器）
+# 里该时区不存在，直接构造会抛 ZoneInfoNotFoundError 并打断定时链路，故回落固定 UTC+8。
+_SHANGHAI_TZ: tzinfo | None = None
+
+
+def _now_shanghai() -> datetime:
+    """返回当前北京时间。"""
+    global _SHANGHAI_TZ
+    if _SHANGHAI_TZ is None:
+        try:
+            _SHANGHAI_TZ = ZoneInfo('Asia/Shanghai')
+        except (KeyError, OSError, ValueError):
+            _SHANGHAI_TZ = timezone(timedelta(hours=8), 'Asia/Shanghai')
+    return datetime.now(_SHANGHAI_TZ)
 
 
 # 内置角色对照表：单文件按模式分节，替代旧版 wife/husband/nte_role_id_map.txt。
@@ -118,19 +136,28 @@ CIRCUIT_COOLDOWN_SECONDS = 30.0
 
 
 # 零点前预热图库图片的时刻（本地时间）与时间上限。
-# 日期翻转后 `_daily_rng` 的种子随之改变，每个用户都会抽到新的图片 URL，
-# 磁盘缓存全部失效 —— 预热的唯一目的是让 00:00 的抽签直接命中缓存。
+# 日期翻转后每人重新抽签，新一天抽到的角色与图片与前一天无关，磁盘缓存对新一天整体
+# 失效 —— 预热的唯一目的是让 00:00 的抽签直接命中缓存。
 # 预热请求受图库的每 IP / 每 token 图片限流约束，不可推迟到 23:50 再突发下载；
 # 提前开始并降低速率，可为 00:00 预留完整的缓存窗口。
 PREFETCH_HOUR = 23
 
 
-# 分钟取值需保证从 PREFETCH_HOUR 起的可用时长（至 24:00）不超过 PREFETCH_MAX_SECONDS，
-# 否则预热会在零点后仍在运行，与本常量的语义相悖。
+# 预热窗口起点。窗口一律在零点结束：跨过零点的预热已无意义（日期早已翻转），
+# 还会与早高峰抢带宽，故实际预算取「墙钟上限」与「距零点剩余秒数」中的较小值。
 PREFETCH_MINUTE = 20
 
 
 PREFETCH_MAX_SECONDS = 30 * 60
+
+
+# 预热状态文件：记录「哪一天已经成功预热」，使重启后不再重跑整库下载。
+PREFETCH_STATE_FILE_NAME = 'prefetch_state.json'
+
+
+# 预热循环的 asyncio 任务名。插件热重载会重新导入模块并丢掉模块级句柄，
+# 只有靠任务名才能发现上一份循环仍在运行，避免两个循环同时下载。
+PREFETCH_TASK_NAME = 'todaywaifu-gallery-prefetch'
 
 
 # 预热每次真实下载之间的间隔。当前图库默认图片限流为 60/min，
@@ -138,8 +165,8 @@ PREFETCH_MAX_SECONDS = 30 * 60
 PREFETCH_DOWNLOAD_INTERVAL_SECONDS = 6.0
 
 
-# 启动后延迟补跑一次预热。重启可能发生在零点之后，此时缓存未必完整；
-# 已缓存的图片会被跳过，因此补跑的成本通常很低，可以安全地无条件下发。
+# 启动后延迟多久再检查预热窗口。留出这段延迟是为了不与 Core 启动抢数据库与线程池；
+# 检查只在窗口内且当天未完成时才真正下载，窗口外重启不产生任何预热流量。
 PREFETCH_STARTUP_DELAY_SECONDS = 60
 
 

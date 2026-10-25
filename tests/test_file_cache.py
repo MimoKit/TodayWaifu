@@ -137,5 +137,64 @@ class UrlCacheTests(unittest.TestCase):
             self.assertFalse(cache.write_url_cache(Path(directory), "https://a", b""))
 
 
+class UrlIndexRebuildTests(unittest.TestCase):
+    """重启后必须能从磁盘恢复「已缓存 URL」索引，否则预热过的图片等于白热。"""
+
+    def test_index_is_rebuilt_from_cache_directory_names(self) -> None:
+        cache = _load_module()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            url = "https://gallery/a.png"
+            self.assertTrue(cache.write_url_cache(root, url, b"image-bytes"))
+            # 模拟进程重启：模块内存里的索引整体丢失
+            cache.clear_cached_url_index()
+            self.assertFalse(cache.is_url_cached(url))
+
+            restored = cache.rebuild_cached_url_index(root)
+
+            self.assertEqual(restored, 1)
+            self.assertTrue(cache.is_url_cached(url))
+
+    def test_rebuild_ignores_shrink_artifacts(self) -> None:
+        cache = _load_module()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            # 压缩结果与图片缓存同目录存放，其文件名不是 URL 摘要，重建时不能计入索引
+            (root / "shrink_webp_2097152_deadbeef").write_bytes(b"x")
+            self.assertEqual(cache.rebuild_cached_url_index(root), 0)
+
+    def test_rebuild_is_bounded_and_tolerates_missing_directory(self) -> None:
+        cache = _load_module()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index in range(3):
+                cache.write_url_cache(root, f"https://gallery/{index}.png", b"x")
+            # 目录不存在时返回 0 而不是抛错：索引只用于优化，缺失应静默退化
+            self.assertEqual(cache.rebuild_cached_url_index(root / "absent"), 0)
+            # 上限生效，避免超大缓存目录把启动时间与内存拖长
+            self.assertEqual(cache.rebuild_cached_url_index(root, limit=2), 2)
+
+    def test_probe_detects_file_without_reading_it(self) -> None:
+        cache = _load_module()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            url = "https://gallery/probe.png"
+            self.assertFalse(cache.has_url_cache(root, url))
+            self.assertTrue(cache.write_url_cache(root, url, b"image-bytes"))
+
+            original = Path.read_bytes
+
+            def _forbidden(self) -> bytes:
+                raise AssertionError("预热探测不得读取图片内容")
+
+            Path.read_bytes = _forbidden
+            try:
+                self.assertTrue(cache.has_url_cache(root, url))
+            finally:
+                Path.read_bytes = original
+            # 探测同时要补记索引，否则后续抽签仍会走全量随机
+            self.assertTrue(cache.is_url_cached(url))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -87,7 +87,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     'DailyWifePrefetchEnabled': GsBoolConfig(
         '零点前预热图库图片',
         '每天 23:20 开始按低速率把候选角色图片预先下载到本地缓存，避免 0 点日期翻转后全员同时下载造成卡顿；'
-        '仅图库模式生效，限时限量且可被取消',
+        '仅图库模式生效，限时限量且可被取消，同一天最多预热一次（重启不会重跑整库下载）',
         True,
     ),
     'DailyWifeGalleryCacheMaxMB': GsIntConfig(
