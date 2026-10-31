@@ -71,7 +71,7 @@ core安装插件TodayWaifu
 `DailyWifeGalleryToken`，否则拉取列表和下载图片都会返回 403。
 
 令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，
-或前往 <https://twf.xlinxc.cn> 自助申请；留空则不携带令牌。无论通过哪种方式申请，
+或前往 [今日老婆令牌控制台](https://twf.xlinxc.cn) 自助申请；留空则不携带令牌。无论通过哪种方式申请，
 均需加入该交流群，未加群者不予审核。
 
 > [!WARNING]
