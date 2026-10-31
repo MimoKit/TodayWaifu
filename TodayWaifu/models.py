@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Protocol
 
-from sqlmodel import Field, delete, select
+from sqlmodel import Field, col, delete, select
 from sqlalchemy import Table, UniqueConstraint, func, tuple_
 from sqlalchemy.sql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
 from gsuid_core.utils.database.startup import exec_list
 from gsuid_core.utils.database.base_models import (
     BaseModel,
+    BaseIDModel,
     engine,
     with_session,
     with_read_session,
@@ -603,13 +604,118 @@ def _deduplicate_table_indexes(table: Table) -> None:
 _deduplicate_table_indexes(DailyWifeRecord.__table__)
 
 
+class DailyWifeMediaAsset(BaseIDModel, table=True):
+    """QQ 官方素材图床台账：记住每张已上传图片的引用，避免重复占用配额。
+
+    平台单机器人最多 100 张有效素材，且图片按「最后一次被引用」滑动过期。若每次发送都
+    重新上传，配额会在几十次会话内耗尽；因此按 (机器人 AppID, 图片内容哈希) 记一行，
+    有效期内直接复用平台给回的 ``qqbot-media://`` 引用。
+
+    主键是自增 id 而非哈希：同一张图可能在不同 AppID 下各有一份（配额按机器人独立计算），
+    业务唯一性交给 (appid, content_hash) 的唯一索引。
+    """
+
+    __table_args__ = (
+        UniqueConstraint('appid', 'content_hash'),
+        {'extend_existing': True},
+    )
+
+    appid: str = Field(default='', title='机器人 AppID', index=True)
+    content_hash: str = Field(default='', title='图片内容哈希', index=True)
+    image_id: str = Field(default='', title='平台图片 ID')
+    url: str = Field(default='', title='Markdown 引用链接')
+    expires_at: int = Field(default=0, title='平台侧过期时间')
+    created_at: int = Field(default=0, title='上传时间')
+    last_used_at: int = Field(default=0, title='上次本地使用时间')
+
+    @classmethod
+    @with_read_session
+    async def get_by_hash(
+        cls,
+        session: AsyncSession,
+        appid: str,
+        content_hash: str,
+    ) -> "DailyWifeMediaAsset | None":
+        """按内容哈希查台账；返回 None 表示这张图还没上传过（或已被清理）。"""
+        result = await session.execute(
+            select(cls).where(cls.appid == appid).where(cls.content_hash == content_hash)
+        )
+        return result.scalars().first()
+
+    @classmethod
+    @with_session
+    async def upsert(
+        cls,
+        session: AsyncSession,
+        appid: str,
+        content_hash: str,
+        image_id: str,
+        url: str,
+        expires_at: int,
+        created_at: int,
+        last_used_at: int,
+    ) -> None:
+        """写入或刷新一条台账，key 为 (appid, content_hash)。"""
+        result = await session.execute(
+            select(cls).where(cls.appid == appid).where(cls.content_hash == content_hash)
+        )
+        row = result.scalars().first()
+        if row is None:
+            session.add(
+                cls(
+                    appid=appid,
+                    content_hash=content_hash,
+                    image_id=image_id,
+                    url=url,
+                    expires_at=expires_at,
+                    created_at=created_at,
+                    last_used_at=last_used_at,
+                )
+            )
+            return
+        row.image_id = image_id
+        row.url = url
+        row.expires_at = expires_at
+        row.last_used_at = last_used_at
+
+    @classmethod
+    @with_session
+    async def touch(cls, session: AsyncSession, asset_id: int | None, now: int, expires_at: int) -> None:
+        """复用素材后刷新本地记账时间。
+
+        `expires_at` 必须一起顺延：平台对「被消息引用」的素材做滑动续期，本地若只更新
+        `last_used_at`，90 天后本地会判为过期而重新上传同一张图，平台的旧素材却因持续
+        被引用永不失效——配额就这样被同一张图反复占用。id 缺失（尚未落库）时静默跳过。
+        """
+        if asset_id is None:
+            return
+        row = await session.get(cls, asset_id)
+        if row is not None:
+            row.last_used_at = now
+            row.expires_at = expires_at
+
+    @classmethod
+    @with_session
+    async def forget(cls, session: AsyncSession, appid: str, image_ids: list[str]) -> int:
+        """平台侧素材被删除后同步清掉本地台账，避免复用失效引用。"""
+        if not image_ids:
+            return 0
+        result = await session.execute(
+            delete(cls).where(cls.appid == appid).where(col(cls.image_id).in_(image_ids))
+        )
+        return int(result.rowcount or 0)
+
+
 @on_core_start_before(priority=-70)
 async def _ensure_daily_wife_record_table() -> None:
     """补建本插件数据表：模型注册晚于 Core 全局建表，缺少该步骤时首启查询会因表不存在而失败。"""
     async with engine.begin() as conn:
         await conn.run_sync(
             DailyWifeRecord.metadata.create_all,
-            tables=[DailyWifeRecord.metadata.tables['dailywiferecord']],
+            tables=[
+                DailyWifeRecord.metadata.tables['dailywiferecord'],
+                DailyWifeMediaAsset.metadata.tables['dailywifemediaasset'],
+            ],
             checkfirst=True,
         )
 
@@ -620,6 +726,24 @@ exec_list.append(
     'ix_daily_wife_record_business_key '
     'ON DailyWifeRecord (day, bot_id, group_id, bucket, user_id)'
 )
+
+# 素材台账的业务键索引：查「这张图传过没有」是每次出图的热路径，缺索引会全表扫。
+exec_list.append(
+    'CREATE UNIQUE INDEX IF NOT EXISTS '
+    'ix_daily_wife_media_asset_business_key '
+    'ON DailyWifeMediaAsset (appid, content_hash)'
+)
+
+
+@site.register_admin
+class DailyWifeMediaAssetAdmin(GsAdminModel):
+    pk_name = 'id'
+    page_schema = PageSchema(
+        label='今日老婆素材图床',
+        icon='fa fa-picture-o',
+    )  # type: ignore
+
+    model = DailyWifeMediaAsset
 
 
 @site.register_admin

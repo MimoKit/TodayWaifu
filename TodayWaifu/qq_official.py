@@ -24,7 +24,7 @@ import hashlib
 import mimetypes
 from io import BytesIO
 from uuid import uuid4
-from typing import Union, Protocol
+from typing import Union, Callable, Protocol, Awaitable
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -330,7 +330,36 @@ def _upload_image_sync(image: bytes) -> tuple[str, tuple[int, int]]:
     return public_url, size
 
 
+# QQ 素材图床的上传实现与「是否可用」判定，由 _bind_media_backend() 在模块导入末尾绑定。
+# 用可替换的模块级引用而不是在函数里直接 import，一是避免 qq_official ↔ media_images
+# 互相依赖，二是让契约测试可以只替换这两个名字，不必拉起数据库与网络依赖。
+_MEDIA_UPLOAD: Callable[[bytes], Awaitable[tuple[str, tuple[int, int]]]] | None = None
+_MEDIA_READY: Callable[[], bool] | None = None
+
+
+def _bind_media_backend() -> None:
+    """把 QQ 素材图床接入上传链路；未启用或未配置时保持回落 COS。"""
+    global _MEDIA_UPLOAD, _MEDIA_READY
+    from . import media_images
+
+    def _ready() -> bool:
+        media_images.warn_if_enabled_without_credentials()
+        return media_images.media_upload_enabled() and media_images.media_configured()
+
+    _MEDIA_READY = _ready
+    _MEDIA_UPLOAD = media_images.ensure_media_url
+
+
 async def _upload_image(image: bytes) -> tuple[str, tuple[int, int]]:
+    """上传结果图并返回 (可写进 Markdown 的地址, 原图尺寸)。
+
+    优先用 QQ 官方素材图床：引用形如 ``qqbot-media://image/v1/<token>``，由平台托管，
+    不必自建公网图床。未启用或没填凭据时回落到腾讯云 COS 的签名地址，保持旧部署不变。
+    """
+    uploader = _MEDIA_UPLOAD
+    ready = _MEDIA_READY
+    if uploader is not None and ready is not None and ready():
+        return await uploader(image)
     return await run_blocking(_upload_image_sync, image)
 
 
@@ -519,3 +548,7 @@ def _generate_petpet_meme_sync(avatar: bytes) -> bytes:
 
 async def _generate_petpet_meme(avatar: bytes) -> bytes:
     return await run_blocking(_generate_petpet_meme_sync, avatar)
+
+
+# 模块加载末尾绑定素材图床后端：此后 _upload_image 才可能走 qqbot-media://。
+_bind_media_backend()

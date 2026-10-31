@@ -437,6 +437,44 @@ QQ_BOT_CONFIG_DEFAULT: Dict[str, GSC] = {
         '本页其余配置项均不生效',
         False,
     ),
+    '_DividerQqBotMedia': GsDivider('QQ 官方素材图床（免 COS）', ''),
+    'DailyWifeQqBotMediaEnabled': GsBoolConfig(
+        '启用 QQ 素材图床',
+        '开启后结果图上传到 QQ 开放平台的「素材管理」，用平台返回的 qqbot-media:// 引用写进 Markdown，'
+        '不需要自建图床；关闭则继续用下面的腾讯云 COS。'
+        '平台限制单机器人 100 张有效素材，超出会被拒绝，故本插件会自动清理最久未用的素材',
+        False,
+    ),
+    'DailyWifeQqBotMediaAppId': GsStrConfig(
+        '机器人 AppID',
+        '开放平台管理端里该机器人的 AppID，用于换取 access_token（每个 AppID 各算 100 张配额）',
+        '',
+    ),
+    'DailyWifeQqBotMediaAppSecret': GsStrConfig(
+        '机器人 AppSecret',
+        '与 AppID 配套的 ClientSecret，仅保存在本机运行配置中，切勿泄露',
+        '',
+        secret=True,
+    ),
+    'DailyWifeQqBotMediaApiBase': GsStrConfig(
+        '素材接口基址',
+        '默认 https://api.bot.qq.com；开放平台若调整域名或走测试环境时改这里',
+        'https://api.bot.qq.com',
+    ),
+    '_DividerQqBotMediaQuota': GsDivider('素材配额与清理', ''),
+    'DailyWifeQqBotMediaQuota': GsIntConfig(
+        '素材数量上限(张)',
+        '平台硬上限 100 张，填更大的值按 100 生效。用于在配额吃紧前主动清理，而不是等到被平台拒绝',
+        100,
+        100,
+    ),
+    'DailyWifeQqBotMediaReserve': GsIntConfig(
+        '预留配额(张)',
+        '始终空出几张不用，方便你在开放平台手动上传素材；'
+        '有效素材达到「上限 − 预留」时，插件会删除最久未被引用的素材再上传',
+        10,
+        100,
+    ),
     '_DividerQqBotCos': GsDivider('腾讯云 COS 图床', ''),
     'DailyWifeQqBotCosRegion': GsStrConfig(
         'COS 存储桶地域',

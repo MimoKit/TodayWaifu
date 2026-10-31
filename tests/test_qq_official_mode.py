@@ -149,6 +149,9 @@ def _load_namespace(config: dict[str, Any] | None = None) -> dict[str, Any]:
         elif isinstance(node, ast.Assign):
             # 保留模块常量（Markdown 尺寸上限、扩展名映射、官方 bot id 集合等）
             body.append(node)
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            # 带类型标注的常量同样是模块状态（如素材图床的可替换实现），缺了会让被测函数 NameError
+            body.append(node)
 
     values = dict(config if config is not None else _CONFIG)
 
@@ -535,7 +538,14 @@ class QqOfficialConfigContractTests(unittest.TestCase):
                 for keyword in getattr(value, 'keywords', []):
                     if keyword.arg == 'secret' and isinstance(keyword.value, ast.Constant) and keyword.value.value:
                         secrets.add(key.value)
-        self.assertEqual(secrets, {'DailyWifeQqBotCosSecretId', 'DailyWifeQqBotCosSecretKey'})
+        self.assertEqual(
+            secrets,
+            {
+                'DailyWifeQqBotCosSecretId',
+                'DailyWifeQqBotCosSecretKey',
+                'DailyWifeQqBotMediaAppSecret',
+            },
+        )
 
     def test_cnb_upload_is_fully_removed(self) -> None:
         # CNB 已淘汰，其上传实现、配置键与常量都不得残留。

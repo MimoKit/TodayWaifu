@@ -93,8 +93,10 @@ def _load_models_with_sqlite() -> tuple[Any, Any, Any]:
 
         return wrapped
 
-    class BaseModel(SQLModel):
+    class BaseIDModel(SQLModel):
         id: int | None = Field(default=None, primary_key=True)
+
+    class BaseModel(BaseIDModel):
         bot_id: str = Field(index=True)
         user_id: str = Field(index=True)
 
@@ -137,6 +139,7 @@ def _load_models_with_sqlite() -> tuple[Any, Any, Any]:
     mount_app.site = _Site()
     core_modules['gsuid_core.utils.database.startup'].exec_list = []
     base_models = core_modules['gsuid_core.utils.database.base_models']
+    base_models.BaseIDModel = BaseIDModel
     base_models.BaseModel = BaseModel
     base_models.engine = None
     base_models.with_session = with_session
