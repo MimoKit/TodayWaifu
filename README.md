@@ -61,7 +61,7 @@ core安装插件TodayWaifu
 今日老婆帮助
 ```
 
-本仓库不包含角色图片。首次安装使用 `local` 时，需要已有 XutheringWavesUID 本地图库，
+本仓库不包含角色图片。首次安装使用 `local` 时，需要已有 [XutheringWavesUID](https://github.com/Loping151/XutheringWavesUID) 本地图库，
 或在 `DailyWifeCustomRolePilePath` 配置自己的角色图片目录；没有本地图片时，可将对应来源改为
 `gallery`，并填写下方的图库访问令牌。
 
