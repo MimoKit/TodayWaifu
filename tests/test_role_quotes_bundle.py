@@ -80,8 +80,8 @@ class BundledQuotesTests(unittest.TestCase):
         """内置库要覆盖绝大多数对照表角色，但不强制要求逐个齐全。
 
         新角色先加进 role_id_map.json、台词后补是正常节奏：没收录的角色在运行时
-        会回退 default_quotes（见 get_role_quote / daily.py 的 `if quote:`），
-        不会静默没台词，所以不该因为少一个角色就把 CI 卡红。
+        返回空串、不显示台词行（见 get_role_quote / daily.py 的 `if quote:`），
+        所以不该因为少一个角色就把 CI 卡红。
 
         这条断言真正要守的是「台词库整体塌掉」那类回归（曾出现内置库缺失、
         装完插件后台词功能静默为空），因此用覆盖率下限而不是精确相等。
@@ -118,12 +118,9 @@ class BundledQuotesTests(unittest.TestCase):
                 self.assertLessEqual(len(quote), MAX_QUOTE_LENGTH, f'{name}: {quote}')
                 self.assertTrue(quote.strip(), f'{name} 存在空台词')
 
-    def test_default_quotes_present(self) -> None:
-        # 兜底台词非空是「未收录角色不会静默没台词」的唯一保障：缺失时 get_role_quote
-        # 返回空串，调用方直接省略台词行且不留任何提示。
-        defaults = self.payload.get('default_quotes')
-        self.assertIsInstance(defaults, list)
-        self.assertTrue(defaults, '需要兜底台词，否则未收录角色仍会静默没有台词')
+    def test_default_quotes_removed(self) -> None:
+        # 通用文本兜底已按需求移除：未收录角色直接不显示台词行，不再编造通用话术。
+        self.assertNotIn('default_quotes', self.payload, '台词库不应保留通用文本兜底')
 
 
 def _function_source(path: Path, name: str) -> str:
