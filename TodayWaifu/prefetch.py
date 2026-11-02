@@ -54,7 +54,7 @@ async def _prefetch_once() -> dict[str, int]:
     ``truncated`` 表示撞到时间上限（本轮没走完，下次窗口可继续）。
     """
     stats = dict(_EMPTY_STATS)
-    if not _cfg_bool('DailyWifePrefetchEnabled', True):
+    if not _cfg_bool('DailyWifePrefetchEnabled', False):
         stats['skipped'] = 1
         return stats
     # 只有跟随图库的功能才需要预热，本地图片源没有网络下载

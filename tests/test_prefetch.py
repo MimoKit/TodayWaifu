@@ -229,11 +229,11 @@ class PrefetchBoundednessTests(unittest.TestCase):
 
     def test_prefetch_is_opt_outable_and_bounded_per_role(self) -> None:
         # 两个配置键缺一不可：开关用于在图库限速的部署上停用预热，每角色张数用于控制
-        # 下载总量；默认开启是因为该功能的价值正来自「默认就生效」。
+        # 下载总量；默认关闭，需要预热的部署自行开启。
         config = (ROOT / 'config_default.py').read_text(encoding='utf-8')
         self.assertIn("'DailyWifePrefetchEnabled'", config)
         self.assertIn("'DailyWifePrefetchImagesPerRole'", config)
-        # 默认开启（否则等于没修），但每角色张数要小
+        # 默认关闭，但每角色张数要小
         self.assertIn('GsBoolConfig(', config)
 
     def test_prefetch_only_runs_in_gallery_mode_and_respects_the_switch(self) -> None:
@@ -241,7 +241,7 @@ class PrefetchBoundednessTests(unittest.TestCase):
         # 对其预热只会空转磁盘 IO 并把耗时计入墙钟预算。
         source = PREFETCH.read_text(encoding='utf-8')
         body = source[source.index('async def _prefetch_once(') : source.index('def _prefetch_modes(')]
-        self.assertIn("_cfg_bool('DailyWifePrefetchEnabled', True)", body)
+        self.assertIn("_cfg_bool('DailyWifePrefetchEnabled', False)", body)
         # 图片来源按功能拆分后，预热只针对跟随图库的那些功能
         self.assertIn("if _image_source(mode) == 'gallery'", body)
         self.assertIn('PREFETCH_MAX_SECONDS', body)
