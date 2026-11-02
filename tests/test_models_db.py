@@ -54,8 +54,16 @@ class DailyWifeRecordDbTests(unittest.TestCase):
         cls._engine = engine
 
         async def _init() -> None:
+            # 只建本用例用到的表：SQLModel.metadata 是进程级共享的，前序用例加载的真实 Core
+            # 模型已把同名索引登记进去，全量 create_all 会撞上「index already exists」。
             async with engine.begin() as conn:
-                await conn.run_sync(SQLModel.metadata.create_all)
+                await conn.run_sync(
+                    lambda c: SQLModel.metadata.create_all(
+                        c,
+                        tables=[cls.models.DailyWifeRecord.__table__],
+                        checkfirst=True,
+                    )
+                )
 
         asyncio.run(_init())
         # 把 with_session 用的全局 session 工厂指向临时库：被测方法由装饰器自行取会话，

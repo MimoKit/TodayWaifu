@@ -163,8 +163,16 @@ def _load_models_with_sqlite() -> tuple[Any, Any, Any]:
     spec.loader.exec_module(module)
 
     async def initialize() -> None:
+        # 只建本用例用到的表：SQLModel.metadata 是进程级共享的，前序用例加载的真实 Core
+        # 模型已把同名索引登记进去，全量 create_all 会撞上「index already exists」。
         async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
+            await conn.run_sync(
+                lambda c: SQLModel.metadata.create_all(
+                    c,
+                    tables=[module.DailyWifeRecord.__table__],
+                    checkfirst=True,
+                )
+            )
 
     async def dispose() -> None:
         await engine.dispose()
