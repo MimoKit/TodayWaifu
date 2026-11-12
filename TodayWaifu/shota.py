@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import json
+
 from .shared import (
     LOG_PREFIX,
     CACHE_TTL_SECONDS,
@@ -18,7 +20,6 @@ from .shared import (
     GalleryPayload,
     RoleRecordValue,
     _cfg,
-    json,
     logger,
     shota_sv,
     _user_key,

@@ -6,6 +6,11 @@
 """
 from __future__ import annotations
 
+import re
+import json
+import time
+import shutil
+
 from .shared import (
     LOG_PREFIX,
     IMAGE_EXTENSIONS,
@@ -23,12 +28,8 @@ from .shared import (
     GalleryPayload,
     MessageSegment,
     RoleRecordValue,
-    re,
     _cfg,
-    json,
-    time,
     logger,
-    shutil,
     loli_sv,
     _user_key,
     _daily_rng,

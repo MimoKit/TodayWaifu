@@ -6,11 +6,12 @@
 """
 from __future__ import annotations
 
+import time
+
 from .shared import (
     LOG_PREFIX,
     Bot,
     Event,
-    time,
     logger,
     _user_key,
     _safe_send,

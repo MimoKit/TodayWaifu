@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+import re
+import time
+import random
+
 from .shared import (
     LOG_PREFIX,
     LIST_FORWARD_THRESHOLD,
@@ -20,11 +24,8 @@ from .shared import (
     MessageSegment,
     MemberCandidate,
     RoleRecordValue,
-    re,
     _cfg,
-    time,
     logger,
-    random,
     _cfg_bool,
     _user_key,
     _daily_rng,

@@ -8,20 +8,13 @@
 """
 from __future__ import annotations
 
-import re
 import sys
-import json
 import time
-import random
-import shutil
 import asyncio
-import hashlib
-import binascii
 from pathlib import Path
 from datetime import date, timedelta
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -32,7 +25,6 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event, Message
 from gsuid_core.server import on_core_shutdown, on_core_start_before
 from gsuid_core.segment import MessageSegment
-from gsuid_core.data_store import get_res_path
 from gsuid_core.help.utils import register_help
 from gsuid_core.utils.database.models import CoreUser
 
@@ -328,13 +320,11 @@ __all__ = [
     '_wife_state', '_writable_role_map_path', '_writable_role_pile_root',
     'DailyWifeRecord',
     'read_file_bytes_cached', 'is_url_cached', 'prefer_cached_urls',
-    'asyncio', 'binascii', 'core_config', 'date', 'get_res_path',
     'assign_husband_sv', 'assign_wife_sv', 'custom_role_sv', 'daily_husband_sv', 'daily_normal_wife_sv',
     'daily_nte_wife_sv', 'daily_wife_sv',
     'divorce_sv', 'gift_sv', 'help_sv', 'husband_list_sv', 'image_upload_sv', 'loli_manage_sv', 'loli_sv', 'shota_sv',
     'marry_member_sv', 'pgr_wife_sv', 'rob_sv', 'specify_wife_sv', 'wife_list_sv',
-    'hashlib', 'json', 'logger', 'random', 're', 'register_help', 'shutil', 'time',
-    'urlopen', 'urlparse',
+    'logger', 'register_help',
 ]
 
 

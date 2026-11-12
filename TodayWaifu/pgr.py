@@ -6,6 +6,9 @@ pgr 分桶（与鸣潮、异环相互独立），并在同一用户当天已有�
 """
 from __future__ import annotations
 
+import time
+import random
+
 from .daily import _build_text
 from .shared import (
     LOG_PREFIX,
@@ -15,9 +18,7 @@ from .shared import (
     Event,
     WifeRecord,
     RoleCandidate,
-    time,
     logger,
-    random,
     _cfg_bool,
     _user_key,
     _daily_rng,

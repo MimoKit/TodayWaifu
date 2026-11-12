@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from pathlib import Path
 from collections import OrderedDict
 
@@ -22,7 +23,6 @@ from .shared import (
     Event,
     MessageSegment,
     logger,
-    asyncio,
     help_sv,
     _safe_send,
     register_help,

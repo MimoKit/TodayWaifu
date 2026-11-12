@@ -9,6 +9,10 @@
 """
 from __future__ import annotations
 
+import re
+import time
+import shutil
+
 from .shared import (
     LOG_PREFIX,
     IMAGE_EXTENSIONS,
@@ -22,10 +26,7 @@ from .shared import (
     Message,
     MessageSegment,
     PendingCustomRoleDelete,
-    re,
-    time,
     logger,
-    shutil,
     _user_key,
     _safe_send,
     _context_key,
