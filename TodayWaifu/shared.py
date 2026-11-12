@@ -430,7 +430,9 @@ async def _prune_old_daily_records() -> None:
     retention_days = _record_retention_days()
     if retention_days <= 0:
         return
-    cutoff = (date.today() - timedelta(days=retention_days)).isoformat()
+    # 用与写入同源的北京时间当天做基准：date.today() 跟随服务器本地时区，在 UTC
+    # 容器里会比 _today_key() 早 8 小时，跨日前后可能把仍在保留期内的记录删掉。
+    cutoff = (date.fromisoformat(_today_key()) - timedelta(days=retention_days)).isoformat()
     try:
         removed = await DailyWifeRecord.delete_before(cutoff)
     except SQLAlchemyError as exc:
