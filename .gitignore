@@ -12,3 +12,5 @@ __pycache__/
 daily_wife_data.json
 data/
 group_member_avatar_cache/
+.coverage
+htmlcov/
