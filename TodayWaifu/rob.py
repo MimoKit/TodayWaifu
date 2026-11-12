@@ -208,20 +208,8 @@ async def _send_rob_daily(bot: Bot, ev: Event, kind: str = 'wife') -> None:
     )
 
 
-async def _send_rob_wife(bot: Bot, ev: Event) -> None:
-    await _send_rob_daily(bot, ev, 'wife')
 
 
-async def _send_rob_husband(bot: Bot, ev: Event) -> None:
-    await _send_rob_daily(bot, ev, 'husband')
-
-
-async def _send_rob_loli(bot: Bot, ev: Event) -> None:
-    await _send_rob_daily(bot, ev, 'loli')
-
-
-async def _send_rob_shota(bot: Bot, ev: Event) -> None:
-    await _send_rob_daily(bot, ev, 'shota')
 
 
 # ── 触发器注册 ────────────────────────────────────────────────────────────────
@@ -242,7 +230,7 @@ async def _send_rob_shota(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'],
 )
 async def rob_wife(bot: Bot, ev: Event) -> None:
-    await _send_rob_wife(bot, ev)
+    await _send_rob_daily(bot, ev, 'wife')
 
 
 @rob_sv.on_fullmatch(
@@ -257,7 +245,7 @@ async def rob_wife(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢老婆', '今日老婆·抢婆娘'],
 )
 async def rob_wife_at(bot: Bot, ev: Event) -> None:
-    await _send_rob_wife(bot, ev)
+    await _send_rob_daily(bot, ev, 'wife')
 
 
 @rob_sv.on_prefix(
@@ -272,7 +260,7 @@ async def rob_wife_at(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢老公'],
 )
 async def rob_husband(bot: Bot, ev: Event) -> None:
-    await _send_rob_husband(bot, ev)
+    await _send_rob_daily(bot, ev, 'husband')
 
 
 @rob_sv.on_fullmatch(
@@ -287,7 +275,7 @@ async def rob_husband(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢老公'],
 )
 async def rob_husband_at(bot: Bot, ev: Event) -> None:
-    await _send_rob_husband(bot, ev)
+    await _send_rob_daily(bot, ev, 'husband')
 
 
 @rob_sv.on_prefix(
@@ -302,7 +290,7 @@ async def rob_husband_at(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢萝莉'],
 )
 async def rob_loli(bot: Bot, ev: Event) -> None:
-    await _send_rob_loli(bot, ev)
+    await _send_rob_daily(bot, ev, 'loli')
 
 
 @rob_sv.on_fullmatch(
@@ -317,7 +305,7 @@ async def rob_loli(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢萝莉'],
 )
 async def rob_loli_at(bot: Bot, ev: Event) -> None:
-    await _send_rob_loli(bot, ev)
+    await _send_rob_daily(bot, ev, 'loli')
 
 
 @rob_sv.on_prefix(
@@ -332,7 +320,7 @@ async def rob_loli_at(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢正太'],
 )
 async def rob_shota(bot: Bot, ev: Event) -> None:
-    await _send_rob_shota(bot, ev)
+    await _send_rob_daily(bot, ev, 'shota')
 
 
 @rob_sv.on_fullmatch(
@@ -347,4 +335,4 @@ async def rob_shota(bot: Bot, ev: Event) -> None:
     aliases=['今日老婆·抢正太'],
 )
 async def rob_shota_at(bot: Bot, ev: Event) -> None:
-    await _send_rob_shota(bot, ev)
+    await _send_rob_daily(bot, ev, 'shota')

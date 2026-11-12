@@ -119,8 +119,12 @@ class ShotaGalleryContractTests(unittest.TestCase):
         self.assertIn('你今天的正太来啦！', shota_source)
 
         # Rob / Gift / Divorce support
-        self.assertIn('_send_rob_shota', rob_source)
-        self.assertIn('_send_gift_shota', gift_source)
+        # 断言的是「正太被接进这条链路」，不是某个中间函数名——
+        # 曾经用 _send_rob_shota 这类一层转发做接线，去掉转发层后要跟着改断言形式。
+        self.assertIn("_send_rob_daily(bot, ev, 'shota')", rob_source)
+        self.assertIn("_send_gift_daily(bot, ev, 'shota')", gift_source)
+        self.assertIn("_accept_gift_daily(bot, ev, 'shota')", gift_source)
+        self.assertIn("_reject_gift_daily(bot, ev, 'shota')", gift_source)
         self.assertIn('divorce_shota', divorce_source)
 
 
