@@ -1,6 +1,6 @@
 [project]
 name = "todaywaifu"
-version = "1.0.0"
+version = "1.0.1"
 description = "基于 GsCore 框架的多游戏「今日老婆」娱乐插件"
 requires-python = ">=3.11,<4.0"
 authors = [{ name = "MimoKit" }]
@@ -15,6 +15,6 @@ dependencies = [
 [tool.gsuid]
 name = "TodayWaifu"
 desc = "多游戏「今日老婆」，含抽老婆 / 抢 / 送 / 离婚、萝莉 / 正太 / 异环 / 战双、自定义角色图库"
-version = "1.0.0"
+version = "1.0.1"
 author = "MimoKit"
 icon = "ICON.png"

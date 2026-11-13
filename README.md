@@ -7,7 +7,7 @@
 <h1 align="center">TodayWaifu</h1>
 <h4 align="center">✨ 基于 GsCore 框架的多游戏「今日老婆」娱乐插件 ✨</h4>
 
-<p align="center">当前版本：<code>v1.0.0</code></p>
+<p align="center">当前版本：<code>v1.0.1</code></p>
 
 <div align="center">
   <a href="https://github.com/Genshin-bots/gsuid_core">早柚核心</a> &nbsp;·&nbsp;
