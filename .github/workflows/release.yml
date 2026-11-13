@@ -1,0 +1,258 @@
+name: Release
+
+# 打 tag（v1.2.3 或 1.2.3）即触发：跑测试 → 校验版本号一致 → 打包 → 发 Release。
+# 手动触发时只需填版本号，工作流自己提交版本变更并打 tag。
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不带 v，如 1.0.2）'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: 校验
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 解析版本号
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            raw="$INPUT_VERSION"
+          else
+            raw="$REF_NAME"
+          fi
+          version="${raw#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::版本号格式不对：'$raw'，应为 1.2.3 或 v1.2.3"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "解析到版本：$version"
+
+      - name: 校验三处版本号一致
+        # 版本号在 pyproject.toml 的 [project] 与 [tool.gsuid] 各一处，version.py 一处。
+        # 三处必须相同，否则控制台显示与实际发布版本会不一致。
+        env:
+          EXPECTED: ${{ steps.version.outputs.version }}
+        run: |
+          python -c '
+          import os, re, sys, tomllib, pathlib
+
+          expected = os.environ["EXPECTED"]
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+          py_ver = re.search(
+              r"TodayWaifu_version\s*=\s*\"([^\"]+)\"",
+              pathlib.Path("TodayWaifu/version.py").read_text(encoding="utf-8"),
+          ).group(1)
+
+          got = {
+              "pyproject [project].version": data["project"]["version"],
+              "pyproject [tool.gsuid].version": data["tool"]["gsuid"]["version"],
+              "TodayWaifu/version.py": py_ver,
+          }
+          bad = {k: v for k, v in got.items() if v != expected}
+          for k, v in got.items():
+              mark = "x" if k in bad else "v"
+              print(f"{mark} {k} = {v}")
+          if bad:
+              print(f"::error::以上版本号应为 {expected}")
+              sys.exit(1)
+          '
+
+      - name: 安装测试依赖
+        # 版本范围与 test.yml 保持一致：sqlmodel 0.0.48+ 会放开 SQLAlchemy 上界，
+        # 拉到 2.1.x 后 greenlet 变成可选 extra，真实 SQLite 用例会假性失败。
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pillow ruff "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet
+
+      - name: 跑测试
+        run: python -m pytest tests/ -q
+
+      - name: Ruff
+        run: ruff check .
+
+  package:
+    name: 打包并发布
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 手动触发时写入版本号并打 tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          python -c '
+          import os, re, pathlib
+
+          version = os.environ["VERSION"]
+
+          # pyproject.toml：[project] 与 [tool.gsuid] 各有一处 version，按段落处理，
+          # 不做全局替换（将来若加了别的 version 字段会误伤）。
+          p = pathlib.Path("pyproject.toml")
+          lines = p.read_text(encoding="utf-8").splitlines()
+          section = ""
+          for i, line in enumerate(lines):
+              stripped = line.strip()
+              if stripped.startswith("[") and stripped.endswith("]"):
+                  section = stripped
+                  continue
+              if section in ("[project]", "[tool.gsuid]") and re.match(r"^version\s*=", stripped):
+                  lines[i] = "version = \"%s\"" % version
+          p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          pathlib.Path("TodayWaifu/version.py").write_text(
+              "TodayWaifu_version = \"%s\"\n" % version, encoding="utf-8"
+          )
+          print("已写入版本", version)
+          '
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml TodayWaifu/version.py
+          git commit -m "🔖 发布 v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin HEAD:main
+          git push origin "v${VERSION}"
+
+      - name: 组装压缩包
+        # 只打插件本体：排除开发产物、IDE 配置、测试与 CI 文件。
+        # GsCore 安装插件时会解压到 plugins/<name>/，压缩包内须有一个顶层目录，
+        # 外层 __init__.py 与 __nest__.py 要在这个目录里。
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          python -c '
+          import os, sys, zipfile, pathlib
+
+          stage = "TodayWaifu"
+          out = "TodayWaifu-%s.zip" % os.environ["VERSION"]
+          root = pathlib.Path(".")
+
+          EXCLUDE_DIRS = {
+              ".git", ".github", ".vscode", ".idea",
+              "tests", "__pycache__", ".pytest_cache", ".ruff_cache",
+              ".venv", "venv", "data", "node_modules",
+          }
+          EXCLUDE_FILES = {
+              ".gitignore", ".gitattributes", ".coverage",
+              "pyrightconfig.json", "ruff.toml", ".pre-commit-config.yaml",
+              "COMMIT_TEMPLATE.md", "daily_wife_config.py",
+          }
+          EXCLUDE_SUFFIX = (".pyc", ".pyo", ".log", ".tmp")
+
+          def keep(path, base):
+              rel = path.relative_to(base)
+              if set(rel.parts[:-1]) & EXCLUDE_DIRS:
+                  return False
+              if rel.name in EXCLUDE_FILES:
+                  return False
+              if rel.name.endswith(EXCLUDE_SUFFIX):
+                  return False
+              return True
+
+          # 插件本体在子目录 TodayWaifu/ 里，仓库根还有 __init__.py / __nest__.py 等
+          # 要一起打包的文件（放进压缩包的同名顶层目录）。
+          include = [
+              "__init__.py", "__nest__.py", "pyproject.toml", "README.md",
+              "LICENSE", "ICON.png", "config_default.py", "help.json",
+              "official_gallery.py", "role_id_map.json", "role_quotes.json",
+              "texture2d", "todaywaifu_help", "tools", "TodayWaifu",
+          ]
+
+          count = 0
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+              for name in include:
+                  src = root / name
+                  if not src.exists():
+                      print("跳过（不存在）：", name)
+                      continue
+                  if src.is_file():
+                      if keep(src, root):
+                          zf.write(src, "%s/%s" % (stage, name))
+                          count += 1
+                      continue
+                  for path in sorted(src.rglob("*")):
+                      if path.is_file() and keep(path, root):
+                          zf.write(path, "%s/%s" % (stage, path.relative_to(root).as_posix()))
+                          count += 1
+
+          size = pathlib.Path(out).stat().st_size
+          print("打包完成：%s  文件 %d 个  %.1f MB" % (out, count, size / 1024 / 1024))
+          if size > 104857600:
+              print("::warning::压缩包超过 100MB，考虑排除大体积资源")
+          '
+
+      - name: 生成 Release 说明
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 "v${VERSION}^" 2>/dev/null || echo "")
+          {
+            echo "## 安装"
+            echo
+            echo '把压缩包解压到 GsCore 的 `plugins/` 目录，重启 Core 即可。'
+            echo
+            echo '```'
+            echo 'plugins/'
+            echo '└── TodayWaifu/'
+            echo '    ├── __init__.py'
+            echo '    ├── __nest__.py'
+            echo '    └── ...'
+            echo '```'
+            echo
+            if [ -n "$prev" ]; then
+              echo "## 更新内容"
+              echo
+              git log --no-merges --pretty='- %s' "$prev..v${VERSION}" | head -50
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.verify.outputs.version }}
+          name: v${{ needs.verify.outputs.version }}
+          body_path: release-notes.md
+          files: TodayWaifu-*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: false
