@@ -95,7 +95,7 @@ jobs:
         # 拉到 2.1.x 后 greenlet 变成可选 extra，真实 SQLite 用例会假性失败。
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest pillow ruff "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet
+          python -m pip install pytest pillow ruff "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet "qqbot-md-sdk>=0.1.0"
 
       - name: 跑测试
         run: python -m pytest tests/ -q

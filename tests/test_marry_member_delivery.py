@@ -9,6 +9,8 @@ from typing import Any
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+from qgbot import md as qmd
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_FILES = {
     name: ROOT / 'TodayWaifu' / name
@@ -65,6 +67,7 @@ def _load_delivery(config: dict[str, Any]) -> tuple[dict[str, Any], list[str], A
 
     upload = AsyncMock(side_effect=AssertionError('娶群友不应上传 COS'))
     namespace: dict[str, Any] = {
+        'qmd': qmd,
         'Message': _Message,
         'MessageSegment': SimpleNamespace(
             at=lambda user_id: _Message('at', user_id), markdown=_markdown,
@@ -105,9 +108,9 @@ class MarryMemberDeliveryTests(unittest.IsolatedAsyncioTestCase):
         image = ('image', b'MEMBER_AVATAR')
         cases = [
             ('official', True, 'qqgroup:1', True, True, 'U1', text,
-             [('markdown', f'<@U1>\n\n{escaped}'), image]),
+             [('markdown', f'<qqbot-at-user id="U1" />\n\n{escaped}'), image]),
             ('official-guild', True, 'qqguild:1', True, True, 'U1', text,
-             [('markdown', f'<@U1>\n\n{escaped}'), image]),
+             [('markdown', f'<qqbot-at-user id="U1" />\n\n{escaped}'), image]),
             ('mode-off', False, 'qqgroup:1', True, True, 'U1', text,
              [('at', 'U1'), '\n', text, image]),
             ('mode-unset', None, 'qqgroup:1', True, True, 'U1', text,
@@ -121,7 +124,7 @@ class MarryMemberDeliveryTests(unittest.IsolatedAsyncioTestCase):
             ('no-user', True, 'qqgroup:1', True, True, None, text,
              [text, image]),
             ('official-no-text', True, 'qqgroup:1', True, True, 'U1', None,
-             [('markdown', '<@U1>'), image]),
+             [('markdown', '<qqbot-at-user id="U1" />'), image]),
             ('personal-no-text', False, 'onebot:1', True, True, 'U1', None,
              [('at', 'U1'), '\n', image]),
             ('direct-no-text', True, 'qqgroup:1', True, False, 'U1', None, image),

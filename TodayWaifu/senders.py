@@ -7,6 +7,8 @@ from base64 import b64encode
 from pathlib import Path
 from dataclasses import dataclass
 
+from qgbot import md as qmd
+
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Message
@@ -604,7 +606,8 @@ async def _send_plain_member_avatar(
     messages: list[Message | str] = []
     mention_user = is_group and user_id is not None and bool(_cfg('DailyWifeAtUser'))
     if mention_user and _qq_bot_mode_enabled() and _is_official_qq_bot(bot):
-        markdown = f'<@{user_id}>'
+        # 旧协议写 `<@id>`，平台已标记弃用；官方当前语法是 `<qqbot-at-user id="" />`。
+        markdown = qmd.mention(str(user_id))
         if text:
             markdown += f'\n\n{_markdown_escape(text)}'
         messages.extend(MessageSegment.markdown(markdown))

@@ -5,9 +5,10 @@
 #    用户会收不到任何结果图。
 # 2. 事件来源不是 QQ 官方机器人时同样返回 False；否则普通个人账号会被强制走
 #    Markdown 通路，而 OB11 不支持 Markdown，消息会发送失败。
-# 3. 上传链路失败必须返回 False 而非抛异常；图床是外部依赖，其故障只应影响观感。
+# 3. 上传链路失败必须返回 False 而非抛异常；素材库是外部依赖，其故障只应影响观感。
 #
-# 另外锁定「@ 仅群聊」与「Markdown 展示尺寸只缩不放」两条渲染约定。
+# 另外锁定「@ 仅群聊」「Markdown 展示尺寸只缩不放」两条渲染约定，以及「不再有腾讯云
+# COS」这一依赖边界：图床一律走 QQ 开放平台的素材管理。
 #
 # 本插件包无法作为顶层包导入（其内层模块使用 `..daily_wife_config` 这类二级相对导入，
 # 脱离 gsuid_core 运行环境即失败），故沿用本仓库既有做法：按 AST 抽取目标函数，注入
@@ -20,30 +21,32 @@ from typing import Any
 from pathlib import Path
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
+from importlib.util import module_from_spec, spec_from_file_location
 from urllib.request import Request
 
 from PIL import Image
+from qgbot import md as qmd
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# qq_official 的扩展名 → MIME 映射复用 media_plan，exec 时需注入同名全局。
+_spec = spec_from_file_location(
+    'todaywaifu_media_plan_for_qq_official', ROOT / 'TodayWaifu' / 'media_plan.py'
+)
+if _spec is None or _spec.loader is None:
+    raise RuntimeError('cannot load media_plan')
+_plan = module_from_spec(_spec)
+_spec.loader.exec_module(_plan)
+_plan_content_type = _plan.content_type_for_extension
 
 _MODULE_PATH = ROOT / 'TodayWaifu' / 'qq_official.py'
 
 _FUNCTION_NAMES = {
     '_qq_bot_mode_enabled',
-    '_cos_region',
-    '_cos_bucket',
-    '_cos_secret_id',
-    '_cos_secret_key',
-    '_cos_path_prefix',
-    '_cos_sign_expired',
-    '_cos_configured',
-    '_client_signature',
     '_is_official_qq_bot',
     '_image_extension_and_size',
     '_content_type_for_extension',
     '_markdown_image_size',
-    '_build_object_key',
-    '_upload_image_sync',
     '_upload_image',
     '_markdown_escape',
     '_build_image_markdown',
@@ -60,15 +63,15 @@ _FUNCTION_NAMES = {
     '_blockquote_markdown',
 }
 
-# 测试用 COS 配置：仅作为配置桩，不指向真实资源。
+# 测试用配置：素材图床开启，凭据齐全（不指向真实资源）。
 _CONFIG = {
     'DailyWifeQqBotMode': True,
-    'DailyWifeQqBotCosRegion': 'ap-guangzhou',
-    'DailyWifeQqBotCosBucket': 'demo-1234567890',
-    'DailyWifeQqBotCosSecretId': 'secret-id',
-    'DailyWifeQqBotCosSecretKey': 'secret-key',
-    'DailyWifeQqBotCosPathPrefix': 'todaywaifu',
-    'DailyWifeQqBotCosSignExpired': 604800,
+    'DailyWifeQqBotMediaEnabled': True,
+    'DailyWifeQqBotMediaAppId': 'app-id',
+    'DailyWifeQqBotMediaAppSecret': 'app-secret',
+    'DailyWifeQqBotMediaApiBase': 'https://api.bot.qq.com',
+    'DailyWifeQqBotMediaQuota': 100,
+    'DailyWifeQqBotMediaReserve': 10,
 }
 
 
@@ -88,6 +91,9 @@ def _fake_image_segment() -> Any:
 
 class _StubLogger:
     def warning(self, *args: object, **kwargs: object) -> None:
+        return None
+
+    def info(self, *args: object, **kwargs: object) -> None:
         return None
 
     def debug(self, *args: object, **kwargs: object) -> None:
@@ -144,8 +150,6 @@ def _load_namespace(config: dict[str, Any] | None = None) -> dict[str, Any]:
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in _FUNCTION_NAMES:
             body.append(node)
-        elif isinstance(node, ast.ClassDef) and node.name == 'CosClient':
-            body.append(node)
         elif isinstance(node, ast.Assign):
             # 保留模块常量（Markdown 尺寸上限、扩展名映射、官方 bot id 集合等）
             body.append(node)
@@ -162,17 +166,16 @@ def _load_namespace(config: dict[str, Any] | None = None) -> dict[str, Any]:
     namespace: dict[str, Any] = {
         'Any': Any,
         'Bot': object,
-        'Message': _FakeMessage,
         'MessageSegment': SimpleNamespace(markdown=_fake_markdown, image=_fake_image_segment),
         'BytesIO': io.BytesIO,
         'Image': Image,
+        'qmd': qmd,
         'logger': _StubLogger(),
         'run_blocking': _run_blocking_inline,
         '_cfg': lambda key: values.get(key),
         '_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
         '_main_cfg_bool': lambda key, default=False: bool(values.get(key, default)),
-        'mimetypes': __import__('mimetypes'),
-        'hashlib': __import__('hashlib'),
+        'content_type_for_extension': _plan_content_type,
         'json': __import__('json'),
         're': __import__('re'),
         'urlparse': __import__('urllib.parse', fromlist=['urlparse']).urlparse,
@@ -180,9 +183,7 @@ def _load_namespace(config: dict[str, Any] | None = None) -> dict[str, Any]:
         'Request': _StubRequest,
         'HTTPError': __import__('urllib.error', fromlist=['HTTPError']).HTTPError,
         'URLError': __import__('urllib.error', fromlist=['URLError']).URLError,
-        'Path': Path,
         'uuid4': __import__('uuid').uuid4,
-        'read_file_bytes_cached': lambda path: Path(path).read_bytes(),
         'Union': Any,
         'Protocol': object,
         'LOG_PREFIX': '[测试]',
@@ -193,21 +194,16 @@ def _load_namespace(config: dict[str, Any] | None = None) -> dict[str, Any]:
     return namespace
 
 
-class _FakeClient:
-    """替换真实 COS 客户端，记录调用参数并回传固定地址。"""
+def _bind_fake_upload(namespace: dict[str, Any], url: str = 'qqbot-media://image/v1/token') -> list[bytes]:
+    """把素材上传替换成「直接返回平台引用」的替身，记录被上传的字节。"""
+    uploads: list[bytes] = []
 
-    def __init__(self, url: str = 'https://cos.example.test/todaywaifu/a.png') -> None:
-        self.url = url
-        self.puts: list[dict[str, Any]] = []
-        self.presigns: list[dict[str, Any]] = []
+    async def _upload(image: bytes) -> tuple[str, tuple[int, int]]:
+        uploads.append(image)
+        return url, (800, 1200)
 
-    def put_object(self, Bucket: str, Key: str, Body: bytes, ContentType: str) -> object:
-        self.puts.append({'Bucket': Bucket, 'Key': Key, 'Body': Body, 'ContentType': ContentType})
-        return {}
-
-    def get_presigned_url(self, Bucket: str, Key: str, Method: str, Expired: int) -> str:
-        self.presigns.append({'Bucket': Bucket, 'Key': Key, 'Method': Method, 'Expired': Expired})
-        return self.url
+    namespace['_upload_image'] = _upload
+    return uploads
 
 
 class QqOfficialModeTests(unittest.IsolatedAsyncioTestCase):
@@ -232,9 +228,9 @@ class QqOfficialModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(sent)
         self.assertEqual(recorder.messages, [])
 
-    async def test_unconfigured_cos_degrades_instead_of_raising(self) -> None:
-        # 总开关开着但 COS 未配置时必须降级：图床故障不应使整条命令失败。
-        namespace = _load_namespace({**_CONFIG, 'DailyWifeQqBotCosBucket': ''})
+    async def test_unconfigured_media_degrades_instead_of_raising(self) -> None:
+        # 总开关开着但图床未启用 / 缺凭据时必须降级：素材库故障不应使整条命令失败。
+        namespace = _load_namespace({**_CONFIG, 'DailyWifeQqBotMediaEnabled': False})
         recorder = _SentRecorder()
         sent = await namespace['_try_send_official_qq_image'](
             _fake_bot('qqgroup:1', recorder), _png(), '文案', 'U1', True
@@ -242,40 +238,40 @@ class QqOfficialModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(sent)
         self.assertEqual(recorder.messages, [])
 
-    async def test_successful_send_uses_markdown_with_cos_url(self) -> None:
+    async def test_successful_send_uses_markdown_with_platform_media_url(self) -> None:
         for at_user in (True, False):
             with self.subTest(at_user=at_user):
                 namespace = _load_namespace({**_CONFIG, 'DailyWifeAtUser': at_user})
                 recorder = _SentRecorder()
-                client = _FakeClient()
-                namespace['_get_cos_client'] = lambda: client
+                uploads = _bind_fake_upload(namespace)
+                image = _png()
 
                 sent = await namespace['_try_send_official_qq_image'](
-                    _fake_bot('qqgroup:1', recorder), _png(), '你今天的老婆是今汐', 'OPENID_1', True
+                    _fake_bot('qqgroup:1', recorder), image, '你今天的老婆是今汐', 'OPENID_1', True
                 )
 
                 self.assertTrue(sent)
                 self.assertEqual(len(recorder.messages), 1)
                 markdown = recorder.messages[0][0]
                 self.assertEqual(markdown.type, 'markdown')
-                self.assertEqual('<@OPENID_1>' in markdown.data, at_user)
+                self.assertEqual('<qqbot-at-user id="OPENID_1" />' in markdown.data, at_user)
                 self.assertIn('你今天的老婆是今汐', markdown.data)
-                self.assertIn(client.url, markdown.data)
-                # 上传必须显式声明 ContentType，否则 COS 按二进制流返回，QQ 无法当图片渲染
-                self.assertEqual(client.puts[0]['ContentType'], 'image/png')
-                self.assertEqual(client.presigns[0]['Method'], 'GET')
+                self.assertIn('qqbot-media://image/v1/token', markdown.data)
+                # 原图必须是上传的那一份，不能被提前压成 base64 或改写
+                self.assertEqual(uploads, [image])
 
     async def test_private_chat_markdown_has_no_mention(self) -> None:
-        # 私聊下发 <@id> 会被 QQ 原样显示成无意义文本，必须剥离。
+        # 私聊下发 @ 标签会被 QQ 原样显示成无意义文本，必须剥离。
         namespace = _load_namespace()
         markdown = namespace['_build_image_markdown']('https://x.test/a.png', (800, 1200), '文案', 'U1', False)
-        self.assertNotIn('<@', markdown)
+        self.assertNotIn('qqbot-at-user', markdown)
         self.assertIn('文案', markdown)
 
     async def test_group_markdown_mentions_trigger_user(self) -> None:
+        # 旧协议的 `<@id>` 已被平台标记弃用，必须用当前语法。
         namespace = _load_namespace()
         markdown = namespace['_build_image_markdown']('https://x.test/a.png', (800, 1200), '文案', 'U1', True)
-        self.assertIn('<@U1>', markdown)
+        self.assertIn('<qqbot-at-user id="U1" />', markdown)
 
     def test_markdown_size_only_shrinks_and_never_upscales(self) -> None:
         namespace = _load_namespace()
@@ -286,15 +282,6 @@ class QqOfficialModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(size_of((800, 1200)), (240, 360))
         # 尺寸不可信时回落到兜底值
         self.assertEqual(size_of((0, 0)), (260, 360))
-
-    def test_object_key_is_content_addressed(self) -> None:
-        # 内容寻址使同图重复上传命中同一对象，保留 QQ 侧缓存收益
-        namespace = _load_namespace()
-        image = _png((32, 32))
-        key = namespace['_build_object_key'](image, 'png')
-        self.assertTrue(key.startswith('todaywaifu/'))
-        self.assertEqual(key, namespace['_build_object_key'](image, 'png'))
-        self.assertNotEqual(key, namespace['_build_object_key'](_png((33, 33)), 'png'))
 
     def test_unsupported_format_is_rejected(self) -> None:
         # 仅允许 QQ Markdown 可稳定渲染的位图格式；其余应报错并走降级
@@ -315,7 +302,6 @@ class QqOfficialModeTests(unittest.IsolatedAsyncioTestCase):
 
 class PetpetNoticeTests(unittest.TestCase):
     """摸头提示及昵称转义的契约。"""
-
 
     def test_petpet_notice_contains_compliance_warning(self) -> None:
         # 合规提醒是平台要求，不是装饰；删除它会让使用者无从知晓审核风险
@@ -503,10 +489,9 @@ class QqOfficialConfigContractTests(unittest.TestCase):
         body = config_source.split('QQ_BOT_CONFIG_DEFAULT', 1)[1]
         first_key = body.index("'DailyWifeQqBotMode'")
         for other in (
-            "'DailyWifeQqBotCosRegion'",
-            "'DailyWifeQqBotCosBucket'",
-            "'DailyWifeQqBotCosSecretId'",
-            "'DailyWifeQqBotCosSecretKey'",
+            "'DailyWifeQqBotMediaEnabled'",
+            "'DailyWifeQqBotMediaAppId'",
+            "'DailyWifeMemeGeneratorUrl'",
         ):
             self.assertLess(first_key, body.index(other), f'{other} 不应排在总开关之前')
         self.assertIn("'是否开启QQ机器人模式'", config_source)
@@ -538,22 +523,40 @@ class QqOfficialConfigContractTests(unittest.TestCase):
                 for keyword in getattr(value, 'keywords', []):
                     if keyword.arg == 'secret' and isinstance(keyword.value, ast.Constant) and keyword.value.value:
                         secrets.add(key.value)
-        self.assertEqual(
-            secrets,
-            {
-                'DailyWifeQqBotCosSecretId',
-                'DailyWifeQqBotCosSecretKey',
-                'DailyWifeQqBotMediaAppSecret',
-            },
-        )
+        self.assertEqual(secrets, {'DailyWifeQqBotMediaAppSecret'})
 
-    def test_cnb_upload_is_fully_removed(self) -> None:
-        # CNB 已淘汰，其上传实现、配置键与常量都不得残留。
+    def test_tencent_cos_is_fully_removed(self) -> None:
+        # 图床已统一走 QQ 开放平台的素材管理；COS 的实现、配置键与依赖都不得残留，
+        # 否则老用户仍会在控制台看到一堆填了也没用的存储桶选项。
         combined = '\n'.join(
             path.read_text(encoding='utf-8-sig') for path in sorted((ROOT / 'TodayWaifu').glob('*.py'))
         ) + (ROOT / 'config_default.py').read_text(encoding='utf-8-sig')
-        self.assertNotIn('cnb', combined.lower())
-        self.assertNotIn('_upload_official_gallery_image_sync', combined)
+        lowered = combined.lower()
+        for token in ('cosclient', 'qcloud_cos', 'cospathprefix', 'cossignexpired', 'cosbucket'):
+            self.assertNotIn(token, lowered)
+        requirements = (ROOT / 'pyproject.toml').read_text(encoding='utf-8-sig')
+        self.assertNotIn('cos-python-sdk-v5', requirements)
+        # 素材上传与 Markdown 构造一律经 SDK，不再手写协议
+        self.assertIn('qqbot-md-sdk', requirements)
+
+    def test_legacy_cos_keys_are_purged_from_existing_config_files(self) -> None:
+        # 老用户的 qq_bot_config.json 里还留着六个废弃键（含明文密钥）；配置实例化之前
+        # 必须先清掉，否则它们会继续出现在控制台上。
+        source = (ROOT / 'daily_wife_config.py').read_text(encoding='utf-8-sig')
+        manifest = source[source.index('_LEGACY_QQ_BOT_KEYS'):]
+        manifest = manifest[:manifest.index(']')]
+        for key in (
+            '_DividerQqBotCos',
+            'DailyWifeQqBotCosRegion',
+            'DailyWifeQqBotCosBucket',
+            'DailyWifeQqBotCosSecretId',
+            'DailyWifeQqBotCosSecretKey',
+            'DailyWifeQqBotCosPathPrefix',
+            'DailyWifeQqBotCosSignExpired',
+        ):
+            self.assertIn(key, manifest)
+        # 清理必须发生在实例化之前，否则旧值会被载入并回写
+        self.assertLess(source.index('_LEGACY_QQ_BOT_KEYS'), source.index('DailyWifeQqBotConfig = StringConfig('))
 
     def test_send_paths_consult_the_official_mode(self) -> None:
         # 三条投递路径都必须尝试官方模式，遗漏任一条会让对应功能在官方机器人上收不到图。
@@ -584,14 +587,22 @@ class QqOfficialConfigContractTests(unittest.TestCase):
         #
         # 只检查 import 语句而非全文匹配：模块文档与 ``_cfg`` 的说明里会以 DailyWifeConfig
         # 举例说明「用错实例」的后果，全文子串判断会把这段解释误判为违规。
+        for name in ('qq_official.py', 'media_images.py'):
+            tree = ast.parse((ROOT / 'TodayWaifu' / name).read_text(encoding='utf-8-sig'))
+            imported: list[str] = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    imported.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.Import):
+                    imported.extend(alias.name for alias in node.names)
+            self.assertNotIn('DailyWifeConfig', imported, f'{name} 不应导入第 1 页实例')
         tree = ast.parse((ROOT / 'TodayWaifu' / 'qq_official.py').read_text(encoding='utf-8-sig'))
-        imported: list[str] = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                imported.extend(alias.name for alias in node.names)
-            elif isinstance(node, ast.Import):
-                imported.extend(alias.name for alias in node.names)
-        self.assertNotIn('DailyWifeConfig', imported)
+        imported = [
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        ]
         self.assertIn('DailyWifeQqBotConfig', imported)
 
 

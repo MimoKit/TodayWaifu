@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from gsuid_core.data_store import get_res_path
@@ -44,7 +45,6 @@ _LEGACY_KEYS_TO_REMOVE = [
 # 都会失效。异常时不中断加载，代价是本次清理未生效（下次启动会重试）。
 if CONFIG_PATH.is_file():
     try:
-        import json
         _raw_data = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
         _raw_changed = False
         for _k in _LEGACY_KEYS_TO_REMOVE:
@@ -116,9 +116,57 @@ DailyWifeShowConfig = StringConfig(
 # QQ 官方机器人配置同样独立成页（控制台第 3 页「QQ机器人配置」）：它只服务官方机器人
 # 这一条发送链路，与普通功能配置的关注点不同，混在同一页会让总开关与图床密钥淹没在
 # 大量业务开关中。独立文件也避免密钥随业务配置一起被导出或备份。
+QQ_BOT_CONFIG_PATH = get_res_path('TodayWaifu') / 'qq_bot_config.json'
+
+# 已废弃的腾讯云 COS 图床键：结果图改由 QQ 开放平台的「素材管理」托管，不再需要自建
+# 图床。这些键已从 QQ_BOT_CONFIG_DEFAULT 移除，但老用户的 qq_bot_config.json 里仍会
+# 留着它们（含明文密钥），故在实例化之前直接从文件里清掉。
+#
+# 分组标题（_DividerQqBotCos）也要一并删除：它已不在默认表里，但 StringConfig 会把
+# 文件里的遗留键原样载入并回写，控制台上会留下一个空标题，而其下的配置项早已消失。
+_LEGACY_QQ_BOT_KEYS = [
+    '_DividerQqBotCos',
+    'DailyWifeQqBotCosRegion',
+    'DailyWifeQqBotCosBucket',
+    'DailyWifeQqBotCosSecretId',
+    'DailyWifeQqBotCosSecretKey',
+    'DailyWifeQqBotCosPathPrefix',
+    'DailyWifeQqBotCosSignExpired',
+]
+
+
+def _purge_legacy_qq_bot_keys(path: Path) -> None:
+    """删除配置文件里的废弃键。
+
+    配置项自带「启用素材图床」开关，旧部署可能只开了它而 COS 密钥留着不用；留着不仅
+    污染控制台，还把已泄露的密钥继续留在磁盘上。清理失败不阻断加载（下次启动重试）。
+    """
+    if not path.is_file():
+        return
+    try:
+        raw = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return
+    if not isinstance(raw, dict):
+        return
+    changed = False
+    for key in _LEGACY_QQ_BOT_KEYS:
+        if key in raw:
+            del raw[key]
+            changed = True
+    if not changed:
+        return
+    try:
+        path.write_text(json.dumps(raw, ensure_ascii=False, indent=4), encoding='utf-8')
+    except OSError:
+        pass
+
+
+_purge_legacy_qq_bot_keys(QQ_BOT_CONFIG_PATH)
+
 DailyWifeQqBotConfig = StringConfig(
     'QQ机器人配置',
-    get_res_path('TodayWaifu') / 'qq_bot_config.json',
+    QQ_BOT_CONFIG_PATH,
     QQ_BOT_CONFIG_DEFAULT,
 )
 

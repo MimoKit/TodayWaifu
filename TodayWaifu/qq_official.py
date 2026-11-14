@@ -1,44 +1,45 @@
-"""QQ 官方机器人模式：结果图上传腾讯云 COS，并以 Markdown 艾特触发者发送。
+"""QQ 官方机器人模式：结果图上传平台素材库，并以 Markdown 艾特触发者发送。
 
 本模块把「官方机器人」与「普通个人账号（OB11）」的差异收敛在一处，命令与投递模块
 只需表达「要发什么图、配什么文案」。总开关为配置页「QQ机器人配置」的首项
 ``DailyWifeQqBotMode``：
 
-- 开启：把结果图上传到腾讯云 COS，取回可公开访问的图片地址，拼成 Markdown 发送。
-  QQ 官方机器人不允许直接下发图片资源，只能下发 Markdown 中的图片链接，故必须先有
-  一个平台可访问的 HTTPS 图床。
+- 开启：把结果图上传到 QQ 开放平台的「素材管理」，取回 ``qqbot-media://`` 引用，拼成
+  Markdown 发送。QQ 官方机器人不允许直接下发图片资源，只能下发 Markdown 中的图片
+  链接；素材库随平台提供，不必自建公网图床。
 - 关闭：返回 False，交由既有 OB11 发送路径处理（``base64://`` 图片段）。
+
+Markdown 语法与图片上传协议由 ``qqbot-md-sdk``（``qgbot``）实现，本模块负责挑图、
+挑平台、组装文案与降级。
 
 设计约定：
 
-1. 上传失败一律返回 False 并降级为普通发送，而不是让整条命令失败。图床是外部依赖，
+1. 上传失败一律返回 False 并降级为普通发送，而不是让整条命令失败。素材库是外部依赖，
    其可用性不应等同于插件可用性。
-2. 上传是阻塞 IO，必须经 ``run_blocking`` 投递到插件自有线程池，不得在事件循环上执行。
-3. COS 客户端按配置惰性构建并缓存；配置变更后由 ``_client_signature`` 检测并重建。
+2. 上传与解码是阻塞 IO / CPU 工作，必须经 ``run_blocking`` 投递到插件自有线程池，
+   不得在事件循环上执行。
 """
 from __future__ import annotations
 
 import re
 import json
-import hashlib
-import mimetypes
 from io import BytesIO
 from uuid import uuid4
-from typing import Union, Callable, Protocol, Awaitable
+from typing import Union, Callable, Awaitable
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from PIL import Image
+from qgbot import md as qmd
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
-from gsuid_core.models import Message
 from gsuid_core.segment import MessageSegment
 
 from .executor import run_blocking
 from .payloads import ConfigValue
 from .constants import LOG_PREFIX, _cfg_bool as _main_cfg_bool
+from .media_plan import content_type_for_extension
 from ..daily_wife_config import DailyWifeQqBotConfig
 
 # GsCore 侧 QQ 官方机器人的 bot_id 前缀：群聊为 qqgroup，频道为 qqguild。
@@ -58,15 +59,6 @@ MARKDOWN_IMAGE_MAX_HEIGHT = 360
 # 无法识别尺寸时的兜底展示尺寸。
 MARKDOWN_IMAGE_FALLBACK_SIZE = (260, 360)
 
-# 图片扩展名 → MIME 类型；COS 需要显式的 ContentType 才能被浏览器与 QQ 正确按图片渲染。
-_EXTENSION_CONTENT_TYPES = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-}
-
 # Pillow 的格式名 → 扩展名。仅支持 QQ Markdown 可稳定渲染的常见位图格式。
 _PILLOW_FORMAT_EXTENSIONS = {
     'JPEG': 'jpg',
@@ -74,8 +66,6 @@ _PILLOW_FORMAT_EXTENSIONS = {
     'GIF': 'gif',
     'WEBP': 'webp',
 }
-
-ClientSignature = tuple[str, str, str, str]
 
 
 def _cfg(key: str) -> ConfigValue:
@@ -108,105 +98,9 @@ def _cfg_bool(key: str, default: bool = False) -> bool:
     return default
 
 
-class CosClient(Protocol):
-    """本模块实际用到的腾讯云 COS 客户端能力子集。
-
-    ``cos-python-sdk-v5`` 不随包提供类型标注，直接引用其类型会让本模块的类型检查
-    失去意义。此处只声明真正调用的两个方法：上传对象与生成预签名下载地址。以协议
-    而非 ``Any`` 或 ``type: ignore`` 表达，既保留类型链，也允许测试注入替身对象。
-    """
-
-    def put_object(
-        self,
-        Bucket: str,
-        Key: str,
-        Body: bytes,
-        ContentType: str,
-    ) -> object: ...
-
-    def get_presigned_url(
-        self,
-        Bucket: str,
-        Key: str,
-        Method: str,
-        Expired: int,
-    ) -> str: ...
-
-
 def _qq_bot_mode_enabled() -> bool:
     """总开关：是否启用 QQ 官方机器人模式。"""
     return _cfg_bool('DailyWifeQqBotMode', False)
-
-
-def _cos_region() -> str:
-    return str(_cfg('DailyWifeQqBotCosRegion') or '').strip()
-
-
-def _cos_bucket() -> str:
-    return str(_cfg('DailyWifeQqBotCosBucket') or '').strip()
-
-
-def _cos_secret_id() -> str:
-    return str(_cfg('DailyWifeQqBotCosSecretId') or '').strip()
-
-
-def _cos_secret_key() -> str:
-    return str(_cfg('DailyWifeQqBotCosSecretKey') or '').strip()
-
-
-def _cos_path_prefix() -> str:
-    return str(_cfg('DailyWifeQqBotCosPathPrefix') or '').strip().strip('/')
-
-
-def _cos_sign_expired() -> int:
-    """图片链接有效期（秒），非法值回落为 7 天。
-
-    该值同时是 COS 侧签名有效期：QQ 拉图时刻与生成时刻之间存在延迟，过短会导致
-    用户收到「图片已过期」，故下限由配置项自身保证，此处只做非正数防护。
-    """
-    value = _cfg('DailyWifeQqBotCosSignExpired')
-    if isinstance(value, bool) or not isinstance(value, int):
-        return 604800
-    return value if value > 0 else 604800
-
-
-def _cos_configured() -> bool:
-    """COS 四个必填项是否齐备；缺任一项都视为未配置。"""
-    return bool(_cos_region() and _cos_bucket() and _cos_secret_id() and _cos_secret_key())
-
-
-def _client_signature() -> ClientSignature:
-    """当前 COS 凭据指纹，用于判断缓存客户端是否仍然有效。"""
-    return (_cos_region(), _cos_bucket(), _cos_secret_id(), _cos_secret_key())
-
-
-_COS_CLIENT: CosClient | None = None
-_COS_CLIENT_SIGNATURE: ClientSignature | None = None
-
-
-def _get_cos_client() -> CosClient:
-    """按当前配置构建或复用 COS 客户端。
-
-    客户端内部持有连接池，逐次新建会平白丢弃复用收益；而凭据是运行时可变配置，
-    故以签名比对决定是否重建，使用户改完配置无需重启插件。
-    """
-    global _COS_CLIENT, _COS_CLIENT_SIGNATURE
-    signature = _client_signature()
-    if _COS_CLIENT is not None and _COS_CLIENT_SIGNATURE == signature:
-        return _COS_CLIENT
-
-    # 惰性导入：官方模式未启用时，本插件不应因缺少 COS SDK 而加载失败。
-    from qcloud_cos import CosConfig, CosS3Client
-
-    config = CosConfig(
-        Region=signature[0],
-        SecretId=signature[2],
-        SecretKey=signature[3],
-        Scheme='https',
-    )
-    _COS_CLIENT = CosS3Client(config)
-    _COS_CLIENT_SIGNATURE = signature
-    return _COS_CLIENT
 
 
 def _is_official_qq_bot(bot: Bot) -> bool:
@@ -243,8 +137,9 @@ def _blockquote_markdown(text: str) -> str:
 
     只做形态转换，条目文本由调用方传入，确保 Markdown 与纯文本两种形态内容一致。
     """
-    lines = text.splitlines() or ['']
-    return '\n'.join(f'> {line}' if line else '>' for line in lines)
+    quoted = qmd.quote(str(text))
+    # SDK 给空行写成 ``> ``；行尾空白不影响渲染，但清掉更利于复制与 diff。
+    return '\n'.join(line.rstrip() for line in (quoted.splitlines() or ['>']))
 
 
 def _image_extension_and_size(image: bytes) -> tuple[str, tuple[int, int]]:
@@ -262,11 +157,12 @@ def _image_extension_and_size(image: bytes) -> tuple[str, tuple[int, int]]:
 
 
 def _content_type_for_extension(extension: str) -> str:
-    known = _EXTENSION_CONTENT_TYPES.get(extension)
-    if known is not None:
-        return known
-    guessed, _encoding = mimetypes.guess_type(f'image.{extension}')
-    return guessed or 'application/octet-stream'
+    """扩展名 → MIME。表情包后端要靠它声明的 Content-Type 才能正确解析上传的头像。
+
+    与素材库共用同一套映射（``media_plan``）：两处各写一份时，改了一处漏了另一处
+    就会表现为「素材能传、表情包后端却报格式不支持」。
+    """
+    return content_type_for_extension(extension)
 
 
 def _markdown_image_size(size: tuple[int, int]) -> tuple[int, int]:
@@ -286,50 +182,6 @@ def _markdown_image_size(size: tuple[int, int]) -> tuple[int, int]:
     return max(1, round(width * scale)), max(1, round(height * scale))
 
 
-def _build_object_key(image: bytes, extension: str) -> str:
-    """以图片内容哈希生成对象键，使同一张图重复上传落在同一地址。
-
-    内容寻址让重复发送天然命中同一对象，既省流量也让 QQ 侧缓存继续有效；以时间戳
-    或随机数命名会使同图每次都是新资源，缓存收益归零。
-    """
-    digest = hashlib.sha256(image).hexdigest()[:32]
-    filename = f'todaywaifu-{digest}.{extension}'
-    prefix = _cos_path_prefix()
-    return f'{prefix}/{filename}' if prefix else filename
-
-
-def _upload_image_sync(image: bytes) -> tuple[str, tuple[int, int]]:
-    """上传图片到 COS 并返回 (公网地址, 原图尺寸)。仅供线程池调用。
-
-    返回带签名的 URL：存储桶默认为私有读写，直接拼接裸地址会得到 403，QQ 服务器
-    无法拉取图片。签名地址在有效期内可匿名访问，满足平台取图需求，同时不要求把
-    整个存储桶开放为公有读。
-    """
-    if not _cos_configured():
-        raise RuntimeError('未配置腾讯云 COS（地域 / 存储桶 / SecretId / SecretKey）')
-
-    extension, size = _image_extension_and_size(image)
-    object_key = _build_object_key(image, extension)
-    client = _get_cos_client()
-
-    client.put_object(
-        Bucket=_cos_bucket(),
-        Key=object_key,
-        Body=image,
-        ContentType=_content_type_for_extension(extension),
-    )
-    public_url = client.get_presigned_url(
-        Bucket=_cos_bucket(),
-        Key=object_key,
-        Method='GET',
-        Expired=_cos_sign_expired(),
-    )
-    parsed = urlparse(public_url)
-    if parsed.scheme != 'https' or not parsed.netloc:
-        raise RuntimeError('COS 没有生成有效的公网图片地址')
-    return public_url, size
-
-
 # QQ 素材图床的上传实现与「是否可用」判定，由 _bind_media_backend() 在模块导入末尾绑定。
 # 用可替换的模块级引用而不是在函数里直接 import，一是避免 qq_official ↔ media_images
 # 互相依赖，二是让契约测试可以只替换这两个名字，不必拉起数据库与网络依赖。
@@ -338,7 +190,7 @@ _MEDIA_READY: Callable[[], bool] | None = None
 
 
 def _bind_media_backend() -> None:
-    """把 QQ 素材图床接入上传链路；未启用或未配置时保持回落 COS。"""
+    """把 QQ 素材图床接入上传链路。"""
     global _MEDIA_UPLOAD, _MEDIA_READY
     from . import media_images
 
@@ -353,18 +205,22 @@ def _bind_media_backend() -> None:
 async def _upload_image(image: bytes) -> tuple[str, tuple[int, int]]:
     """上传结果图并返回 (可写进 Markdown 的地址, 原图尺寸)。
 
-    优先用 QQ 官方素材图床：引用形如 ``qqbot-media://image/v1/<token>``，由平台托管，
-    不必自建公网图床。未启用或没填凭据时回落到腾讯云 COS 的签名地址，保持旧部署不变。
+    引用形如 ``qqbot-media://image/v1/<token>``，由平台托管，不必自建公网图床。
+    未启用或没填凭据时抛错，由 ``_try_send_official_qq_image`` 统一降级。
     """
     uploader = _MEDIA_UPLOAD
     ready = _MEDIA_READY
-    if uploader is not None and ready is not None and ready():
-        return await uploader(image)
-    return await run_blocking(_upload_image_sync, image)
+    if uploader is None or ready is None or not ready():
+        raise RuntimeError('QQ 素材图床未启用，或未填写 AppID / AppSecret')
+    return await uploader(image)
 
 
 def _markdown_escape(text: str) -> str:
-    """转义 Markdown 元字符，避免角色名或文案破坏结构与 @ 解析。"""
+    """转义 Markdown 元字符，避免角色名或文案破坏结构与 @ 解析。
+
+    SDK 只负责生成合法语法，不对调用方给的正文做转义（那会把用户想用的强调语法一并
+    打死），故转义留在插件侧，由调用方按「这段是纯文本」的语义显式使用。
+    """
     out: list[str] = []
     for char in text:
         if char in '\\`*_[]()#>-!':
@@ -382,15 +238,16 @@ def _build_image_markdown(
 ) -> str:
     """拼装「艾特触发者 + 文案 + 图片」的 Markdown 正文。
 
-    @ 只有群聊才有意义：私聊下发 ``<@id>`` 会被 QQ 原样显示成一段无意义文本。
+    @ 只有群聊才有意义：私聊下发 @ 标签会被 QQ 原样显示成一段无意义文本。
     """
+    width, height = _markdown_image_size(size)
     parts: list[str] = []
-    if is_group and user_id is not None:
-        parts.append(f'<@{user_id}>')
+    mention_target = str(user_id or '').strip()
+    if is_group and mention_target:
+        parts.append(qmd.mention(mention_target))
     if text:
         parts.append(_markdown_escape(text))
-    width, height = _markdown_image_size(size)
-    parts.append(f'![image #{width}px #{height}px]({image_url})')
+    parts.append(qmd.image(image_url, width, height))
     return '\n\n'.join(parts)
 
 
@@ -401,11 +258,11 @@ async def _try_send_official_qq_image(
     user_id: str | int | None,
     is_group: bool,
 ) -> bool:
-    """官方机器人模式下尝试走「COS 上传 + Markdown」发送。
+    """官方机器人模式下尝试走「素材上传 + Markdown」发送。
 
     返回 True 表示已由本路径发送完毕，调用方不得再走普通发送（否则用户收到两条）；
     返回 False 表示应降级为普通图片发送，涵盖三种情形：总开关关闭、事件来源不是官方
-    机器人、上传链路失败。降级而非抛错，是为了让图床故障只影响观感，不影响功能。
+    机器人、上传链路失败。降级而非抛错，是为了让素材库故障只影响观感，不影响功能。
 
     异常在此处收敛：本函数是「可选增强」的边界，其失败不应使命令整体失败。
     """
@@ -419,14 +276,9 @@ async def _try_send_official_qq_image(
         markdown = _build_image_markdown(public_url, size, text, mention_user, is_group)
         await bot.send(MessageSegment.markdown(markdown))
     except Exception as exc:
-        logger.warning(f'{LOG_PREFIX} QQ 机器人图床 Markdown 发送失败，降级为普通图片: {exc}')
+        logger.warning(f'{LOG_PREFIX} QQ 机器人素材发送失败，降级为普通图片: {exc}')
         return False
     return True
-
-
-def _markdown_message(markdown: str) -> list[Message]:
-    """构造 Markdown 消息段；独立成函数以便测试直接断言其结构。"""
-    return MessageSegment.markdown(markdown)
 
 
 def _official_markdown_inline_text(text: str, fallback: str = '这位群友') -> str:
@@ -451,7 +303,7 @@ def _build_petpet_notice_markdown(member_name: str) -> str:
         '> \n'
         '> 这张表情包使用本次「娶群友」缓存的群成员头像生成。\n'
         '> 如果头像异常、侵权或涉嫌违规，可能触发 QQ 平台审核或被举报；请确认头像合规后再使用。\n\n'
-        '---\n\n'
+        f'{qmd.divider()}\n\n'
         '表情包见下一条消息。'
     )
 

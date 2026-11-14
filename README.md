@@ -51,7 +51,7 @@ git clone https://github.com/MimoKit/TodayWaifu
 core安装插件TodayWaifu
 ```
 
-重启 GsCore 后，框架会按 `pyproject.toml` 安装插件依赖，包括腾讯云 COS SDK。
+重启 GsCore 后，框架会按 `pyproject.toml` 安装插件依赖，包括 Markdown 与素材上传所用的 [qqbot-md-sdk](https://github.com/MimoKit/qgbot)。
 
 ## 丨快速上手
 

@@ -35,7 +35,7 @@ jobs:
         # 插件运行时由 Core 的依赖树保证这套组合，测试环境需显式复刻。
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest pillow ruff "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet
+          python -m pip install pytest pillow ruff "sqlalchemy>=2.0.0,<2.1.0" "sqlmodel<0.0.31" aiosqlite greenlet "qqbot-md-sdk>=0.1.0"
 
       - name: Run test suite
         run: python -m pytest tests/ -q

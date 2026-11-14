@@ -9,7 +9,7 @@ license = { text = "GPL-3.0-or-later" }
 # gsuid-core / sqlmodel / apscheduler / pydantic-ai 属框架基础依赖，重复声明会与 Core
 # 自身的版本约束产生冲突。此处列出的依赖由框架在启动时自动安装。
 dependencies = [
-    "cos-python-sdk-v5>=1.9.44",
+    "qqbot-md-sdk>=0.1.0",
 ]
 
 [tool.gsuid]
