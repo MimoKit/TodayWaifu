@@ -115,8 +115,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     'DailyWifeGalleryToken': GsStrConfig(
         '图库访问令牌',
-        '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 '
-        '(https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
+        '图库接口启用令牌鉴权后必填。进 QQ 交流群 1041664919 '
+        '(https://qm.qq.com/q/uzIKKiRsQ2) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
         '',
     ),
     '_DividerNteWife': GsDivider('异环老婆', ''),

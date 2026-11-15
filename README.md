@@ -12,7 +12,7 @@
 <div align="center">
   <a href="https://github.com/Genshin-bots/gsuid_core">早柚核心</a> &nbsp;·&nbsp;
   <a href="https://blog.xlinxc.cn/posts/botplugin/todaywaifu-plugin-intro">详细文档</a> &nbsp;·&nbsp;
-  <a href="https://qm.qq.com/q/pJVt8HNwrg">交流Q群</a> &nbsp;·&nbsp;
+  <a href="https://qm.qq.com/q/uzIKKiRsQ2">交流Q群</a> &nbsp;·&nbsp;
   <a href="https://github.com/MimoKit/TodayWaifu/issues">问题反馈</a>
 </div>
 
@@ -31,7 +31,7 @@
 > 本插件是 [早柚核心 (gsuid_core)](https://github.com/Genshin-bots/gsuid_core) 的扩展插件，须先完成 GsCore 框架部署方可使用。首次安装后需重启 GsCore 才能完全生效
 
 > [!NOTE]
-> 插件仍在持续迭代。使用中如遇问题或有改进建议，欢迎提交 [Issue](https://github.com/MimoKit/TodayWaifu/issues)，或加入交流群 **798949533** 讨论。
+> 插件仍在持续迭代。使用中如遇问题或有改进建议，欢迎提交 [Issue](https://github.com/MimoKit/TodayWaifu/issues)，或加入交流群 **1041664919** 讨论。
 
 <br/>
 
@@ -70,7 +70,7 @@ core安装插件TodayWaifu
 图库的**列表接口与图片本身均要求鉴权**，必须在控制台填写
 `DailyWifeGalleryToken`，否则拉取列表和下载图片都会返回 403。
 
-令牌请进 QQ 交流群 [798949533](https://qm.qq.com/q/pJVt8HNwrg) 获取，
+令牌请进 QQ 交流群 [1041664919](https://qm.qq.com/q/uzIKKiRsQ2) 获取，
 或前往 [今日老婆令牌控制台](https://twf.xlinxc.cn) 自助申请；留空则不携带令牌。无论通过哪种方式申请，
 均需加入该交流群，未加群者不予审核。
 
@@ -138,7 +138,7 @@ core安装插件TodayWaifu
 
 上述台词、文案、角色名称及相关内容的**著作权、版权及其他一切权利，均归其原作品版权方、开发商、发行商及原作者所有**。本插件仅在非商业性的娱乐互动场景中引用这些内容，**不以任何形式主张对上述素材的版权**，亦不代表与原版权方存在任何关联、合作或授权关系。
 
-若相关版权方认为本插件的内容引用侵犯了您的合法权益，请通过 [Issue](https://github.com/MimoKit/TodayWaifu/issues) 或交流群 **798949533** 联系我们，我们将在核实后第一时间删除或调整相关内容。
+若相关版权方认为本插件的内容引用侵犯了您的合法权益，请通过 [Issue](https://github.com/MimoKit/TodayWaifu/issues) 或交流群 **1041664919** 联系我们，我们将在核实后第一时间删除或调整相关内容。
 
 ## 丨版权©️
 

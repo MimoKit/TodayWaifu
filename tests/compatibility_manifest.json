@@ -72,7 +72,7 @@
       },
       {
         "key": "DailyWifeGalleryToken",
-        "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌', '')"
+        "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 1041664919 (https://qm.qq.com/q/uzIKKiRsQ2) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌', '')"
       },
       {
         "key": "_DividerNteWife",
