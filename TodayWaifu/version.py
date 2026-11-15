@@ -1,1 +1,1 @@
-TodayWaifu_version = "1.0.1"
+TodayWaifu_version = "1.0.2"
