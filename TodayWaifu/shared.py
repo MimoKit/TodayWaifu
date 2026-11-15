@@ -220,10 +220,6 @@ from .display_name import (
 from .invalidation import _invalidate_candidate_cache
 from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
-from .upload_access import (
-    can_upload_images,
-    can_use_whitelisted_feature,
-)
 from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
 from .circuit_breaker import CircuitBreaker
 from .daily_repository import ContextKey, ContextRegistry
@@ -231,11 +227,11 @@ from ..daily_wife_config import DailyWifeConfig
 
 help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
-assign_wife_sv = SV('今日老婆-分配老婆', priority=2)
-assign_husband_sv = SV('今日老婆-分配老公', priority=2)
+assign_wife_sv = SV('今日老婆-分配老婆', pm=1, priority=2)
+assign_husband_sv = SV('今日老婆-分配老公', pm=1, priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
-image_upload_sv = SV('今日老婆-图片上传', priority=2)
-specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
+image_upload_sv = SV('今日老婆-图片上传', pm=1, priority=2)
+specify_wife_sv = SV('今日老婆-指定老婆', pm=1, priority=2)
 wife_list_sv = SV('今日老婆-老婆列表', priority=3)
 husband_list_sv = SV('今日老婆-老公列表', priority=3)
 marry_member_sv = SV('今日老婆-娶群友', priority=3)
@@ -286,7 +282,6 @@ __all__ = [
     '_has_active_wife', '_http_get', '_http_get_with_retry', '_husband_available', '_husband_enabled',
     '_image_source', '_invalidate_candidate_cache', '_loli_enabled', '_shota_enabled',
     '_apply_no_r18', '_no_r18_enabled',
-    '_can_assign_husband', '_can_assign_wife', '_can_specify_wife', '_can_upload_images',
     '_is_excluded_role', '_is_male_role',
     'get_role_quote',
     '_is_master', '_is_secondhand_wife',
@@ -339,41 +334,6 @@ def _is_master(ev: Event) -> bool:
     if not isinstance(masters, list):
         return False
     return str(ev.user_id) in {str(master) for master in masters}
-
-
-def _can_upload_images(ev: Event) -> bool:
-    return _is_master(ev) or can_upload_images(
-        ev.user_id,
-        (),
-        _cfg('DailyWifeImageUploadWhitelist'),
-    )
-
-
-def _can_assign_wife(ev: Event) -> bool:
-    # SV 层不能锁 pm（否则框架会在进处理器前把白名单普通群员一并挡掉），而未锁 pm
-    # 的 SV 默认值为 6（普通群员），若再拿 user_pm <= sv.pm 比较就会退化成全员放行；
-    # 因此分配与指定一律在业务门内收敛为「机器人主人或对应白名单」。
-    return _is_master(ev) or can_use_whitelisted_feature(
-        ev.user_id,
-        (),
-        _cfg('DailyWifeAssignWhitelist'),
-    )
-
-
-def _can_assign_husband(ev: Event) -> bool:
-    return _is_master(ev) or can_use_whitelisted_feature(
-        ev.user_id,
-        (),
-        _cfg('DailyWifeAssignWhitelist'),
-    )
-
-
-def _can_specify_wife(ev: Event) -> bool:
-    return _is_master(ev) or can_use_whitelisted_feature(
-        ev.user_id,
-        (),
-        _cfg('DailyWifeSpecifyWhitelist'),
-    )
 
 
 def _prune_daily_context_state() -> None:

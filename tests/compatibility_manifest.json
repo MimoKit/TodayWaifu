@@ -75,10 +75,6 @@
         "expr": "GsStrConfig('图库访问令牌', '图库接口启用令牌鉴权后必填。进 QQ 交流群 798949533 (https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌', '')"
       },
       {
-        "key": "DailyWifeImageUploadWhitelist",
-        "expr": "GsListStrConfig('图片上传白名单', '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单', [])"
-      },
-      {
         "key": "_DividerNteWife",
         "expr": "GsDivider('异环老婆', '')"
       },
@@ -149,18 +145,6 @@
       {
         "key": "DailyWifeDebugMode",
         "expr": "GsBoolConfig('主人 Debug 模式', '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试', False)"
-      },
-      {
-        "key": "_DividerAssignWife",
-        "expr": "GsDivider('分配老婆', '')"
-      },
-      {
-        "key": "DailyWifeAssignWhitelist",
-        "expr": "GsListStrConfig('分配老婆/老公白名单', '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关可在对应服务中配置', [])"
-      },
-      {
-        "key": "DailyWifeSpecifyWhitelist",
-        "expr": "GsListStrConfig('指定老婆白名单', '允许使用指定老婆功能的用户 ID。机器人主人无需加入白名单；功能开关可在“今日老婆-指定老婆”服务中配置', [])"
       },
       {
         "key": "_DividerDailyWife",
@@ -377,7 +361,7 @@
     {
       "file": "TodayWaifu/daily.py",
       "function": "daily_wife_prefix",
-      "decorator": "specify_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='抽取当前用户今天的老婆。\\n    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。\\n    ', covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'], aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'])"
+      "decorator": "specify_wife_sv.on_prefix(('今日老婆', '娶婆娘', 'jrlp', 'qlp'), block=True, to_ai='为当前用户指定今天的老婆角色。\\n    仅当用户明确指定老婆角色名时调用；随机抽取请调 daily_wife_full，查列表请调 daily_wife_list。\\n    Args:\\n        text: 指定的老婆角色名，例如“今汐”“长离”；需具备「今日老婆-指定老婆」服务权限（默认主人）。\\n    ', covers=['按角色名指定当前用户的今日老婆（需指定老婆服务权限）'], aliases=['今日老婆·指定老婆'])"
     },
     {
       "file": "TodayWaifu/daily.py",
@@ -387,7 +371,7 @@
     {
       "file": "TodayWaifu/daily.py",
       "function": "daily_nte_wife_prefix",
-      "decorator": "specify_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='抽取当前用户今天的异环老婆。\\n    该功能需要先在控制台开启。机器人主人或指定老婆白名单用户可把角色名放入 text。\\n    Args:\\n        text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。\\n    ', covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'])"
+      "decorator": "specify_wife_sv.on_prefix('今日异环老婆', block=True, to_ai='为当前用户指定今天的异环老婆角色。\\n    该功能需要先在控制台开启。仅当用户明确指定了异环角色名时调用；随机抽取请调用 daily_nte_wife_full。\\n    Args:\\n        text: 异环角色名；需具备「今日老婆-指定老婆」服务权限（默认主人）。\\n    ', covers=['按角色名指定当前用户的今日异环老婆（需指定老婆服务权限）'], aliases=['今日老婆·指定异环老婆'])"
     },
     {
       "file": "TodayWaifu/daily.py",
@@ -397,7 +381,7 @@
     {
       "file": "TodayWaifu/daily.py",
       "function": "daily_normal_wife_prefix",
-      "decorator": "specify_wife_sv.on_prefix(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='抽取当前用户今天的普通老婆（二次元作品角色）。\\n    当用户说“今日普通老婆”“普通老婆”时调用。\\n    如果用户指定了角色名或作品名，把角色名或作品名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。\\n    ', covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'], aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'])"
+      "decorator": "specify_wife_sv.on_prefix(('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'), block=True, to_ai='为当前用户指定今天的普通老婆（二次元作品角色）。\\n    仅当用户明确指定角色名或作品名时调用；随机抽取请调 daily_normal_wife_full，查列表请调 daily_normal_wife_list。\\n    Args:\\n        text: 指定的普通老婆角色名或作品名；需具备「今日老婆-指定老婆」服务权限（默认主人）。\\n    ', covers=['按角色名或作品名指定当前用户的今日普通老婆（需指定老婆服务权限）'], aliases=['今日老婆·指定普通老婆', '今日老婆·指定动漫老婆'])"
     },
     {
       "file": "TodayWaifu/daily.py",
@@ -437,7 +421,7 @@
     {
       "file": "TodayWaifu/daily.py",
       "function": "daily_husband_prefix",
-      "decorator": "specify_wife_sv.on_prefix('今日老公', block=True, to_ai='抽取当前用户今天的老公。\\n    当用户说“今日老公”“我今天的老公是谁”时调用。\\n    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。\\n    Args:\\n        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。\\n    ', covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽老公', '今日老婆·今日老公'])"
+      "decorator": "specify_wife_sv.on_prefix('今日老公', block=True, to_ai='为当前用户指定今天的老公角色。\\n    仅当用户明确指定了老公角色名时调用；随机抽取请调用 daily_husband_full，查看列表请调用 daily_husband_list。\\n    Args:\\n        text: 指定的老公角色名；需具备「今日老婆-指定老婆」服务权限（默认主人）。\\n    ', covers=['按角色名指定当前用户的今日老公（需指定老婆服务权限）'], aliases=['今日老婆·指定老公'])"
     },
     {
       "file": "TodayWaifu/daily.py",
@@ -597,7 +581,7 @@
     {
       "file": "TodayWaifu/pgr.py",
       "function": "daily_pgr_wife_prefix",
-      "decorator": "specify_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='抽取当前用户今天的战双老婆。\\n    机器人主人或指定老婆白名单用户可以指定战双角色名。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；仅主人或白名单用户可用。\\n    ', covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'], aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'])"
+      "decorator": "specify_wife_sv.on_prefix(('今日战双老婆', 'jrzslp'), block=True, to_ai='为当前用户指定今天的战双老婆角色。\\n    仅当用户明确指定了战双角色名时调用；随机抽取请调用 daily_pgr_wife。\\n    Args:\\n        text: 战双角色名，例如“露西亚”；需具备「今日老婆-指定老婆」服务权限（默认主人）。\\n    ', covers=['按角色名指定当前用户的今日战双老婆（需指定老婆服务权限）'], aliases=['今日老婆·指定战双老婆'])"
     },
     {
       "file": "TodayWaifu/pgr.py",

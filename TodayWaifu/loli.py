@@ -45,7 +45,6 @@ from .shared import (
     _loli_image_root,
     _record_from_dict,
     _auth_error_reason,
-    _can_upload_images,
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
@@ -428,9 +427,6 @@ async def _send_loli_image(bot: Bot, ev: Event) -> None:
 
 
 async def _send_upload_loli(bot: Bot, ev: Event) -> None:
-    if not _can_upload_images(ev):
-        return await _send_loli_text(bot, '你不在图片上传白名单中。')
-
     refs = _loli_upload_refs(ev)
     if not refs:
         return await _send_loli_text(bot, '请同时发送图片和命令，例如：上传萝莉图片 [图片]')

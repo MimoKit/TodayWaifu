@@ -150,6 +150,10 @@ class ConfigReferenceTests(unittest.TestCase):
             'DailyShotaGalleryApiUrl',
             'DailyWifePgrGalleryApiUrl',
             'DailyWifeRandomGalleryApiUrl',
+            '_DividerAssignWife',
+            'DailyWifeImageUploadWhitelist',
+            'DailyWifeAssignWhitelist',
+            'DailyWifeSpecifyWhitelist',
         )
         # 按整包拼接后做子串匹配：旧键可能以 `or _cfg('旧键')` 的兜底形式或变量赋值形式
         # 出现，无法靠调用点扫描穷尽

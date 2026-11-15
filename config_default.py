@@ -119,11 +119,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '(https://qm.qq.com/q/pJVt8HNwrg) 获取并前往 https://twf.xlinxc.cn 申请；留空则不携带令牌',
         '',
     ),
-    'DailyWifeImageUploadWhitelist': GsListStrConfig(
-        '图片上传白名单',
-        '允许使用本插件全部图片上传功能的用户 ID。机器人主人无需加入白名单',
-        [],
-    ),
     '_DividerNteWife': GsDivider('异环老婆', ''),
     'DailyWifeNteEnabled': GsBoolConfig(
         '启用今日异环老婆',
@@ -205,17 +200,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '主人 Debug 模式',
         '开启后机器人主人每次抽取都会临时随机重抽，不读取或写入当天记录，便于调试',
         False,
-    ),
-    '_DividerAssignWife': GsDivider('分配老婆', ''),
-    'DailyWifeAssignWhitelist': GsListStrConfig(
-        '分配老婆/老公白名单',
-        '允许使用分配老婆和分配老公功能的用户 ID。机器人主人无需加入白名单；功能开关可在对应服务中配置',
-        [],
-    ),
-    'DailyWifeSpecifyWhitelist': GsListStrConfig(
-        '指定老婆白名单',
-        '允许使用指定老婆功能的用户 ID。机器人主人无需加入白名单；功能开关可在“今日老婆-指定老婆”服务中配置',
-        [],
     ),
     '_DividerDailyWife': GsDivider('今日老婆', ''),
     'DailyWifeTextTemplate': GsStrConfig(

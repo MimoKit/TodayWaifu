@@ -22,7 +22,7 @@ class CommandPriorityTests(unittest.TestCase):
             source,
         )
         specify_priority = re.search(
-            r"specify_wife_sv\s*=\s*SV\('今日老婆-指定老婆',\s*priority=(\d+)\)",
+            r"specify_wife_sv\s*=\s*SV\('今日老婆-指定老婆',\s*pm=1,\s*priority=(\d+)\)",
             source,
         )
 

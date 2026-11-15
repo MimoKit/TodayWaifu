@@ -25,7 +25,6 @@ class PgrFeatureSourceTests(unittest.TestCase):
         # 战双图库地址已并入统一的 DailyWifeApiUrl
         self.assertIn("'DailyWifeApiUrl'", config)
         self.assertIn("'DailyWifePgrTextTemplate'", config)
-        self.assertIn("'DailyWifeImageUploadWhitelist'", config)
         self.assertTrue(
             any(
                 isinstance(node, ast.AsyncFunctionDef)
@@ -59,19 +58,16 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn("record.image.startswith(('http://', 'https://'))", source)
         self.assertIn('await _send_role_image(', source)
 
-    def test_all_image_uploads_share_global_whitelist(self) -> None:
-        # 三条上传链路（自定义、萝莉、战双）必须共用同一白名单与同一服务权限门：
-        # 任一处漏掉门禁，都会让未授权用户经该入口写入服务器文件，
-        # 且因入口分散而难以在日常使用中察觉。
+    def test_all_image_uploads_share_image_upload_sv(self) -> None:
+        # 三条上传链路（自定义、萝莉、战双）必须共用同一 `image_upload_sv`（默认 pm=1）：
+        # 任一处脱离该服务都会绕开统一的上传权限控制。
         shared = (ROOT / 'TodayWaifu' / 'shared.py').read_text(encoding='utf-8-sig')
         custom = (ROOT / 'TodayWaifu' / 'custom_role.py').read_text(encoding='utf-8-sig')
         loli = (ROOT / 'TodayWaifu' / 'loli.py').read_text(encoding='utf-8-sig')
         pgr = (ROOT / 'TodayWaifu' / 'pgr.py').read_text(encoding='utf-8-sig')
 
-        self.assertIn("image_upload_sv = SV('今日老婆-图片上传'", shared)
-        self.assertIn("_cfg('DailyWifeImageUploadWhitelist')", shared)
+        self.assertIn("image_upload_sv = SV('今日老婆-图片上传', pm=1, priority=2)", shared)
         for source in (custom, loli, pgr):
-            self.assertIn('if not _can_upload_images(ev):', source)
             self.assertIn('@image_upload_sv.', source)
 
     def test_pgr_upload_requires_existing_role_directory(self) -> None:
@@ -151,23 +147,17 @@ class PgrFeatureSourceTests(unittest.TestCase):
             self.assertLess(source.index('is_debug_active ='), source.index('_get_other_daily_wife_name('))
             self.assertIn('if not is_transient_draw:', source)
 
-    def test_role_selection_has_independent_sv_and_whitelist(self) -> None:
-        # 指定老婆使用独立服务与白名单，与图片上传权限分离：两者混用会迫使只想开放指定
-        # 的部署同时开放文件写入。指定结果同样落每日记录（不再只做临时预览、0 点随记录
-        # 重置），故 is_transient_draw 只允许在调试路径为真。
-        config = (ROOT / 'config_default.py').read_text(encoding='utf-8-sig')
+    def test_role_selection_uses_independent_specify_wife_sv(self) -> None:
+        # 指定老婆使用独立的 `specify_wife_sv`（默认 pm=1），与图片上传权限分离：两者混用会迫使
+        # 只想开放指定的部署同时开放文件写入。指定结果同样落每日记录（不再只做临时预览、0 点随
+        # 记录重置），故 is_transient_draw 只允许在调试路径为真。
         shared = (ROOT / 'TodayWaifu' / 'shared.py').read_text(encoding='utf-8-sig')
         daily = (ROOT / 'TodayWaifu' / 'daily.py').read_text(encoding='utf-8-sig')
         pgr = (ROOT / 'TodayWaifu' / 'pgr.py').read_text(encoding='utf-8-sig')
 
-        self.assertIn("'_DividerAssignWife': GsDivider('分配老婆', '')", config)
-        self.assertIn("'DailyWifeSpecifyWhitelist'", config)
-        self.assertIn("specify_wife_sv = SV('今日老婆-指定老婆'", shared)
-        self.assertIn("_cfg('DailyWifeSpecifyWhitelist')", shared)
-        self.assertIn('def _can_specify_wife(ev: Event) -> bool:', shared)
+        self.assertIn("specify_wife_sv = SV('今日老婆-指定老婆', pm=1, priority=2)", shared)
         for source in (daily, pgr):
-            self.assertIn('can_specify_role = _can_specify_wife(ev)', source)
-            # 主人指定不再走临时预览：与普通抽取一样写入每日记录，0 点随记录重置
+            # 指定不再走临时预览：与普通抽取一样写入每日记录，0 点随记录重置
             self.assertIn('is_transient_draw = is_debug_active', source)
             self.assertIn('specified_role=specified_role', source)
         self.assertIn('@specify_wife_sv.on_prefix(', daily)
@@ -190,7 +180,6 @@ class PgrFeatureSourceTests(unittest.TestCase):
         self.assertIn('if is_transient_draw:', function)
         self.assertIn('_load_pgr_wife_candidates()', function)
         self.assertIn('_pgr_candidates_by_name(candidates, specified_name)', function)
-        self.assertIn('只有机器人主人或指定老婆白名单用户', function)
         self.assertIn('战双老婆图库中没有角色', function)
         self.assertIn('_pick_role_record(candidates, random)', function)
         self.assertIn(

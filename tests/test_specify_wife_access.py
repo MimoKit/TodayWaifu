@@ -1,22 +1,24 @@
-"""指定老婆（今日老婆 角色名）的权限契约：仅机器人主人与指定老婆白名单可用。
+"""指定老婆、分配老婆/老公与图片上传的权限契约：统一由 GsCore `SV` 层默认 `pm=1` 托管。
 
-`specify_wife_sv` 同时承载 `今日老婆 帮助`、`今日老婆 列表` 等前缀分支，且必须允许白名单内
-的普通群员（user_pm=6）进入处理器，因此 SV 层不可锁 `pm`（锁 `pm` 会被框架提前挡掉）；
-而未锁 `pm` 的 SV 在 GsCore 中默认 `pm=6`，业务门若拿 `ev.user_pm <= specify_wife_sv.pm`
-比较就会退化成全员放行（即 dc5cc06 引入的线上缺陷）。
+插件不再维护独立的白名单配置项或处理器内二次鉴权门：
+1. 四个管理/特权 `SV`（指定老婆、分配老婆、分配老公、图片上传）默认 `pm=1`（仅主人），
+   普通随机抽取 `SV` 保持默认 `pm=6`（全员可用）。
+2. 当管理员在 GsCore 网页控制台调低对应 `SV` 的 `pm` 或配置 `SV` 白名单放行非主人用户时，
+   处理器内部不得再以主人身份或旧白名单拦截请求。
 """
 
 from __future__ import annotations
 
 import ast
+import asyncio
 import unittest
-import importlib.util
 from types import SimpleNamespace
 from pathlib import Path
+from unittest.mock import Mock, AsyncMock
 
 ROOT = Path(__file__).resolve().parents[1]
 SHARED_PATH = ROOT / 'TodayWaifu' / 'shared.py'
-UPLOAD_ACCESS_PATH = ROOT / 'TodayWaifu' / 'upload_access.py'
+DAILY_PATH = ROOT / 'TodayWaifu' / 'daily.py'
 
 
 class _FakeSV:
@@ -29,84 +31,134 @@ class _FakeSV:
         self.kwargs = kwargs
 
 
-def _load_upload_access():
-    spec = importlib.util.spec_from_file_location('todaywaifu_specify_upload_access', UPLOAD_ACCESS_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError('cannot load upload_access module')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _load_specify_runtime(whitelist: object):
-    """连同 `specify_wife_sv = SV(...)` 与 `_can_specify_wife` 一起从真实源码加载执行。"""
+def _load_shared_svs() -> dict[str, _FakeSV]:
     tree = ast.parse(SHARED_PATH.read_text(encoding='utf-8-sig'))
-    sv_assign = next(
+    sv_assigns = [
         node
         for node in tree.body
         if isinstance(node, ast.Assign)
-        and any(isinstance(t, ast.Name) and t.id == 'specify_wife_sv' for t in node.targets)
-    )
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == 'SV'
+    ]
+    module = ast.Module(body=sv_assigns, type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace: dict[str, object] = {'SV': _FakeSV}
+    exec(compile(module, str(SHARED_PATH), 'exec'), namespace)  # noqa: S102
+    return {key: value for key, value in namespace.items() if isinstance(value, _FakeSV)}
+
+
+def _extract_async_function(path: Path, name: str, namespace: dict[str, object]):
+    tree = ast.parse(path.read_text(encoding='utf-8-sig'))
     function = next(
         node
         for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == '_can_specify_wife'
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name
     )
     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
-    module = ast.Module(body=[future, sv_assign, function], type_ignores=[])
+    module = ast.Module(body=[future, function], type_ignores=[])
     ast.fix_missing_locations(module)
-    access = _load_upload_access()
-    namespace: dict[str, object] = {
-        'SV': _FakeSV,
-        '_is_master': lambda ev: str(ev.user_id) == '10000',
-        'can_use_whitelisted_feature': access.can_use_whitelisted_feature,
-        'normalized_user_ids': access.normalized_user_ids,
-        '_cfg': lambda key: whitelist if key == 'DailyWifeSpecifyWhitelist' else [],
-    }
-    exec(compile(module, str(SHARED_PATH), 'exec'), namespace)  # noqa: S102
-    return namespace['specify_wife_sv'], namespace['_can_specify_wife']
+    exec(compile(module, str(path), 'exec'), namespace)  # noqa: S102
+    return namespace[name]
 
 
-def _event(user_id: str, user_pm: int) -> SimpleNamespace:
-    return SimpleNamespace(user_id=user_id, user_pm=user_pm)
+class PrivilegedSvAccessTests(unittest.IsolatedAsyncioTestCase):
+    def test_privileged_services_default_to_pm1_while_daily_draws_stay_open(self) -> None:
+        svs = _load_shared_svs()
+        for sv_var in (
+            'specify_wife_sv',
+            'assign_wife_sv',
+            'assign_husband_sv',
+            'image_upload_sv',
+            'custom_role_sv',
+            'loli_manage_sv',
+        ):
+            with self.subTest(sv=sv_var):
+                self.assertEqual(svs[sv_var].pm, 1)
+                self.assertEqual(svs[sv_var].priority, 2)
 
+        for open_sv in (
+            'daily_wife_sv',
+            'daily_husband_sv',
+            'daily_nte_wife_sv',
+            'pgr_wife_sv',
+            'daily_normal_wife_sv',
+        ):
+            with self.subTest(sv=open_sv):
+                self.assertEqual(svs[open_sv].pm, 6)
 
-class SpecifyWifeAccessTests(unittest.TestCase):
-    def test_specify_sv_does_not_lock_pm_at_framework_layer(self) -> None:
-        sv, _ = _load_specify_runtime(whitelist=[])
-        self.assertEqual(sv.pm, 6, '指定老婆的 SV 不能锁 pm，否则白名单群员与列表/帮助子命令会被框架拦截')
+    async def test_specify_handler_allows_non_master_once_sv_permits_entry(self) -> None:
+        """管理员把 `specify_wife_sv` 调低权限放行普通成员后，处理器必须直接执行指定角色。"""
+        role = SimpleNamespace(name='今汐', role_ids=('1304',), images=('https://example.com/jinxi.png',))
+        chosen = SimpleNamespace(
+            name='今汐',
+            record_type='role',
+            image='https://example.com/jinxi.png',
+            to_role=lambda: role,
+        )
+        ensure_record = AsyncMock(return_value=chosen)
+        send_record = AsyncMock()
+        safe_send = AsyncMock()
+        namespace: dict[str, object] = {
+            'LOG_PREFIX': '[TodayWaifu]',
+            'logger': Mock(),
+            '_daily_item_title': lambda mode: '老婆',
+            '_is_master': lambda ev: False,
+            '_cfg_bool': lambda key, default=False: False,
+            '_normalize_role_name': lambda name: name.strip(),
+            '_load_candidates': AsyncMock(return_value=((role,), None)),
+            '_get_other_daily_wife_name': AsyncMock(return_value=None),
+            '_load_daily_context': AsyncMock(return_value={'wives': {}, 'safe_wives': {}}),
+            '_user_key': lambda ev: str(ev.user_id),
+            '_daily_bucket_name': lambda mode: 'wives',
+            '_wife_state': lambda raw: 'none',
+            '_ensure_daily_wife_record': ensure_record,
+            '_send_record_image': send_record,
+            '_safe_send': safe_send,
+        }
+        handler = _extract_async_function(DAILY_PATH, '_send_daily_wife', namespace)
+        ev = SimpleNamespace(user_id='30001', group_id='100', user_pm=6)
 
-    def test_master_passes_regardless_of_permission_level(self) -> None:
-        _, gate = _load_specify_runtime(whitelist=[])
-        self.assertTrue(gate(_event('10000', 6)))
+        await handler(object(), ev, mode='wife', specified_name='今汐')
 
-    def test_whitelisted_normal_member_passes(self) -> None:
-        _, gate = _load_specify_runtime(whitelist=['30001'])
-        self.assertTrue(gate(_event('30001', 6)))
+        safe_send.assert_not_awaited()
+        ensure_record.assert_awaited_once_with(ev, mode='wife', specified_role=role)
+        send_record.assert_awaited_once()
 
-    def test_normal_member_is_rejected_by_default(self) -> None:
-        _, gate = _load_specify_runtime(whitelist=[])
-        self.assertFalse(gate(_event('30001', 6)))
+    async def test_assign_wife_handler_allows_non_master_once_sv_permits_entry(self) -> None:
+        """管理员把 `assign_wife_sv` 调低权限放行非主人后，分配处理器不得再在内部拦截。"""
+        role = SimpleNamespace(name='今汐', role_ids=('1304',))
+        chosen = SimpleNamespace(name='今汐', image='https://example.com/jinxi.png')
+        save_records = AsyncMock()
+        send_role = AsyncMock()
+        safe_send = AsyncMock()
+        lock = asyncio.Lock()
+        namespace: dict[str, object] = {
+            'LOG_PREFIX': '[TodayWaifu]',
+            'logger': Mock(),
+            'random': Mock(),
+            '_get_event_target_user_id': lambda ev: '30002',
+            '_assignment_role_name': lambda ev, target: '今汐',
+            '_load_candidates': AsyncMock(return_value=((role,), None)),
+            '_filter_by_mode': lambda candidates, mode: candidates,
+            '_find_assignable_wife': lambda candidates, name: role,
+            '_pick_role_record': lambda candidates, rng: chosen,
+            '_record_to_dict': lambda record, ev, key: {'name': record.name, 'image': record.image},
+            '_user_key': lambda ev: str(ev.user_id),
+            'name_from_event': lambda ev: '群管理A',
+            '_daily_context_lock': lambda ev: lock,
+            '_save_daily_records': save_records,
+            '_send_role_image': send_role,
+            '_safe_send': safe_send,
+        }
+        handler = _extract_async_function(DAILY_PATH, '_send_assign_wife', namespace)
+        ev = SimpleNamespace(user_id='20001', group_id='100', user_pm=3)
 
-    def test_unlisted_group_admin_and_owner_are_rejected(self) -> None:
-        _, gate = _load_specify_runtime(whitelist=[])
-        self.assertFalse(gate(_event('20001', 3)))
-        self.assertFalse(gate(_event('20002', 2)))
+        await handler(object(), ev)
 
-    def test_specify_whitelist_config_keeps_default_empty(self) -> None:
-        tree = ast.parse((ROOT / 'config_default.py').read_text(encoding='utf-8-sig'))
-        for node in tree.body:
-            if not isinstance(node, ast.AnnAssign) or not isinstance(node.value, ast.Dict):
-                continue
-            if not isinstance(node.target, ast.Name) or node.target.id != 'CONFIG_DEFAULT':
-                continue
-            for key, value in zip(node.value.keys, node.value.values):
-                if isinstance(key, ast.Constant) and key.value == 'DailyWifeSpecifyWhitelist':
-                    expr = ast.unparse(value)
-                    self.assertIn('GsListStrConfig', expr)
-                    self.assertTrue(expr.endswith('[])'), expr)
-                    return
-        raise AssertionError('CONFIG_DEFAULT 里没有 DailyWifeSpecifyWhitelist')
+        safe_send.assert_not_awaited()
+        save_records.assert_awaited_once()
+        send_role.assert_awaited_once()
 
 
 if __name__ == '__main__':

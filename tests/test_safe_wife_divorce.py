@@ -131,7 +131,6 @@ class SafeWifeDivorceTests(unittest.IsolatedAsyncioTestCase):
             '_daily_item_title': lambda mode: '老婆',
             '_is_master': lambda ev: False,
             '_cfg_bool': lambda key, default: False,
-            '_can_specify_wife': lambda ev: False,
             '_normalize_role_name': lambda name: name,
             '_get_other_daily_wife_name': AsyncMock(return_value=None),
             '_record_from_dict': Mock(return_value=SimpleNamespace(name='新老婆')),

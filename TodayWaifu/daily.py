@@ -43,13 +43,11 @@ from .shared import (
     marry_member_sv,
     name_from_event,
     specify_wife_sv,
-    _can_assign_wife,
     _has_active_wife,
     _load_candidates,
     _send_role_image,
     daily_husband_sv,
     load_group_names,
-    _can_specify_wife,
     _daily_item_title,
     _pick_role_record,
     _record_from_dict,
@@ -59,7 +57,6 @@ from .shared import (
     _husband_available,
     _pick_group_member,
     _save_daily_record,
-    _can_assign_husband,
     _daily_context_lock,
     _load_daily_context,
     _save_daily_records,
@@ -337,20 +334,12 @@ async def _send_daily_wife(bot: Bot, ev: Event, mode: str = 'wife', specified_na
 
     is_master = _is_master(ev)
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
-    can_specify_role = _can_specify_wife(ev)
     specified_name = _normalize_role_name(specified_name)
-    # Debug 模式下仅做临时预览、不落库；主人指定同样写入每日记录，
+    # Debug 模式下仅做临时预览、不落库；指定角色同样写入每日记录，
     # 以便与普通抽取共享同一套每日唯一性与跨日重置语义。
     is_transient_draw = is_debug_active
 
     specified_role: RoleCandidate | None = None
-    if specified_name and not can_specify_role:
-        logger.warning(f'{LOG_PREFIX} 用户 {ev.user_id} 尝试指定角色 {specified_name}，已拒绝')
-        return await _safe_send(
-            bot,
-            f'只有机器人主人或指定老婆白名单用户才能指定{title}哦。',
-        )
-
     if specified_name and not is_transient_draw:
         candidates, error = await _load_candidates(mode)
         if error or not candidates:
@@ -586,9 +575,7 @@ def _find_assignable_wife(candidates: tuple[RoleCandidate, ...], role_name: str)
 
 
 async def _send_assign_wife(bot: Bot, ev: Event) -> None:
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起主人分配老婆命令')
-    if not _can_assign_wife(ev):
-        return await _safe_send(bot, '只有机器人主人或分配老婆白名单用户可以分配老婆。')
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起分配老婆命令')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
@@ -635,11 +622,9 @@ async def _send_assign_wife(bot: Bot, ev: Event) -> None:
 
 
 async def _send_assign_husband(bot: Bot, ev: Event) -> None:
-    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起主人分配老公命令')
+    logger.info(f'{LOG_PREFIX} 用户 {ev.user_id} 发起分配老公命令')
     if not _husband_available():
         return
-    if not _can_assign_husband(ev):
-        return await _safe_send(bot, '只有机器人主人或分配白名单用户可以分配老公。')
 
     target_user_id = _get_event_target_user_id(ev)
     if not target_user_id:
@@ -780,14 +765,13 @@ async def _send_wife_list(bot: Bot, ev: Event, mode: str = 'wife') -> None:
 @specify_wife_sv.on_prefix(
     ('今日老婆', '娶婆娘', 'jrlp', 'qlp'),
     block=True,
-    to_ai="""抽取当前用户今天的老婆。
-    当用户说“今日老婆”“帮我娶个老婆”“我今天的老婆是谁”时调用。
-    如果用户指定了角色名，把角色名放在 text 里，例如“今汐”“长离”；如果用户要看列表，text 填“列表”。
+    to_ai="""为当前用户指定今天的老婆角色。
+    仅当用户明确指定老婆角色名时调用；随机抽取请调 daily_wife_full，查列表请调 daily_wife_list。
     Args:
-        text: 可选，指定老婆角色名；留空表示随机抽取今日老婆；填“列表”表示查看老婆列表。
+        text: 指定的老婆角色名，例如“今汐”“长离”；需具备「今日老婆-指定老婆」服务权限（默认主人）。
     """,
-    covers=['鸣潮角色每日随机抽取（每天一次、全天固定），返回角色名与立绘'],
-    aliases=['今日老婆·抽老婆', '今日老婆·今日老婆', '今日老婆·娶婆娘'],
+    covers=['按角色名指定当前用户的今日老婆（需指定老婆服务权限）'],
+    aliases=['今日老婆·指定老婆'],
 )
 async def daily_wife_prefix(bot: Bot, ev: Event) -> list[str] | None:
     specified_name = str(ev.text or '').strip()
@@ -821,13 +805,13 @@ async def daily_wife_full(bot: Bot, ev: Event) -> None:
 @specify_wife_sv.on_prefix(
     '今日异环老婆',
     block=True,
-    to_ai="""抽取当前用户今天的异环老婆。
-    该功能需要先在控制台开启。机器人主人或指定老婆白名单用户可把角色名放入 text。
+    to_ai="""为当前用户指定今天的异环老婆角色。
+    该功能需要先在控制台开启。仅当用户明确指定了异环角色名时调用；随机抽取请调用 daily_nte_wife_full。
     Args:
-        text: 异环角色名；仅机器人主人或指定老婆白名单用户可用。
+        text: 异环角色名；需具备「今日老婆-指定老婆」服务权限（默认主人）。
     """,
-    covers=['异环(NTE)角色每日随机抽取，返回角色名与立绘'],
-    aliases=['今日老婆·抽异环老婆', '今日老婆·今日异环老婆'],
+    covers=['按角色名指定当前用户的今日异环老婆（需指定老婆服务权限）'],
+    aliases=['今日老婆·指定异环老婆'],
 )
 async def daily_nte_wife_prefix(bot: Bot, ev: Event) -> None:
     if not _cfg_bool('DailyWifeNteEnabled', False):
@@ -855,14 +839,13 @@ async def daily_nte_wife_full(bot: Bot, ev: Event) -> None:
 @specify_wife_sv.on_prefix(
     ('今日普通老婆', '普通老婆', 'ptlp', 'jrptlp'),
     block=True,
-    to_ai="""抽取当前用户今天的普通老婆（二次元作品角色）。
-    当用户说“今日普通老婆”“普通老婆”时调用。
-    如果用户指定了角色名或作品名，把角色名或作品名放在 text 里；如果用户要看列表，text 填“列表”。
+    to_ai="""为当前用户指定今天的普通老婆（二次元作品角色）。
+    仅当用户明确指定角色名或作品名时调用；随机抽取请调 daily_normal_wife_full，查列表请调 daily_normal_wife_list。
     Args:
-        text: 可选，指定普通老婆角色名或作品名；留空表示随机抽取今日普通老婆；填“列表”表示查看普通老婆列表。
+        text: 指定的普通老婆角色名或作品名；需具备「今日老婆-指定老婆」服务权限（默认主人）。
     """,
-    covers=['二次元动漫角色（跨作品）每日随机抽取，返回「来自{作品}的{角色}」'],
-    aliases=['今日老婆·抽普通老婆', '今日老婆·今日普通老婆', '今日老婆·动漫老婆'],
+    covers=['按角色名或作品名指定当前用户的今日普通老婆（需指定老婆服务权限）'],
+    aliases=['今日老婆·指定普通老婆', '今日老婆·指定动漫老婆'],
 )
 async def daily_normal_wife_prefix(bot: Bot, ev: Event) -> None:
     specified_name = str(ev.text or '').strip()
@@ -979,14 +962,13 @@ async def assign_husband_usage(bot: Bot, ev: Event) -> None:
 @specify_wife_sv.on_prefix(
     '今日老公',
     block=True,
-    to_ai="""抽取当前用户今天的老公。
-    当用户说“今日老公”“我今天的老公是谁”时调用。
-    如果用户指定了角色名，把角色名放在 text 里；如果用户要看列表，text 填“列表”。
+    to_ai="""为当前用户指定今天的老公角色。
+    仅当用户明确指定了老公角色名时调用；随机抽取请调用 daily_husband_full，查看列表请调用 daily_husband_list。
     Args:
-        text: 可选，指定老公角色名；留空表示随机抽取今日老公；填“列表”表示查看老公列表。
+        text: 指定的老公角色名；需具备「今日老婆-指定老婆」服务权限（默认主人）。
     """,
-    covers=['鸣潮男性角色每日随机抽取，返回角色名与立绘'],
-    aliases=['今日老婆·抽老公', '今日老婆·今日老公'],
+    covers=['按角色名指定当前用户的今日老公（需指定老婆服务权限）'],
+    aliases=['今日老婆·指定老公'],
 )
 async def daily_husband_prefix(bot: Bot, ev: Event) -> None:
     if not _husband_available():

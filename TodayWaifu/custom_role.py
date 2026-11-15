@@ -34,7 +34,6 @@ from .shared import (
     custom_role_sv,
     write_role_map,
     image_upload_sv,
-    _can_upload_images,
     _normalize_role_name,
     _writable_role_map_path,
     _image_message_from_path,
@@ -366,11 +365,6 @@ async def _send_create_custom_wife_role(bot: Bot, ev: Event) -> list[str] | None
 
 
 async def _send_upload_custom_wife_images(bot: Bot, ev: Event) -> list[str] | None:
-    # 权限校验先于任何解析与落盘：上传会在用户目录写入文件，
-    # 越权请求必须在产生副作用之前被拒绝。
-    if not _can_upload_images(ev):
-        return await _safe_send(bot, '你不在图片上传白名单中。')
-
     role_name = _clean_upload_role_name(ev.text, strip_wife_suffix=True)
     if not role_name:
         return await _safe_send(bot, '请输入角色名，例如：上传老婆图片 达妮娅，并附带图片。')

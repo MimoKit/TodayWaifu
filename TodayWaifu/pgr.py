@@ -31,11 +31,9 @@ from .shared import (
     image_upload_sv,
     specify_wife_sv,
     _send_role_image,
-    _can_specify_wife,
     _pick_role_record,
     _record_from_dict,
     _send_local_image,
-    _can_upload_images,
     _daily_bucket_name,
     _daily_context_lock,
     _load_daily_context,
@@ -74,9 +72,6 @@ def _save_pgr_image(role_dir: Path, source: str, index: int) -> Path | None:
 
 
 async def _send_upload_pgr_wife_images(bot: Bot, ev: Event) -> None:
-    if not _can_upload_images(ev):
-        return await _safe_send(bot, '你不在图片上传白名单中。')
-
     # 剥掉常见引号：用户习惯把角色名连同引号一起复制，未剥离会导致精确匹配失败
     role_name = str(ev.text or '').strip().strip('"“”‘’')
     if not role_name:
@@ -223,20 +218,12 @@ async def _send_daily_pgr_wife(
 
     is_master = _is_master(ev)
     is_debug_active = _cfg_bool('DailyWifeDebugMode', False) and is_master
-    can_specify_role = _can_specify_wife(ev)
     specified_name = _normalize_role_name(specified_name)
-    # 仅 Debug 模式保持临时预览不落库；主人指定同样写入每日记录，0 点随记录重置。若把主人
-    # 指定也当作临时预览，指定结果不进记录，抢/送/离婚将全部读不到目标
+    # 仅 Debug 模式保持临时预览不落库；指定角色同样写入每日记录，0 点随记录重置。若把指定
+    # 也当作临时预览，指定结果不进记录，抢/送/离婚将全部读不到目标
     is_transient_draw = is_debug_active
 
     specified_role: RoleCandidate | None = None
-    # 指定权限先于存在性校验：无权限用户不应从报错差异中探测图库内容
-    if specified_name and not can_specify_role:
-        return await _safe_send(
-            bot,
-            '只有机器人主人或指定老婆白名单用户才能指定战双老婆。',
-        )
-
     if specified_name and not is_transient_draw:
         matched = _pgr_candidates_by_name(
             await _load_pgr_wife_candidates(), specified_name
@@ -333,13 +320,13 @@ async def _send_daily_pgr_wife(
 @specify_wife_sv.on_prefix(
     ('今日战双老婆', 'jrzslp'),
     block=True,
-    to_ai="""抽取当前用户今天的战双老婆。
-    机器人主人或指定老婆白名单用户可以指定战双角色名。
+    to_ai="""为当前用户指定今天的战双老婆角色。
+    仅当用户明确指定了战双角色名时调用；随机抽取请调用 daily_pgr_wife。
     Args:
-        text: 战双角色名，例如“露西亚”；仅主人或白名单用户可用。
+        text: 战双角色名，例如“露西亚”；需具备「今日老婆-指定老婆」服务权限（默认主人）。
     """,
-    covers=['战双帕弥什角色每日随机抽取，返回角色名与立绘'],
-    aliases=['今日老婆·抽战双老婆', '今日老婆·今日战双老婆'],
+    covers=['按角色名指定当前用户的今日战双老婆（需指定老婆服务权限）'],
+    aliases=['今日老婆·指定战双老婆'],
 )
 async def daily_pgr_wife_prefix(bot: Bot, ev: Event) -> None:
     await _send_daily_pgr_wife(bot, ev, str(ev.text or '').strip())

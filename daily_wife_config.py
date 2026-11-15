@@ -29,8 +29,8 @@ if _LEGACY_CONFIG_PATH.is_file() and not CONFIG_PATH.is_file():
     except OSError:
         pass
 
-# 历史遗留的图库地址键：图库地址已收敛到统一的 DailyWifeApiUrl，这些键指向的接口
-# 均已停用。保留它们只会让控制台暴露失效选项，故集中列出以便统一清除。
+# 历史遗留的配置键：图库地址已收敛到统一的 DailyWifeApiUrl，插件自建的各类白名单也已退役
+# （权限统一交由对应 SV 服务配置管理）。保留它们只会让控制台暴露失效选项，故集中列出以便统一清除。
 _LEGACY_KEYS_TO_REMOVE = [
     'DailyWifeGalleryApiUrl',
     'DailyWifeNormalGalleryApiUrl',
@@ -38,6 +38,10 @@ _LEGACY_KEYS_TO_REMOVE = [
     'DailyShotaGalleryApiUrl',
     'DailyWifePgrGalleryApiUrl',
     'DailyWifeRandomGalleryApiUrl',
+    '_DividerAssignWife',
+    'DailyWifeImageUploadWhitelist',
+    'DailyWifeAssignWhitelist',
+    'DailyWifeSpecifyWhitelist',
 ]
 
 # 清理必须在配置实例化之前针对底层 JSON 文件执行：StringConfig 以文件内容初始化各配置
