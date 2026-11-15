@@ -1,10 +1,23 @@
+from __future__ import annotations
+
 import ast
 import unittest
 import importlib.util
+from types import SimpleNamespace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SHARED_PATH = ROOT / 'TodayWaifu' / 'shared.py'
 UPLOAD_ACCESS_PATH = ROOT / 'TodayWaifu' / 'upload_access.py'
+
+
+class _FakeSV:
+    """复刻 GsCore `SV` 默认 `pm=6` 的构造语义，防止桩对象掩盖默认权限。"""
+
+    def __init__(self, name: str = '', pm: int = 6, priority: int = 5, **kwargs: object) -> None:
+        self.name = name
+        self.pm = pm
+        self.priority = priority
 
 
 # 以文件路径而非包名加载 upload_access：该模块是纯函数实现，直接加载可绕开
@@ -30,11 +43,43 @@ def _function_source(relative: str, name: str) -> str:
     raise AssertionError(f'{relative} 里没有 {name}')
 
 
-class AssignWifeAccessTests(unittest.TestCase):
-    """分配老婆的放行条件由「仅主人」放宽为「主人或白名单」，且不得回退。"""
+def _load_assign_wife_runtime(whitelist: object):
+    tree = ast.parse(_source('TodayWaifu/shared.py'))
+    sv_assign = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == 'assign_wife_sv' for t in node.targets)
+    )
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == '_can_assign_wife'
+    )
+    future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
+    module = ast.Module(body=[future, sv_assign, function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    access = _load_upload_access()
+    namespace: dict[str, object] = {
+        'SV': _FakeSV,
+        '_is_master': lambda ev: str(ev.user_id) == '10000',
+        'can_use_whitelisted_feature': access.can_use_whitelisted_feature,
+        'normalized_user_ids': access.normalized_user_ids,
+        '_cfg': lambda key: whitelist if key == 'DailyWifeAssignWhitelist' else [],
+    }
+    exec(compile(module, str(SHARED_PATH), 'exec'), namespace)  # noqa: S102
+    return namespace['assign_wife_sv'], namespace['_can_assign_wife']
 
-    # 以下四例锁定 can_use_whitelisted_feature 的判定边界。该函数同时承载上传图片与
-    # 分配老婆两条链路，任一侧放宽都会同时改变另一侧的可达用户范围，故边界须显式固定。
+
+def _event(user_id: str, user_pm: int) -> SimpleNamespace:
+    return SimpleNamespace(user_id=user_id, user_pm=user_pm)
+
+
+class AssignWifeAccessTests(unittest.TestCase):
+    """分配老婆的放行条件为「仅主人或白名单」，不得因 SV 默认 pm=6 退化为全员放行。"""
+
+    # 以下四例锁定 can_use_whitelisted_feature 的判定边界。该函数同时承载上传图片、
+    # 指定老婆与分配老婆/老公链路，任一侧放宽都会同时改变可达用户范围，故边界须显式固定。
     def test_whitelisted_user_passes_generic_gate(self) -> None:
         access = _load_upload_access()
         self.assertTrue(access.can_use_whitelisted_feature('10001', [], ['10001']))
@@ -51,30 +96,19 @@ class AssignWifeAccessTests(unittest.TestCase):
         access = _load_upload_access()
         self.assertTrue(access.can_use_whitelisted_feature('10002', [], '10001, 10002\n10003'))
 
-    # 服务权限（user_pm / sv.pm）与白名单是两条独立放行路径。数值越小权限越高，
-    # 比较方向写反会让低权限用户通过、高权限用户被拒，且不易在日常使用中暴露。
-    def test_service_permission_level_allows_authorized_user(self) -> None:
-        access = _load_upload_access()
-        self.assertTrue(access.can_use_pm_or_whitelisted_feature('10001', 3, 3, [], []))
+    def test_master_passes_assign_wife_gate(self) -> None:
+        _, gate = _load_assign_wife_runtime(whitelist=[])
+        self.assertTrue(gate(_event('10000', 6)))
 
-    def test_service_permission_level_rejects_lower_priority_user(self) -> None:
-        access = _load_upload_access()
-        self.assertFalse(access.can_use_pm_or_whitelisted_feature('10001', 6, 3, [], []))
+    def test_whitelisted_member_passes_assign_wife_gate(self) -> None:
+        _, gate = _load_assign_wife_runtime(whitelist=['30001'])
+        self.assertTrue(gate(_event('30001', 6)))
 
-    def test_whitelist_still_overrides_service_permission_level(self) -> None:
-        access = _load_upload_access()
-        self.assertTrue(access.can_use_pm_or_whitelisted_feature('10001', 6, 3, [], ['10001']))
-
-    # 以下三例以源码文本为断言对象（而非行为）：分配入口需经统一鉴权门，且
-    # 白名单配置名必须与配置默认值中的键一致，任一改名都会静默失效。
-    def test_assign_gate_uses_assign_whitelist(self) -> None:
-        gate = _function_source('TodayWaifu/shared.py', '_can_assign_wife')
-        self.assertIn('_is_master(ev)', gate)
-        self.assertIn('DailyWifeAssignWhitelist', gate)
-        # ev.user_pm + assign_wife_sv.pm 是 98446b8 补入的服务权限比较；缺失时
-        # 达到该服务权限的用户会被判为无权限，即该提交所修的线上问题。
-        self.assertIn('ev.user_pm', gate)
-        self.assertIn('assign_wife_sv.pm', gate)
+    def test_unlisted_members_and_admins_are_rejected_by_assign_wife_gate(self) -> None:
+        _, gate = _load_assign_wife_runtime(whitelist=[])
+        self.assertFalse(gate(_event('30001', 6)))
+        self.assertFalse(gate(_event('20001', 3)))
+        self.assertFalse(gate(_event('20002', 2)))
 
     def test_assign_gate_is_exported_for_submodules(self) -> None:
         self.assertIn("'_can_assign_wife'", _source('TodayWaifu/shared.py'))

@@ -33,25 +33,6 @@ def can_use_whitelisted_feature(
     )
 
 
-def can_use_pm_or_whitelisted_feature(
-    user_id: str | int,
-    user_pm: int | str,
-    required_pm: int | str,
-    master_ids: object,
-    whitelist_ids: object,
-) -> bool:
-    """允许达到当前服务权限，或命中主人/白名单。"""
-    # 白名单先于权限比较：白名单用户即便权限不足也应放行，这一顺序不可调换。
-    if can_use_whitelisted_feature(user_id, master_ids, whitelist_ids):
-        return True
-    try:
-        # 权限值可能来自配置或平台侧的字符串，转换失败按「无权限」处理，
-        # 不向上抛出，以免一条格式错误的配置让命令整体不可用。
-        return int(user_pm) <= int(required_pm)
-    except (TypeError, ValueError):
-        return False
-
-
 def can_upload_images(
     user_id: str | int,
     master_ids: object,

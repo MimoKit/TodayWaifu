@@ -222,7 +222,7 @@ from .source_cache import AsyncSourceCache
 from .kind_metadata import DAILY_KIND_METADATA, DailyKindMetadata
 from .upload_access import (
     can_upload_images,
-    can_use_pm_or_whitelisted_feature,
+    can_use_whitelisted_feature,
 )
 from .role_map_store import loads_role_map, write_role_map, migrate_legacy_text_map
 from .circuit_breaker import CircuitBreaker
@@ -232,7 +232,7 @@ from ..daily_wife_config import DailyWifeConfig
 help_sv = SV('今日老婆-帮助', priority=0)
 custom_role_sv = SV('今日老婆-自定义老婆', pm=1, priority=2)
 assign_wife_sv = SV('今日老婆-分配老婆', priority=2)
-assign_husband_sv = SV('今日老婆-分配老公', pm=3, priority=2)
+assign_husband_sv = SV('今日老婆-分配老公', priority=2)
 loli_manage_sv = SV('今日老婆-萝莉图库管理', pm=1, priority=2)
 image_upload_sv = SV('今日老婆-图片上传', priority=2)
 specify_wife_sv = SV('今日老婆-指定老婆', priority=2)
@@ -350,33 +350,27 @@ def _can_upload_images(ev: Event) -> bool:
 
 
 def _can_assign_wife(ev: Event) -> bool:
-    return _is_master(ev) or can_use_pm_or_whitelisted_feature(
+    # SV 层不能锁 pm（否则框架会在进处理器前把白名单普通群员一并挡掉），而未锁 pm
+    # 的 SV 默认值为 6（普通群员），若再拿 user_pm <= sv.pm 比较就会退化成全员放行；
+    # 因此分配与指定一律在业务门内收敛为「机器人主人或对应白名单」。
+    return _is_master(ev) or can_use_whitelisted_feature(
         ev.user_id,
-        ev.user_pm,
-        assign_wife_sv.pm,
         (),
         _cfg('DailyWifeAssignWhitelist'),
     )
 
 
 def _can_assign_husband(ev: Event) -> bool:
-    # 与分配老婆共用同一份白名单，但遵循「今日老婆-分配老公」服务卡的权限。
-    return _is_master(ev) or can_use_pm_or_whitelisted_feature(
+    return _is_master(ev) or can_use_whitelisted_feature(
         ev.user_id,
-        ev.user_pm,
-        assign_husband_sv.pm,
         (),
         _cfg('DailyWifeAssignWhitelist'),
     )
 
 
 def _can_specify_wife(ev: Event) -> bool:
-    # 与「今日老婆-指定老婆」服务卡共用同一套权限：控制台把该服务设为群主/群管理
-    # 后，达到该权限的用户即可指定角色；白名单仍是独立的放行路径。
-    return _is_master(ev) or can_use_pm_or_whitelisted_feature(
+    return _is_master(ev) or can_use_whitelisted_feature(
         ev.user_id,
-        ev.user_pm,
-        specify_wife_sv.pm,
         (),
         _cfg('DailyWifeSpecifyWhitelist'),
     )

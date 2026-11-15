@@ -1,8 +1,10 @@
 """分配老公：命令入口、权限门与记录桶必须与分配老婆对称。
 
-历史上有分配老婆但没有分配老公；该能力在 2026-09-30 补入，后因上游同步丢失。
-本文件把该能力的入口、权限与落库位置固定下来，避免再次被同步覆盖后无人发现。
+SV 层与分配老婆同样不锁 `pm`，统一交由 `_can_assign_husband` 按「主人或分配白名单」判定，
+否则白名单内的普通群员（user_pm=6）会在进入处理器前就被框架拦截。
 """
+
+from __future__ import annotations
 
 import ast
 import json
@@ -16,6 +18,15 @@ SHARED_PATH = ROOT / 'TodayWaifu' / 'shared.py'
 DAILY_PATH = ROOT / 'TodayWaifu' / 'daily.py'
 UPLOAD_ACCESS_PATH = ROOT / 'TodayWaifu' / 'upload_access.py'
 HELP_PATH = ROOT / 'help.json'
+
+
+class _FakeSV:
+    """复刻 GsCore `SV` 默认 `pm=6` 的构造语义，防止桩对象掩盖默认权限。"""
+
+    def __init__(self, name: str = '', pm: int = 6, priority: int = 5, **kwargs: object) -> None:
+        self.name = name
+        self.pm = pm
+        self.priority = priority
 
 
 def _source(path: Path) -> str:
@@ -39,24 +50,32 @@ def _load_upload_access():
     return module
 
 
-def _load_assign_husband_gate(required_pm: int, whitelist):
+def _load_assign_husband_runtime(whitelist: object):
     tree = ast.parse(_source(SHARED_PATH))
+    sv_assign = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == 'assign_husband_sv' for t in node.targets)
+    )
     function = next(
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == '_can_assign_husband'
     )
     future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
-    module = ast.Module(body=[future, function], type_ignores=[])
+    module = ast.Module(body=[future, sv_assign, function], type_ignores=[])
     ast.fix_missing_locations(module)
-    namespace = {
+    access = _load_upload_access()
+    namespace: dict[str, object] = {
+        'SV': _FakeSV,
         '_is_master': lambda ev: str(ev.user_id) == '10000',
-        'can_use_pm_or_whitelisted_feature': _load_upload_access().can_use_pm_or_whitelisted_feature,
-        'assign_husband_sv': SimpleNamespace(pm=required_pm),
-        '_cfg': lambda key: whitelist,
+        'can_use_whitelisted_feature': access.can_use_whitelisted_feature,
+        'normalized_user_ids': access.normalized_user_ids,
+        '_cfg': lambda key: whitelist if key == 'DailyWifeAssignWhitelist' else [],
     }
     exec(compile(module, str(SHARED_PATH), 'exec'), namespace)  # noqa: S102
-    return namespace['_can_assign_husband']
+    return namespace['assign_husband_sv'], namespace['_can_assign_husband']
 
 
 def _event(user_id: str, user_pm: int) -> SimpleNamespace:
@@ -64,23 +83,24 @@ def _event(user_id: str, user_pm: int) -> SimpleNamespace:
 
 
 class AssignHusbandTests(unittest.TestCase):
-    def test_husband_assign_service_is_registered_separately(self) -> None:
-        self.assertIn(
-            "assign_husband_sv = SV('今日老婆-分配老公', pm=3, priority=2)",
-            _source(SHARED_PATH),
-        )
+    def test_husband_assign_service_does_not_lock_pm_at_framework_layer(self) -> None:
+        sv, _ = _load_assign_husband_runtime(whitelist=[])
+        self.assertEqual(sv.name, '今日老婆-分配老公')
+        self.assertEqual(sv.priority, 2)
+        self.assertEqual(sv.pm, 6, '分配老公的 SV 不能锁 pm，否则白名单普通群员会被框架提前拦截')
 
-    def test_group_admin_passes_assign_husband_gate(self) -> None:
-        gate = _load_assign_husband_gate(required_pm=3, whitelist=[])
-        self.assertTrue(gate(_event('20001', 3)))
-
-    def test_normal_member_is_rejected_by_assign_husband_gate(self) -> None:
-        gate = _load_assign_husband_gate(required_pm=3, whitelist=[])
-        self.assertFalse(gate(_event('30001', 6)))
+    def test_master_passes_assign_husband_gate(self) -> None:
+        _, gate = _load_assign_husband_runtime(whitelist=[])
+        self.assertTrue(gate(_event('10000', 6)))
 
     def test_whitelisted_member_passes_assign_husband_gate(self) -> None:
-        gate = _load_assign_husband_gate(required_pm=3, whitelist=['30001'])
+        _, gate = _load_assign_husband_runtime(whitelist=['30001'])
         self.assertTrue(gate(_event('30001', 6)))
+
+    def test_unlisted_members_and_admins_are_rejected_by_assign_husband_gate(self) -> None:
+        _, gate = _load_assign_husband_runtime(whitelist=[])
+        self.assertFalse(gate(_event('30001', 6)))
+        self.assertFalse(gate(_event('20001', 3)))
 
     def test_handler_reads_husband_candidates_and_writes_husbands_bucket(self) -> None:
         source = _function_source(DAILY_PATH, '_send_assign_husband')
