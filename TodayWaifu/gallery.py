@@ -381,7 +381,7 @@ async def _download_image(url: str) -> bytes:
     """下载图库图片；按 URL 归一化后的哈希落盘缓存，并合并相同 URL 的并发下载。
 
     归一化由 `file_cache` 负责：图库为每张图附加的短期签名随周期轮换，若以原始 URL 为
-    缓存键，签名一变即视为新资源，既使预热成果全部失效，也会在磁盘上重复保存同一张图。
+    缓存键，签名一变即视为新资源，会在磁盘上重复保存同一张图。
 
     并发合并以 URL 为键共享同一个 Task，使同一张图只下载一次；合并的前提是下载任务
     独立于任何等待方，因此单个等待者超时或取消不会中断共享任务，其余等待者仍能取到
@@ -583,8 +583,7 @@ async def _load_candidates(mode: str = 'wife') -> tuple[tuple[RoleCandidate, ...
     if role_mode == 'nte':
         return await _load_nte_candidates()
     if role_mode == 'pgr':
-        # 战双必须走专属加载器：此前该模式落入鸣潮分支，因缺少对应 ID 对照表而必然报错，
-        # 零点预热在此模式下完全空转
+        # 战双必须走专属加载器：此前该模式落入鸣潮分支，因缺少对应 ID 对照表而必然报错
         pgr_candidates = await _load_pgr_wife_candidates()
         if not pgr_candidates:
             return None, '战双老婆图库里还没有可用图片。'

@@ -183,15 +183,6 @@ class SourceSwitchWiringTests(unittest.TestCase):
         loli = (PACKAGE / 'loli.py').read_text(encoding='utf-8')
         self.assertIn("_loli_api_url() if _image_source('loli') == 'gallery' else ''", loli)
 
-    def test_prefetch_only_preheats_switches_that_use_the_gallery(self) -> None:
-        # 预热只对走图库的功能有意义：对 local 模式预热会凭空下载图片，既浪费带宽，
-        # 也把本应完全离线的模式拉回网络依赖。
-        prefetch = (PACKAGE / 'prefetch.py').read_text(encoding='utf-8')
-        body = prefetch[prefetch.index('async def _prefetch_once(') : prefetch.index('def _prefetch_modes(')]
-        self.assertIn("if _image_source(mode) == 'gallery'", body)
-        self.assertIn('for mode in modes:', body)
-
-
 class PgrBehaviourTests(unittest.TestCase):
     """行为级验证：local 完全不碰网络，gallery 优先远程、失败才回退本地。"""
 

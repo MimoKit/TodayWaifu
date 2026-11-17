@@ -326,9 +326,6 @@ __all__ = [
 _CACHE_MAINTENANCE_TASK: asyncio.Task[None] | None = None
 
 
-_PREFETCH_TASK: asyncio.Task[None] | None = None
-
-
 def _is_master(ev: Event) -> bool:
     masters = core_config.get_config('masters')
     if not isinstance(masters, list):
@@ -490,32 +487,35 @@ async def _stop_blocking_executor_on_shutdown() -> None:
     shutdown_blocking_executor()
 
 
-@on_core_start_before(priority=-60)
-async def _start_gallery_prefetch_on_startup() -> None:
-    """启动预热循环与图片投递 worker，并从磁盘恢复已缓存图片索引。
+async def restore_cached_url_index() -> int:
+    """启动时用缓存目录重建「已缓存 URL」索引，返回恢复的条目数。
 
-    索引只驻留内存，重启后必须重建：否则 `prefer_cached_urls` 退化为全量随机，
-    前一天预热过的图片等于白热。
+    该索引只驻留内存，重启后为空，`prefer_cached_urls` 随即退化为全量随机。
+    文件名即缓存键，一次目录遍历即可还原，无需读盘或重新下载。
     """
-    global _PREFETCH_TASK
-    from .prefetch import PREFETCH_TASK_NAME, _prefetch_loop, prefetch_task_running, restore_cached_url_index
+    from .paths import _gallery_image_cache_root
+    from .file_cache import rebuild_cached_url_index
 
+    try:
+        count = await run_blocking(rebuild_cached_url_index, _gallery_image_cache_root())
+    except OSError as exc:
+        logger.warning(f'{LOG_PREFIX} 重建图库缓存索引失败: {exc}')
+        return 0
+    if count:
+        logger.info(f'{LOG_PREFIX} 已恢复图库缓存索引 {count} 项')
+    return count
+
+
+@on_core_start_before(priority=-60)
+async def _start_gallery_services_on_startup() -> None:
+    """启动图片投递 worker，并从磁盘恢复已缓存图片索引。
+
+    索引只驻留内存，重启后必须重建：否则 `prefer_cached_urls` 退化为全量随机。
+    """
     start_image_delivery_workers()
     await restore_cached_url_index()
-    if _PREFETCH_TASK is not None and not _PREFETCH_TASK.done():
-        return
-    # 插件热重载会丢掉模块级句柄，靠任务名认出上一份循环，避免两个循环同时下载
-    if prefetch_task_running():
-        return
-    _PREFETCH_TASK = asyncio.create_task(_prefetch_loop(), name=PREFETCH_TASK_NAME)
 
 
 @on_core_shutdown
-async def _stop_gallery_prefetch_on_shutdown() -> None:
-    global _PREFETCH_TASK
-    task = _PREFETCH_TASK
-    _PREFETCH_TASK = None
-    if task is not None and not task.done():
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+async def _stop_gallery_services_on_shutdown() -> None:
     await stop_image_delivery_workers()

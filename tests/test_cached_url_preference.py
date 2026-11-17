@@ -1,8 +1,7 @@
-"""预热命中率契约：抽签候选集必须收敛到磁盘上已有的图片。
+"""缓存命中契约：抽签候选集必须收敛到磁盘上已有的图片。
 
-预热按角色只下载前几张图（默认 2 张）。提交 40af9d1 之前，抽签直接取
-`rng.choice(role.images)`，角色有 10 张图时预热仅覆盖 20%，其余 80% 仍在零点高发期
-走网络下载，预热投入没有转化为冷启动下载量的下降。
+提交 40af9d1 之前，抽签直接取 `rng.choice(role.images)`，抽到未缓存的图就必须
+在发送时走网络下载。优先从已缓存图片里挑，能直接命中的就不必再下载。
 
 本文件守护两层契约：内存 URL 索引在写入、命中读、过期删除与容量溢出四条路径上都必须
 与磁盘状态一致；挑选函数在无缓存时必须退回全量，保持与既有实现同种子逐次一致。
@@ -55,7 +54,7 @@ class CachedUrlIndexTests(unittest.TestCase):
             file_cache.clear_cached_url_index()
             self.assertFalse(file_cache.is_url_cached('https://x/b.png'))
 
-            # 重启后进程内索引为空，若读命中不回填，预热过的图片在索引里等同于不存在，
+            # 重启后进程内索引为空，若读命中不回填，已缓存的图片在索引里等同于不存在，
             # 首次抽签的偏好判定会整体退化
             self.assertIsNotNone(file_cache.read_url_cache(root, 'https://x/b.png'))
             self.assertTrue(file_cache.is_url_cached('https://x/b.png'), '命中读也要记进索引')

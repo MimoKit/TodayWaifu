@@ -91,8 +91,7 @@ def canonical_url(url: str) -> str:
     """剔除随时间变化的授权参数，得到可长期复用的资源标识。
 
     图库常为图片 URL 附加短期签名（`?e=<过期>&s=<签名>`）：签名按周期轮换，图片本身
-    并未改变。若直接以原始 URL 作缓存键，签名一换即导致整库缓存失效——零点前的预热
-    全部作废，磁盘还会按新键把同一张图片重复保存一份。
+    并未改变。若直接以原始 URL 作缓存键，签名一换即导致整库缓存失效，磁盘还会按新键把同一张图片重复保存一份。
 
     仅剔除 `_VOLATILE_QUERY_PARAMS` 中已知的易变参数，其余参数原样保留，以免把语义
     不同的资源错误归并为同一缓存键；不含易变参数时原样返回，故旧式无签名 URL 的缓存
@@ -135,9 +134,7 @@ def url_hash_cache_path(cache_root: Path, url: str) -> Path:
 
 
 # ── 已缓存 URL 索引 ───────────────────────────────────────────────────────────
-# 零点前的预热只覆盖每个角色的前几张图，而抽签为 `rng.choice(role.images)`：
-# 角色有 10 张图、仅预热 2 张时命中率只有 20%，其余 80% 仍在零点访问网络。
-# 此索引记录磁盘上已存在哪些图，抽签时优先从中挑选，使预热命中率达到 100%
+# 此索引记录磁盘上已存在哪些图，抽签时优先从中挑选，减少发送阶段的网络下载
 # （随机性保留，仅将随机范围收敛到已缓存集合）。
 _CACHED_URL_HASHES: set[str] = set()
 
@@ -155,8 +152,8 @@ def _remember_cached_url(url: str) -> None:
 def has_url_cache(cache_root: Path, url: str) -> bool:
     """只判断图片是否已落盘，不读取内容。
 
-    预热只关心「还要不要下载」：命中时若顺手把整张图读进内存再哈希、再压一遍，
-    一次重启补跑就会按张数累积出可观的读盘与 CPU。
+    调用方只关心「还要不要下载」：命中时若顺手把整张图读进内存再哈希、再压一遍，
+    按张数累积会产生可观的读盘与 CPU。
     """
     path = url_hash_cache_path(cache_root, url)
     try:
@@ -179,8 +176,8 @@ def _is_url_cache_name(name: str) -> bool:
 def rebuild_cached_url_index(cache_root: Path, limit: int = CACHED_URL_INDEX_MAX) -> int:
     """用缓存目录里的文件名重建「已缓存 URL」索引，返回恢复的条目数。
 
-    索引只驻留内存，进程重启后为空，`prefer_cached_urls` 随即退化为全量随机——
-    预热过的图片等于白热。文件名本身就是缓存键，一次目录遍历即可还原，无需读盘。
+    索引只驻留内存，进程重启后为空，`prefer_cached_urls` 随即退化为全量随机。
+    文件名本身就是缓存键，一次目录遍历即可还原，无需读盘。
     """
     if limit <= 0 or not cache_root.is_dir():
         return 0
