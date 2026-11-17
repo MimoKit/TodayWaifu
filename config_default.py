@@ -84,12 +84,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '开启后“今日老婆”指令使用普通老婆远程图库，遵循今日老婆限制',
         False,
     ),
-    'DailyWifePrefetchEnabled': GsBoolConfig(
-        '零点前预热图库图片',
-        '每天 23:20 开始按低速率把候选角色图片预先下载到本地缓存，避免 0 点日期翻转后全员同时下载造成卡顿；'
-        '仅图库模式生效，限时限量且可被取消，同一天最多预热一次（重启不会重跑整库下载）',
-        False,
-    ),
     'DailyWifeGalleryCacheMaxMB': GsIntConfig(
         '图库缓存容量上限(MB)',
         '本地图库图片缓存的总容量上限，超出后自动淘汰最旧的文件；设为 0 表示不限制',
@@ -101,12 +95,6 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         '超过该天数的每日老婆记录会被定期清理，避免数据表随天数无限增长；设为 0 表示永久保留',
         30,
         3650,
-    ),
-    'DailyWifePrefetchImagesPerRole': GsIntConfig(
-        '每个角色预热图片数',
-        '预热时每个角色最多下载几张图。数值越大命中率越高、占用带宽越多；设为 0 可只保留开关效果',
-        2,
-        20,
     ),
     'DailyWifeNormalTextTemplate': GsStrConfig(
         '今日普通老婆文字模板',
